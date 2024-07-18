@@ -1,6 +1,9 @@
 # setup workspace
 setwd("~/Desktop")
+#install.packages("stringr")
 library(stringr)
+
+# make sure to download the most current daily check data before running this script
 
 # read data
 bags <- read.csv("GOEEL-eelgrass-Sweden-exp_Bags.csv")
@@ -18,7 +21,7 @@ dead_bags <- bags[which(bags$bagKey %in% dead),]$bagnum_num
 date <- str_split_fixed(daily$dailyTimestamp, " ", n = 2)
 daily$date <- date[,1]
 
-# filter data to only today's date (TO DO - or can do this in spreadsheet before upload to R)
+# filter data to only today's date
 daily_today <- daily[(daily$date == "7/18/2024"),] # change for today's date
 
 # merge daily and bags
