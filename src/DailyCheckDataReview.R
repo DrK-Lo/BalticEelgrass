@@ -2,6 +2,7 @@
 setwd("~/Desktop")
 #install.packages("stringr")
 library(stringr)
+library(lubridate)
 
 # make sure to download the most current daily check data before running this script
 
@@ -17,9 +18,13 @@ daily
 date <- str_split_fixed(daily$dailyTimestamp, " ", n = 2)
 daily$date <- date[,1]
 
+# reformat date
+newdate <- strptime(as.character(daily$date), "%m/%d/%Y")
+daily$dateformatted <- format(newdate, "%Y-%m-%d")
+
 # filter data to only today's date
-daily_today <- daily[(daily$date == "7/18/2024"),] # change for today's date
-daily_prev <- daily[!(daily$date == "7/18/2024"),] # change for today's date
+daily_today <- daily[(daily$dateformatted == Sys.Date()),] # can also replace Sys.Date() with date of interest
+daily_prev <- daily[!(daily$dateformatted == Sys.Date()),] # can also replace Sys.Date() with date of interest
 
 # which individuals are dead today?
 dead <- daily_today[which(daily_today$isAlive == FALSE),]$bagKey
