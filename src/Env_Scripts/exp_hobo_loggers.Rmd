@@ -1,0 +1,359 @@
+---
+title: "env_dat_experiment"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Eelgrass/BalticEelgrass/data")
+```
+
+## Experimental Data
+
+We used HOBO loggers to keep track of the temperature in all of the mesocosm tanks throughout the experiment - these mesocosm temperatures will be what I use to calculate mean, min, and max temperature in each treatment for offset calculation. It is important to know that I must match the environmental variables used in genomic offset training to those used in calculation, so the actual variables I will include in offset calculation will be mean and max temperature, as well as mean and minimum salinity (these latter two will be the same, as salinity was held constant throughout the experimental period.)
+
+Salinity does not need to be calculated, but temperature does. I will thus want to start by processing temperature in each tank, as I will likely have tank effects, before calculating averages across treatments. Each tank had three HOBO loggers deployed, which outputs its own csv file with entries logged every 15 minutes.
+
+### Setup and formatting
+
+I need to read in all the data from the mesocosm loggers.
+
+```{r}
+# mesocosm environmental data is read in seperately because there are so many files for each HOBO logger
+setup <- as.data.frame(read.csv("experiment/GOEEL-eelgrass-Sweden-exp - Setup.csv"))
+A1a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A1a.xlsx"))[,-1]
+A1b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A1b.xlsx"))[,-1]
+A1c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A1c.xlsx"))[,-1]
+A2a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A2a.xlsx"))[,-1]
+A2b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A2b.xlsx"))[,-1]
+A2c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A2c.xlsx"))[,-1]
+A3a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A3a.xlsx"))[,-1]
+A3b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A3b.xlsx"))[,-1]
+A3c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A3c.xlsx"))[,-1]
+A4a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A4a.xlsx"))[,-1]
+A4b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A4b.xlsx"))[,-1]
+A4c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A4c.xlsx"))[,-1]
+B1a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B1a.xlsx"))[,-1]
+B1b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B1b.xlsx"))[,-1]
+B1c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B1c.xlsx"))[,-1]
+B2a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B2a.xlsx"))[,-1]
+B2b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B2b.xlsx"))[,-1]
+B2c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B2c.xlsx"))[,-1]
+B3a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B3a.xlsx"))[,-1]
+B3b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B3b.xlsx"))[,-1]
+B3c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B3c.xlsx"))[,-1]
+B4a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B4a.xlsx"))[,-1]
+B4b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B4b.xlsx"))[,-1]
+B4c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B4c.xlsx"))[,-1]
+C1a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C1a.xlsx"))[,-1]
+C1b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C1b.xlsx"))[,-1]
+C1c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C1c.xlsx"))[,-1]
+C2a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C2a.xlsx"))[,-1]
+C2b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C2b.xlsx"))[,-1]
+C2c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C2c.xlsx"))[,-1]
+C3a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C3a.xlsx"))[,-1]
+C3b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C3b.xlsx"))[,-1]
+C3c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C3c.xlsx"))[,-1]
+C4a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C4a.xlsx"))[,-1]
+C4b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C4b.xlsx"))[,-1]
+C4c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C4c.xlsx"))[,-1]
+gas <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/gas2024.xlsx"))[,-1]
+
+# experimental individuals
+setup <- read.csv("experiment/GOEEL-eelgrass-Sweden-exp - Setup.csv")
+```
+
+
+### Pre=processing
+
+I need to first clean the dataset to only contain the dates when the experiment was actively running. The experiment started 07/03/2024 at ~9:00:00am, so I need to remove entries from before this time point. I also want to remove data from end point of experiment, so after 08/07/2024. Once I have done this, I will add information about which logger and tank data is associated with. Then, I will combine all this information into a single data frame. 
+
+```{r}
+# change colnames to be more usable
+colnames(gas) <- colnames(A1a) <- colnames(A1b) <- colnames(A1c) <- colnames(A2a) <- colnames(A2b) <- colnames(A2c) <- colnames(A3a) <- colnames(A3b) <- colnames(A3c) <- colnames(A4a) <- colnames(A4b) <- colnames(A4c) <- colnames(B1a) <- colnames(B1b) <- colnames(B1c) <- colnames(B2a) <- colnames(B2b) <- colnames(B2c) <- colnames(B3a) <- colnames(B3b) <- colnames(B3c) <- colnames(B4a) <- colnames(B4b) <- colnames(B4c) <- colnames(C1a) <- colnames(C1b) <- colnames(C1c) <- colnames(C2a) <- colnames(C2b) <- colnames(C2c) <- colnames(C3a) <- colnames(C3b) <- colnames(C3c) <- colnames(C4a) <- colnames(C4b) <- colnames(C4c) <- c("datetime","temp","light")
+
+# trim
+A1a_trim <- A1a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A1b_trim <- A1b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A1c_trim <- A1c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+A2a_trim <- A2a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A2b_trim <- A2b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A2c_trim <- A2c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+A3a_trim <- A3a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A3b_trim <- A3b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A3c_trim <- A3c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+A4a_trim <- A4a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A4b_trim <- A4b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A4c_trim <- A4c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+B1a_trim <- B1a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B1b_trim <- B1b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B1c_trim <- B1c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+B2a_trim <- B2a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B2b_trim <- B2b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B2c_trim <- B2c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+B3a_trim <- B3a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B3b_trim <- B3b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B3c_trim <- B3c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+B4a_trim <- B4a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B4b_trim <- B4b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B4c_trim <- B4c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+C1a_trim <- C1a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C1b_trim <- C1b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C1c_trim <- C1c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+C2a_trim <- C2a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C2b_trim <- C2b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C2c_trim <- C2c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+C3a_trim <- C3a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C3b_trim <- C3b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C3c_trim <- C3c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+C4a_trim <- C4a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C4b_trim <- C4b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C4c_trim <- C4c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+gas_trim <- gas %>% filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+# also add column for tank and logger
+# A tanks
+A1a_trim$logger <- "A1a"
+A1a_trim$tank <- "A1"
+A1b_trim$logger <- "A1b"
+A1b_trim$tank <- "A1"
+A1c_trim$logger <- "A1c"
+A1c_trim$tank <- "A1"
+A2a_trim$logger <- "A2a"
+A2a_trim$tank <- "A2"
+A2b_trim$logger <- "A2b"
+A2b_trim$tank <- "A2"
+A2c_trim$logger <- "A2c"
+A2c_trim$tank <- "A2"
+A3a_trim$logger <- "A3a"
+A3a_trim$tank <- "A3"
+A3b_trim$logger <- "A3b"
+A3b_trim$tank <- "A3"
+A3c_trim$logger <- "A3c"
+A3c_trim$tank <- "A3"
+A4a_trim$logger <- "A4a"
+A4a_trim$tank <- "A4"
+A4b_trim$logger <- "A4b"
+A4b_trim$tank <- "A4"
+A4c_trim$logger <- "A4c"
+A4c_trim$tank <- "A4"
+
+B1a_trim$logger <- "B1a"
+B1a_trim$tank <- "B1"
+B1b_trim$logger <- "B1b"
+B1b_trim$tank <- "B1"
+B1c_trim$logger <- "B1c"
+B1c_trim$tank <- "B1"
+B2a_trim$logger <- "B2a"
+B2a_trim$tank <- "B2"
+B2b_trim$logger <- "B2b"
+B2b_trim$tank <- "B2"
+B2c_trim$logger <- "B2c"
+B2c_trim$tank <- "B2"
+B3a_trim$logger <- "B3a"
+B3a_trim$tank <- "B3"
+B3b_trim$logger <- "B3b"
+B3b_trim$tank <- "B3"
+B3c_trim$logger <- "B3c"
+B3c_trim$tank <- "B3"
+B4a_trim$logger <- "B4a"
+B4a_trim$tank <- "B4"
+B4b_trim$logger <- "B4b"
+B4b_trim$tank <- "B4"
+B4c_trim$logger <- "B4c"
+B4c_trim$tank <- "B4"
+
+C1a_trim$logger <- "C1a"
+C1a_trim$tank <- "C1"
+C1b_trim$logger <- "C1b"
+C1b_trim$tank <- "C1"
+C1c_trim$logger <- "C1c"
+C1c_trim$tank <- "C1"
+C2a_trim$logger <- "C2a"
+C2a_trim$tank <- "C2"
+C2b_trim$logger <- "C2b"
+C2b_trim$tank <- "C2"
+C2c_trim$logger <- "C2c"
+C2c_trim$tank <- "C2"
+C3a_trim$logger <- "C3a"
+C3a_trim$tank <- "C3"
+C3b_trim$logger <- "C3b"
+C3b_trim$tank <- "C3"
+C3c_trim$logger <- "C3c"
+C3c_trim$tank <- "C3"
+C4a_trim$logger <- "C4a"
+C4a_trim$tank <- "C4"
+C4b_trim$logger <- "C4b"
+C4b_trim$tank <- "C4"
+C4c_trim$logger <- "C4c"
+C4c_trim$tank <- "C4"
+
+all_tanks <- rbind(A1a_trim,A1b_trim,A1c_trim,A2a_trim,A2b_trim,A2c_trim,A3a_trim,A3b_trim,A3c_trim,A4a_trim,A4b_trim,A4c_trim,B1a_trim,B1b_trim,B1c_trim,B2a_trim,B2b_trim,B2c_trim,B3a_trim,B3b_trim,B3c_trim,B4a_trim,B4b_trim,B4c_trim,C1a_trim,C1b_trim,C1c_trim,C2a_trim,C2b_trim,C2c_trim,C3a_trim,C3b_trim,C3c_trim,C4a_trim,C4b_trim,C4c_trim)
+```
+
+Now I want to calculate summary statistics for each tank and each treatment, specifically I am looking for average temperature
+
+```{r}
+# summarize by tank
+tank_temps <- all_tanks %>% group_by(tank) %>%
+  summarise(mean_temp = mean(temp),
+            min_temp = min(temp),
+            max_temp = max(temp),
+            sd_temp = sd(temp))
+
+# notice that max temp of logger C3c spiked in the beginning of the experiment in a way that does not fit with the other two loggers, trim these data then re-do this bit
+# remove those funky rows
+all_tanks_trim <- all_tanks[-(108035:108044),]
+
+# re-summarize by tank
+tank_temps <- all_tanks_trim %>% group_by(tank) %>%
+  summarise(mean_temp = mean(temp),
+            min_temp = min(temp),
+            max_temp = max(temp),
+            sd_temp = sd(temp))
+
+# add a column for heat/ctrl
+control <- c("A1","A2","C1","C2","C3","C4")
+all_tanks_trim$trt <- ifelse(all_tanks_trim$tank %in% control, "ctrl", "heat")
+
+# summarize by trt
+trt_temps <- all_tanks_trim %>% group_by(trt) %>%
+  summarise(mean_temp = mean(temp),
+            min_temp = min(temp),
+            max_temp = max(temp),
+            sd_temp = sd(temp))
+
+# save these data
+write.csv(tank_temps, "EnvDat/temp_tanks_summary.csv")
+write.csv(trt_temps, "EnvDat/temp_trts_summary.csv")
+
+# compare to meadow
+gas_temps <- data.frame(meadow = "gas", min_temp = min(gas_trim$temp), max_temp = max(gas_trim$temp), avg_temp = mean(gas_trim$temp), sd_temp = sd(gas_trim$temp))
+
+# we have a small time series where the logger experienced temps 10 degrees above any other recorded and light was high enough to suggest it was out of the water, remove these
+gas_temps <- data.frame(meadow = "gas", min_temp = min(gas_trim[which(gas_trim$temp < 35),]$temp), max_temp = max(gas_trim[which(gas_trim$temp < 35),]$temp), avg_temp = mean(gas_trim[which(gas_trim$temp < 35),]$temp), sd_temp = sd(gas_trim[which(gas_trim$temp < 35),]$temp))
+
+gas_temps # everything lines up well with the control tanks!
+```
+
+Great, now I need to get this data into a format where it is matched with all experimental individuals. 
+
+```{r}
+# individuals are stored in setup data
+setup
+
+# remove practice
+setup_trim <- setup[!setup$bagKey == "F054C074", c("setupKey","setupLabel","bagKey")]
+
+# get labels
+exp_labels <- str_split_fixed(setup_trim$setupLabel, "07/", 2)[,1]
+
+# split this into a larger dataframe
+exp_df <- as.data.frame(str_split_fixed(exp_labels, "_", 5))
+colnames(exp_df) <- c("bagnum","tank","pop","genet","trt")
+exp_df$ind <- paste0(exp_df$pop,"_",exp_df$genet)
+
+# now format environmental data by treatment
+trt_env_dat <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"), max_temp = c(temps_trt_sum[temps_trt_sum$trt == "ctrl",]$max_temp, temps_trt_sum[temps_trt_sum$trt == "ctrl",]$max_temp, temps_trt_sum[temps_trt_sum$trt == "heat",]$max_temp, temps_trt_sum[temps_trt_sum$trt == "heat",]$max_temp), avg_temp = c(temps_trt_sum[temps_trt_sum$trt == "ctrl",]$avg_temp, temps_trt_sum[temps_trt_sum$trt == "ctrl",]$avg_temp, temps_trt_sum[temps_trt_sum$trt == "heat",]$avg_temp, temps_trt_sum[temps_trt_sum$trt == "heat",]$avg_temp), min_sal = c(21, 7, 16, 5), avg_sal = c(21, 7, 16, 5))
+
+# and combine
+exp_ind_env <- merge(exp_df, trt_env_dat, by = c("trt"))
+
+# order this by bagnum
+exp_env_ord <- exp_ind_env[order(as.numeric(exp_ind_env$bagnum)),]
+
+# also need pop/trt level
+pops <- unique(levels(as.factor(exp_env_ord$pop)))
+trt <- unique(levels(as.factor(exp_env_ord$trt)))
+pop_trt_df <- expand.grid(pops, trt)
+colnames(pop_trt_df) <- c("pop","trt")
+pop_trt_env <- merge(pop_trt_df, trt_env_dat, by = c("trt"))
+
+# save both the indiv and pop level env dfs
+write.csv(exp_env_ord, "EnvDat/indiv_trt_env_dat.csv")
+write.csv(pop_trt_env, "EnvDat/pop_trt_env_dat.csv")
+```
+
+Finally, I need to standardize all the environmental data.
+
+```{r}
+# quick data inspection
+head(exp_env_ord)
+head(pop_trt_env)
+
+# scale
+exp_env_ord_std <- scale(exp_env_ord[,7:10])
+pop_trt_env_std <- scale(pop_trt_env[,3:6])
+colnames(exp_env_ord_std) <- colnames(pop_trt_env_std) <-  c("max_temp_scaled", "temp_scaled", "min_sal_scaled", "sal_scaled")
+
+# attach scaled information back to env dfs
+exp_env_ord_scaled <- as.data.frame(cbind(exp_env_ord[,1:6], exp_env_ord_std))
+pop_trt_env_scaled <- as.data.frame(cbind(pop_trt_env[,1:2], pop_trt_env_std))
+
+# keep track of scaling factors
+exp_env_ord_scale <- attr(exp_env_ord_std, "scaled:scale")
+exp_env_ord_center <- attr(exp_env_ord_std, "scaled:center")
+pop_trt_env_scale <- attr(pop_trt_env_std, "scaled:scale")
+pop_trt_env_center <- attr(pop_trt_env_std, "scaled:center")
+
+# put those scaling factors into their own df
+scaling <- as.data.frame(rbind(exp_env_ord_scale, exp_env_ord_center, pop_trt_env_scale, pop_trt_env_center))
+scaling$factor_type <- rownames(scaling)
+rownames(scaling) <- NULL
+scaling
+
+# write all of this information out to csv for any future analysis
+write.csv(exp_env_ord_scaled, "EnvDat/Ind_Exp_Env_030725.csv")
+write.csv(pop_trt_env_scaled, "EnvDat/Pop_Exp_Env_030725.csv")
+write.csv(scaling, "EnvDat/Env_Exp_ScalingFactors_030725.csv")
+```

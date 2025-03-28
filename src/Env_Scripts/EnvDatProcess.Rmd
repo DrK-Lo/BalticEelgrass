@@ -1,0 +1,820 @@
+---
+title: "EelgrassEnvDataProcessing"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Eelgrass/BalticEelgrass/data")
+```
+
+# Environmental Data Processing
+
+This script is for processing environmental data for genomic offset calculation of the project "VR_Zostera_genomic_offset." It includes processing of the seascape data used to train offset models, as well as processing of the mesocosm environmental data used to make final offset predictions. 
+
+## Seascape Data
+
+This data was already compiled by Steffi Ries & Marlene Jahnke to run GEAs. I am just processing it to be in formats compatible with LEA, RDA, and GF. More details about how this data was processed to find these averages can be found [here](https://drive.google.com/drive/u/0/folders/1CNLeIIg3IUlEkCgfIC6P8k9tesJ-BNtq).
+
+### Setup & Formatting
+
+I have already set my working directory in the setup chunk to be the "data" folder in the larger eelgrass directory. Now I need to include certain libraries and load relevant data files. 
+
+```{r}
+# packages
+library(BiocManager) # needed to download specific packages
+library(readxl) # reading xlsx files
+library(LEA) # landscape genomics
+library(psych) # environmental data cleaning
+library(vegan) # environmental data cleaning
+library(tidyr) # data cleaning
+library(dplyr) # data cleaning
+library(stringr) # data cleaning
+library(ggplot2) # plotting
+library(s2) # mapping
+library(rnaturalearth) # mapping
+library(rnaturalearthdata) # mapping
+library(maps) # mapping
+library(ggspatial) # mapping
+
+# data
+seascape_dat <- read.csv("EnvDat/summary_env_data_meadows_GEA.csv") # seascape env data
+indiv_list <- read_excel("seascape_data/MLL_per_individual_list.xlsx") # seascape individuals data
+
+# seascape env data reads in funky, change column names and remove first row
+colnames(seascape_dat) <- seascape_dat[1,]
+seascape_dat <- seascape_dat[-1,]
+```
+
+Data is now loaded, but I need make some formatting changes so that it's more usable.
+
+```{r}
+# the column names have spaces in them, change names to be more code friendly
+colnames(seascape_dat) <- c("region","site_full","Pop","long","lat","temp_curr","sal_curr","temp_8.5","sal_8.5","max_temp_curr","min_sal_curr")
+
+# also deal with lat/long
+seascape_dat$long <- as.numeric(gsub(",", ".", gsub("\\.", "", seascape_dat$long)))
+seascape_dat$lat <- as.numeric(gsub(",", ".", gsub("\\.", "", seascape_dat$lat)))
+
+# and ensure consistency in site abbreviations by getting rid of funky characters
+seascape_dat$Pop[seascape_dat$Pop == "ÅLA"] <- "ALA"
+seascape_dat$Pop[seascape_dat$Pop == "BÅD"] <- "BAD"
+```
+
+
+### Pre-processing
+
+Now that I have environmental data for all my sites in a coding-friendly format, I need to figure out which of these variables should be included in my model. To do so, I will make sure that I don't have any variables that are too correlated. I should also separate out the "future" environmental data from the dataset I want to use for training offsets.
+
+```{r}
+# start by splitting current and future data
+curr <- seascape_dat[,c("region","site_full","Pop","long","lat","temp_curr","max_temp_curr","sal_curr","min_sal_curr")]
+fut <- seascape_dat[,c("region","site_full","Pop","long","lat","temp_8.5","sal_8.5")]
+
+# let's also keep a df with the population data only
+pop <- curr[,c("region","site_full","Pop","long","lat")]
+write.csv(pop,"seascape_data/population_data.csv")
+
+# now I need to look at variable correlation
+pairs.panels(curr[,6:9]) # perfect, nothing is too correlated! probably Steffi already did this step :)
+```
+
+Everything is looking good! I want to make sure now that my environmental data will match my genomic data by having one row in my environmental dataset for each individual in my genomic dataset. To do so, I will need to process the individual data and pair this with my environmental data.
+
+```{r}
+# deal with individual data
+indiv_list <- as.data.frame(indiv_list)
+pops_split <- stringr::str_split_fixed(indiv_list$`Indv #`, "-", 2) # split Indv # to have population in a seperate column
+indiv_list_full <- cbind(indiv_list, pops_split) # add this info back to original file
+colnames(indiv_list_full) <- c("MLL_no","Indv_no","Pop","Pop_no")
+table(indiv_list_full$Pop) # between 4 and 20 individuals in each pop - most 17+ inds
+
+# also put together an mll dataset
+MLL_split <- stringr::str_split_fixed(colnames(eelgrass_vcf_MLL@gt), "-", 3)
+MLL_inds <- MLL_split[-1,3]
+indiv_list_MLL <- indiv_list_full[indiv_list_full$Indv_no %in% MLL_inds,]
+
+# now put this together with the environmental dataset
+head(curr)
+head(indiv_list_full)
+
+# oops! our environmental data is listed as character when I want it numeric
+curr$temp_curr <- as.numeric(curr$temp_curr)
+curr$max_temp_curr <- as.numeric(curr$max_temp_curr)
+curr$sal_curr <- as.numeric(curr$sal_curr)
+curr$min_sal_curr <- as.numeric(curr$min_sal_curr)
+fut$temp_8.5 <- as.numeric(fut$temp_8.5)
+fut$sal_8.5 <- as.numeric(fut$sal_8.5)
+
+# I can put it together using "Pop"
+full_curr <- merge(indiv_list_full, curr, by = c("Pop"))
+mll_curr <- merge(indiv_list_MLL, curr, by = c("Pop"))
+full_fut <- merge(indiv_list_full, fut, by = c("Pop"))
+mll_fut <- merge(indiv_list_MLL, fut, by = c("Pop"))
+```
+
+Perfect, now I have an entry for every individual in the seascape dataset. Finally, I should standardize all of the environmental data.
+
+```{r}
+# quick data inspection
+head(full_curr)
+head(full_fut)
+
+# scale
+curr_std_full <- scale(full_curr[,9:12])
+curr_std_mll <- scale(mll_curr[,9:12])
+fut_std_full <- scale(full_fut[,9:10])
+fut_std_mll <- scale(mll_fut[,9:10])
+colnames(curr_std_full) <- colnames(curr_std_mll) <-  c("temp_scaled","max_temp_scaled","sal_scaled","min_sal_scaled")
+colnames(fut_std_full) <- colnames(fut_std_mll) <- c("temp_scaled8.5","sal_scaled8.5")
+
+# attach scaled information back to env dfs
+curr_full_scaled <- as.data.frame(cbind(full_curr[,1:8], curr_std_full))
+curr_mll_scaled <- as.data.frame(cbind(mll_curr[,1:8], curr_std_mll))
+fut_full_scaled <- as.data.frame(cbind(full_fut[,1:8], fut_std_full))
+fut_mll_scaled <- as.data.frame(cbind(mll_fut[,1:8], fut_std_mll))
+
+# keep track of scaling factors
+curr_scale_env_full <- attr(curr_std_full, "scaled:scale")
+curr_center_env_full <- attr(curr_std_full, "scaled:center")
+curr_scale_env_mll <- attr(curr_std_mll, "scaled:scale")
+curr_center_env_mll <- attr(curr_std_mll, "scaled:center")
+fut_scale_env_full <- attr(fut_std_full, "scaled:scale")
+fut_center_env_full <- attr(fut_std_full, "scaled:center")
+fut_scale_env_mll <- attr(fut_std_mll, "scaled:scale")
+fut_center_env_mll <- attr(fut_std_mll, "scaled:center")
+
+# put those scaling factors into their own df
+scaling <- as.data.frame(rbind(curr_scale_env_full, curr_center_env_full, curr_scale_env_mll, curr_center_env_mll,fut_scale_env_full,fut_center_env_full,fut_scale_env_mll,fut_center_env_mll))
+scaling$factor_type <- rownames(scaling)
+rownames(scaling) <- NULL
+scaling
+
+# write all of this information out to csv for any future analysis
+write.csv(curr_full_scaled, "EnvDat/Full_CurrEnv_Seascape_031825.csv")
+write.csv(curr_mll_scaled, "EnvDat/MLL_CurrEnv_Seascape_031825.csv")
+write.csv(fut_full_scaled, "EnvDat/Full_FutEnv_Seascape_031825.csv")
+write.csv(fut_mll_scaled, "EnvDat/MLL_FutEnv_Seascape_031825.csv")
+write.csv(scaling, "EnvDat/Env_Seascape_ScalingFactors_031825.csv")
+```
+
+### Formatting for LEA
+
+LEA requires environmental data be formatted as a .env file type. 
+
+```{r}
+# prep as matrix
+current_full_mat <- as.matrix(curr_full_scaled[,9:12])
+current_mll_mat <- as.matrix(curr_mll_scaled[,9:12])
+future_full_mat <- as.matrix(fut_full_scaled[,9:10])
+future_mll_mat <- as.matrix(fut_mll_scaled[,9:10])
+
+# and convert to env format
+write.env(current_full_mat, "EnvDat/current_full_env.env")
+write.env(current_MLL_mat, "EnvDat/current_MLL_env.env")
+write.env(future_full_mat, "EnvDat/future_full_env.env")
+write.env(future_MLL_mat, "EnvDat/future_MLL_env.env")
+```
+
+### Formatting for RDA & GF
+
+RDA needs information in the exact format I already had it in, so no need to do any further processing - just know that I will use the csv for RDA. When I go to run RDA, I will likely also want to correct for population structure by including PCs from a PCA, but this will come when the analysis is actually run.
+
+GF requires environmental data in the same format as RDA, just a regular table format. However, the authors suggest using PCNMs to integrate spatial variation, rather than just latitude and longitude. I will go ahead and do this now, rather than as part of the script for training and running GF models. 
+
+```{r}
+# isolate coordinates
+coord_full <- curr_full_scaled[,c("long", "lat")]
+coord_mll <- curr_mll_scaled[,c("long", "lat")]
+
+# generate PCNMs
+pcnm_full <- pcnm(dist(coord_full))
+pcnm_mll <- pcnm(dist(coord_mll))
+
+# keep half of positive PCNMs as suggest by authors (determine which authors, I am using following tutorial https://github.com/pgugger/LandscapeGenomics/blob/master/2018_China/Exercise3.md)
+keep_full <- round(length(which(pcnm_full$value < 0))/2)
+keep_mll <- round(length(which(pcnm_mll$value < 0))/2)
+pcnm_keep_full <- scores(pcnm_full)[,1:keep_full]
+pcnm_keep_mll <- scores(pcnm_mll)[,1:keep_mll]
+
+# create file output that contains just climate and pcnm spatial variables, i.e. no lat long
+write.csv(cbind(pcnm_keep_full, curr_full_scaled[,9:12]), "EnvDat/current_full_env_gf.csv")
+write.csv(cbind(pcnm_keep_mll, curr_mll_scaled[,9:12]), "EnvDat/current_mll_env_gf.csv")
+write.csv(cbind(pcnm_keep_full, fut_full_scaled[,9:10]), "EnvDat/fut_full_env_gf.csv")
+write.csv(cbind(pcnm_keep_mll, fut_mll_scaled[,9:10]), "EnvDat/fut_mll_env_gf.csv")
+
+# also make a version of this dataset at the population level - note mll vs full doesn't matter here, as everything is at the population level
+curr_pop <- cbind(pcnm_keep_full, curr_full_scaled)
+fut_pop <- cbind(pcnm_keep_full, fut_full_scaled)
+curr_pop_rm <- curr_pop[!duplicated(curr_pop$Pop),]
+fut_pop_rm <- fut_pop[!duplicated(fut_pop$Pop),]
+
+# save these
+curr_pop_save <- curr_pop_rm[,c("pcnm_keep_full","temp_scaled","max_temp_scaled","sal_scaled","min_sal_scaled")]
+fut_pop_save <- fut_pop_rm[,c("pcnm_keep_full","temp_scaled8.5","sal_scaled8.5")] # this will pose a problem with the variables not lining up across datasets
+write.csv(curr_pop_save,"EnvDat/curr_pop_env_gf.csv")
+write.csv(fut_pop_save,"EnvDat/fut_pop_env_gf.csv")
+```
+
+
+## Experimental Data
+
+I used HOBO loggers to keep track of the temperature in all of the mesocosm tanks throughout the experiment - these mesocosm temperatures will be what I use to calculate mean, min, and max temperature in each treatment for offset calculation. It is important to know that I must match the environmental variables used in training to those used in calculation, so the actual variables I will include in offset calculation will be mean and max temperature, as well as mean and minimum salinity (these latter two will be the same, as salinity was held constant throughout the experimental period.)
+
+Salinity does not need to be calculated, but temperature does. I will thus want to start by processing temperature in each tank, as I will likely have tank effects, before calculating averages across treatments. Each tank had three HOBO loggers deployed, which outputs its own csv file with entries logged every 15 minutes.
+
+### Setup and formatting
+
+I need to read in all the data from the mesocosm loggers.
+
+```{r}
+# mesocosm environmental data is read in seperately because there are so many files for each HOBO logger
+setup <- as.data.frame(read.csv("experiment/GOEEL-eelgrass-Sweden-exp - Setup.csv"))
+A1a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A1a.xlsx"))[,-1]
+A1b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A1b.xlsx"))[,-1]
+A1c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A1c.xlsx"))[,-1]
+A2a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A2a.xlsx"))[,-1]
+A2b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A2b.xlsx"))[,-1]
+A2c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A2c.xlsx"))[,-1]
+A3a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A3a.xlsx"))[,-1]
+A3b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A3b.xlsx"))[,-1]
+A3c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A3c.xlsx"))[,-1]
+A4a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A4a.xlsx"))[,-1]
+A4b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A4b.xlsx"))[,-1]
+A4c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/A4c.xlsx"))[,-1]
+B1a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B1a.xlsx"))[,-1]
+B1b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B1b.xlsx"))[,-1]
+B1c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B1c.xlsx"))[,-1]
+B2a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B2a.xlsx"))[,-1]
+B2b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B2b.xlsx"))[,-1]
+B2c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B2c.xlsx"))[,-1]
+B3a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B3a.xlsx"))[,-1]
+B3b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B3b.xlsx"))[,-1]
+B3c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B3c.xlsx"))[,-1]
+B4a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B4a.xlsx"))[,-1]
+B4b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B4b.xlsx"))[,-1]
+B4c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/B4c.xlsx"))[,-1]
+C1a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C1a.xlsx"))[,-1]
+C1b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C1b.xlsx"))[,-1]
+C1c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C1c.xlsx"))[,-1]
+C2a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C2a.xlsx"))[,-1]
+C2b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C2b.xlsx"))[,-1]
+C2c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C2c.xlsx"))[,-1]
+C3a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C3a.xlsx"))[,-1]
+C3b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C3b.xlsx"))[,-1]
+C3c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C3c.xlsx"))[,-1]
+C4a <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C4a.xlsx"))[,-1]
+C4b <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C4b.xlsx"))[,-1]
+C4c <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/C4c.xlsx"))[,-1]
+gas <- as.data.frame(read_excel("EnvDat/HOBOloggers_GOeelgrass2024/gas2024.xlsx"))[,-1]
+
+# experimental individuals
+setup <- read.csv("experiment/GOEEL-eelgrass-Sweden-exp - Setup.csv")
+```
+
+
+### Pre=processing
+
+I need to first clean the dataset to only contain the dates when the experiment was actively running. The experiment started 07/03/2024 at ~9:00:00am, so I need to remove entries from before this time point. I also want to remove data from end point of experiment, so after 08/07/2024. Once I have done this, I will add information about which logger and tank data is associated with. Then, I will combine all this information into a single data frame. 
+
+```{r}
+# change colnames to be more usable
+colnames(gas) <- colnames(A1a) <- colnames(A1b) <- colnames(A1c) <- colnames(A2a) <- colnames(A2b) <- colnames(A2c) <- colnames(A3a) <- colnames(A3b) <- colnames(A3c) <- colnames(A4a) <- colnames(A4b) <- colnames(A4c) <- colnames(B1a) <- colnames(B1b) <- colnames(B1c) <- colnames(B2a) <- colnames(B2b) <- colnames(B2c) <- colnames(B3a) <- colnames(B3b) <- colnames(B3c) <- colnames(B4a) <- colnames(B4b) <- colnames(B4c) <- colnames(C1a) <- colnames(C1b) <- colnames(C1c) <- colnames(C2a) <- colnames(C2b) <- colnames(C2c) <- colnames(C3a) <- colnames(C3b) <- colnames(C3c) <- colnames(C4a) <- colnames(C4b) <- colnames(C4c) <- c("datetime","temp","light")
+
+# trim
+A1a_trim <- A1a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A1b_trim <- A1b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A1c_trim <- A1c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+A2a_trim <- A2a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A2b_trim <- A2b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A2c_trim <- A2c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+A3a_trim <- A3a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A3b_trim <- A3b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A3c_trim <- A3c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+A4a_trim <- A4a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A4b_trim <- A4b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+A4c_trim <- A4c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+B1a_trim <- B1a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B1b_trim <- B1b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B1c_trim <- B1c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+B2a_trim <- B2a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B2b_trim <- B2b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B2c_trim <- B2c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+B3a_trim <- B3a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B3b_trim <- B3b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B3c_trim <- B3c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+B4a_trim <- B4a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B4b_trim <- B4b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+B4c_trim <- B4c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+C1a_trim <- C1a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C1b_trim <- C1b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C1c_trim <- C1c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+C2a_trim <- C2a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C2b_trim <- C2b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C2c_trim <- C2c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+C3a_trim <- C3a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C3b_trim <- C3b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C3c_trim <- C3c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+C4a_trim <- C4a %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C4b_trim <- C4b %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+C4c_trim <- C4c %>% 
+  filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+gas_trim <- gas %>% filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
+
+# also add column for tank and logger
+# A tanks
+A1a_trim$logger <- "A1a"
+A1a_trim$tank <- "A1"
+A1b_trim$logger <- "A1b"
+A1b_trim$tank <- "A1"
+A1c_trim$logger <- "A1c"
+A1c_trim$tank <- "A1"
+A2a_trim$logger <- "A2a"
+A2a_trim$tank <- "A2"
+A2b_trim$logger <- "A2b"
+A2b_trim$tank <- "A2"
+A2c_trim$logger <- "A2c"
+A2c_trim$tank <- "A2"
+A3a_trim$logger <- "A3a"
+A3a_trim$tank <- "A3"
+A3b_trim$logger <- "A3b"
+A3b_trim$tank <- "A3"
+A3c_trim$logger <- "A3c"
+A3c_trim$tank <- "A3"
+A4a_trim$logger <- "A4a"
+A4a_trim$tank <- "A4"
+A4b_trim$logger <- "A4b"
+A4b_trim$tank <- "A4"
+A4c_trim$logger <- "A4c"
+A4c_trim$tank <- "A4"
+
+B1a_trim$logger <- "B1a"
+B1a_trim$tank <- "B1"
+B1b_trim$logger <- "B1b"
+B1b_trim$tank <- "B1"
+B1c_trim$logger <- "B1c"
+B1c_trim$tank <- "B1"
+B2a_trim$logger <- "B2a"
+B2a_trim$tank <- "B2"
+B2b_trim$logger <- "B2b"
+B2b_trim$tank <- "B2"
+B2c_trim$logger <- "B2c"
+B2c_trim$tank <- "B2"
+B3a_trim$logger <- "B3a"
+B3a_trim$tank <- "B3"
+B3b_trim$logger <- "B3b"
+B3b_trim$tank <- "B3"
+B3c_trim$logger <- "B3c"
+B3c_trim$tank <- "B3"
+B4a_trim$logger <- "B4a"
+B4a_trim$tank <- "B4"
+B4b_trim$logger <- "B4b"
+B4b_trim$tank <- "B4"
+B4c_trim$logger <- "B4c"
+B4c_trim$tank <- "B4"
+
+C1a_trim$logger <- "C1a"
+C1a_trim$tank <- "C1"
+C1b_trim$logger <- "C1b"
+C1b_trim$tank <- "C1"
+C1c_trim$logger <- "C1c"
+C1c_trim$tank <- "C1"
+C2a_trim$logger <- "C2a"
+C2a_trim$tank <- "C2"
+C2b_trim$logger <- "C2b"
+C2b_trim$tank <- "C2"
+C2c_trim$logger <- "C2c"
+C2c_trim$tank <- "C2"
+C3a_trim$logger <- "C3a"
+C3a_trim$tank <- "C3"
+C3b_trim$logger <- "C3b"
+C3b_trim$tank <- "C3"
+C3c_trim$logger <- "C3c"
+C3c_trim$tank <- "C3"
+C4a_trim$logger <- "C4a"
+C4a_trim$tank <- "C4"
+C4b_trim$logger <- "C4b"
+C4b_trim$tank <- "C4"
+C4c_trim$logger <- "C4c"
+C4c_trim$tank <- "C4"
+
+all_tanks <- rbind(A1a_trim,A1b_trim,A1c_trim,A2a_trim,A2b_trim,A2c_trim,A3a_trim,A3b_trim,A3c_trim,A4a_trim,A4b_trim,A4c_trim,B1a_trim,B1b_trim,B1c_trim,B2a_trim,B2b_trim,B2c_trim,B3a_trim,B3b_trim,B3c_trim,B4a_trim,B4b_trim,B4c_trim,C1a_trim,C1b_trim,C1c_trim,C2a_trim,C2b_trim,C2c_trim,C3a_trim,C3b_trim,C3c_trim,C4a_trim,C4b_trim,C4c_trim)
+```
+
+Now I want to calculate summary statistics for each tank and each treatment, specifically I am looking for average temperature. COME BACK HERE, NEED MEDIAN TEMP AS WELL.
+
+```{r}
+# summarize by tank
+tank_temps <- all_tanks %>% group_by(tank) %>%
+  summarise(mean_temp = mean(temp),
+            min_temp = min(temp),
+            max_temp = max(temp),
+            med_temp = median(temp),
+            sd_temp = sd(temp))
+
+# notice that max temp of logger C3c spiked in the beginning of the experiment in a way that does not fit with the other two loggers, trim these data then re-do this bit
+# remove those funky rows
+all_tanks_trim <- all_tanks[-(108035:108044),]
+
+# re-summarize by tank
+tank_temps <- all_tanks_trim %>% group_by(tank) %>%
+  summarise(mean_temp = mean(temp),
+            min_temp = min(temp),
+            max_temp = max(temp),
+            med_temp = median(temp),
+            sd_temp = sd(temp))
+
+# add a column for heat/ctrl
+control <- c("A1","A2","C1","C2","C3","C4")
+all_tanks_trim$trt <- ifelse(all_tanks_trim$tank %in% control, "ctrl", "heat")
+
+# summarize by trt
+trt_temps <- all_tanks_trim %>% group_by(trt) %>%
+  summarise(mean_temp = mean(temp),
+            min_temp = min(temp),
+            max_temp = max(temp),
+            median_temp = median(temp),
+            sd_temp = sd(temp))
+
+# save these data
+write.csv(tank_temps, "EnvDat/temp_tanks_summary.csv")
+write.csv(trt_temps, "EnvDat/temp_trts_summary.csv")
+
+# compare to meadow
+gas_temps <- data.frame(meadow = "gas", min_temp = min(gas_trim$temp), max_temp = max(gas_trim$temp), avg_temp = mean(gas_trim$temp), median_temp = median(gas_trim$temp), sd_temp = sd(gas_trim$temp))
+
+# we have a small time series where the logger experienced temps 10 degrees above any other recorded and light was high enough to suggest it was out of the water, remove these
+gas_temps <- data.frame(meadow = "gas", min_temp = min(gas_trim[which(gas_trim$temp < 35),]$temp), max_temp = max(gas_trim[which(gas_trim$temp < 35),]$temp), avg_temp = mean(gas_trim[which(gas_trim$temp < 35),]$temp), median_temp = median(gas_trim[which(gas_trim$temp < 35),]$temp), sd_temp = sd(gas_trim[which(gas_trim$temp < 35),]$temp))
+
+gas_temps # everything lines up well with the control tanks! max and min are a bit different though (~3ºC)
+```
+
+Great, now I need to get this data into a format where it is matched with all experimental individuals. 
+
+```{r}
+# individuals are stored in setup data
+setup
+
+# remove practice
+setup_trim <- setup[!setup$bagKey == "F054C074", c("setupKey","setupLabel","bagKey")]
+
+# get labels
+exp_labels <- str_split_fixed(setup_trim$setupLabel, "07/", 2)[,1]
+
+# split this into a larger dataframe
+exp_df <- as.data.frame(str_split_fixed(exp_labels, "_", 5))
+colnames(exp_df) <- c("bagnum","tank","pop","genet","trt")
+exp_df$ind <- paste0(exp_df$pop,"_",exp_df$genet)
+
+# now format environmental data by treatment
+trt_env_dat <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"), max_temp = c(trt_temps[trt_temps$trt == "ctrl",]$max_temp, trt_temps[trt_temps$trt == "ctrl",]$max_temp, trt_temps[trt_temps$trt == "heat",]$max_temp, trt_temps[trt_temps$trt == "heat",]$max_temp), med_temp = c(trt_temps[trt_temps$trt == "ctrl",]$median_temp, trt_temps[trt_temps$trt == "ctrl",]$median_temp, trt_temps[trt_temps$trt == "heat",]$median_temp, trt_temps[trt_temps$trt == "heat",]$median_temp), min_sal = c(21, 7, 16, 5), med_sal = c(21, 7, 16, 5))
+
+# and combine
+exp_ind_env <- merge(exp_df, trt_env_dat, by = c("trt"))
+
+# order this by bagnum
+exp_env_ord <- exp_ind_env[order(as.numeric(exp_ind_env$bagnum)),]
+
+# also need pop/trt level
+pops <- unique(levels(as.factor(exp_env_ord$pop)))
+trt <- unique(levels(as.factor(exp_env_ord$trt)))
+pop_trt_df <- expand.grid(pops, trt)
+colnames(pop_trt_df) <- c("pop","trt")
+pop_trt_env <- merge(pop_trt_df, trt_env_dat, by = c("trt"))
+
+# save both the indiv and pop level env dfs
+write.csv(exp_env_ord, "EnvDat/indiv_trt_env_dat.csv")
+write.csv(pop_trt_env, "EnvDat/pop_trt_env_dat.csv")
+```
+
+Finally, I need to standardize all the environmental data.
+
+```{r}
+# quick data inspection
+head(exp_env_ord)
+head(pop_trt_env)
+
+# scale
+exp_env_ord_std <- scale(exp_env_ord[,7:10])
+pop_trt_env_std <- scale(pop_trt_env[,3:6])
+colnames(exp_env_ord_std) <- colnames(pop_trt_env_std) <-  c("max_temp_scaled", "temp_scaled", "min_sal_scaled", "sal_scaled")
+
+# attach scaled information back to env dfs
+exp_env_ord_scaled <- as.data.frame(cbind(exp_env_ord[,1:6], exp_env_ord_std))
+pop_trt_env_scaled <- as.data.frame(cbind(pop_trt_env[,1:2], pop_trt_env_std))
+
+# keep track of scaling factors
+exp_env_ord_scale <- attr(exp_env_ord_std, "scaled:scale")
+exp_env_ord_center <- attr(exp_env_ord_std, "scaled:center")
+pop_trt_env_scale <- attr(pop_trt_env_std, "scaled:scale")
+pop_trt_env_center <- attr(pop_trt_env_std, "scaled:center")
+
+# put those scaling factors into their own df
+scaling <- as.data.frame(rbind(exp_env_ord_scale, exp_env_ord_center, pop_trt_env_scale, pop_trt_env_center))
+scaling$factor_type <- rownames(scaling)
+rownames(scaling) <- NULL
+scaling
+
+# write all of this information out to csv for any future analysis
+write.csv(exp_env_ord_scale, "EnvDat/Ind_Exp_Env_030725.csv")
+write.csv(pop_trt_env_scale, "EnvDat/Pop_Exp_Env_030725.csv")
+write.csv(scaling, "EnvDat/Env_Exp_ScalingFactors_030725.csv")
+```
+
+### Environmental Distance
+
+I need to calculate environmental distance between the tanks and the site-of-origin for the experimental populations. 
+
+The treatment data is stored in pop_trt_env object from above, while the population site of origin data is stored in ...
+
+It's important that I don't use the scaled data for this version, as it the two datasets are scaled differently.
+
+```{r}
+# check data
+trt_env_dat # treatments, unscaled
+mll_curr # has expanded current data, unscaled
+
+# assign trt_env_dat to new obj, change column names to avoid incompatibilities when using rbind()
+trt_env_fordist <- trt_env_dat
+names(trt_env_fordist)[names(trt_env_fordist) == "trt"] <- "trtpop"
+
+# mll curr needs to be collapsed to one entry per pop
+pop_env_fordist <- mll_curr[!(duplicated(mll_curr$Pop)),]
+
+# keep just some of the columns from curr_pop_rm to better match trt_env_dat
+pop_env_fordist_filt <- subset(pop_env_fordist, select = c(Pop, temp_curr, max_temp_curr, sal_curr, min_sal_curr))
+
+# need to rename a few columns
+colnames(pop_env_fordist_filt) <- c("trtpop", "med_temp", "max_temp", "med_sal", "min_sal")
+
+# reorder
+pop_env_fordist_filt <- pop_env_fordist_filt[,c("trtpop","max_temp","med_temp","min_sal","med_sal")]
+
+trt_env_fordist <- trt_env_fordist[,c("trtpop","max_temp","med_temp","min_sal","med_sal")]
+
+# everything is now in the same order with the same column names, put everything together
+env_dist_dat_prep <- rbind(pop_env_fordist_filt, trt_env_fordist)
+
+# now standardize
+env_dist_dat_std <- round(decostand(env_dist_dat_prep[,2:5], method = "standardize"), 4)
+
+# and calc dists
+euc_dists <- round(vegdist(env_dist_dat_std, method = "euclidian",
+                           upper = F, diag = T), 4)
+euc_dists_df <- as.data.frame(as.matrix(euc_dists))
+
+# add pops back as colnames & rownames
+rownames(euc_dists_df) <- colnames(euc_dists_df) <- env_dist_dat_prep[,1]
+
+# keep this df
+write.csv(euc_dists_df, "EnvDat/euclidian_trt_v_origin.csv")
+
+# just pops in experiment
+pops_in_exp <- c("BJO","GAS","GOT","HOG","HOR","KAL","TempControl-21psu","TempControl-7psu","TempWarm-16psu","TempWarm-5psu") 
+
+# visualize distances for these groups
+euc_dists_df_exp <- euc_dists_df[rownames(euc_dists_df) %in% pops_in_exp, colnames(euc_dists_df) %in% pops_in_exp]
+
+euc_dists_df_exp2 <- euc_dists_df_exp
+euc_dists_df_exp2$pops1 <- rownames(euc_dists_df_exp)
+euc_dists_long <- euc_dists_df_exp2 %>% 
+  pivot_longer(-pops1, names_to = "pops2", values_to = "distances") %>%
+  as.data.frame()
+euc_dists_long
+
+popsdf1 <- data.frame(pops = pops_in_exp, order = 1:length(pops_in_exp))
+popsdf2 <- data.frame(pops = pops_in_exp, order = 1:length(pops_in_exp))
+colnames(popsdf1) <- c("pops1","order1")
+colnames(popsdf2) <- c("pops2","order2")
+euc_dists_long_mg <- merge(popsdf1[,c("pops1","order1")], euc_dists_long, by = "pops1")
+euc_dists_long_mg2 <- merge(popsdf2[,c("pops2","order2")], euc_dists_long_mg, by = "pops2")
+
+library(viridis)
+euc_dist_trtpop <- ggplot(euc_dists_long_mg2, aes(x = fct_reorder(pops1, order1), 
+                              y = fct_reorder(pops2, order2), 
+                              fill = distances))+
+  theme_classic()+
+  geom_tile(color = "black") +
+#  geom_text(aes(label = distances), color = "white", size = 4)+
+  scale_fill_viridis_c(name = "Euclidean 
+Distance", limits = c(0, 7.5))+
+  theme(plot.title = element_text(size = 20), 
+        legend.title = element_text(size = 14),
+        legend.position = "right", legend.justification = "top") +
+  ylab("")+
+  xlab("")+
+  ggtitle("Environmental Distance between Sites and Treatments") +
+  theme(plot.title = element_text(size = 18), 
+        legend.title = element_text(size = 14),
+        legend.position = "right", legend.justification = "top")
+euc_dist_trtpop
+```
+
+
+### Formatting for LEA
+
+I need to format these datasets for LEA by converting to .env
+
+```{r}
+# prep as matrix
+ind_exp_mat <- as.matrix(exp_env_ord_scaled[,7:10])
+pop_exp_mat <- as.matrix(pop_trt_env_scaled[,3:6])
+
+# and convert to env format
+write.env(ind_exp_mat, "EnvDat/Ind_Exp_Env_030725.env")
+write.env(pop_exp_mat, "EnvDat/Pop_Exp_Env_030725.env")
+```
+
+
+### Formatting for RDA & GF
+
+RDA needs information in the exact format I already had it in, so no need to do any further processing - just know that I will use the csv for RDA. The same is true for gradientForest, since I have no spatial variables in this df.
+
+
+
+## Experimental Population Historical Environments
+
+While I have processed both the seascape training data and the mesocosm data, I have not yet actually extracted the environment of origin data for the populations actually used in the experiment. I will consolidate that information now. 
+
+We had eight populations that we exposed to experimental treatments. These populations came from 8 locations around the coast of Sweden, 4 from the West coast and 4 from the East coast. In order to run the genomic offset models, we need to characterize the environment of these populations in situ. Currently, I only have the data from XX populations - I am waiting for word from Marlene Jahnke and Per Jonsson on the remaining data. In the meantime I will process the data that already exists in order to start making some progress on the offset modeling.
+
+
+### Setup and formatting
+
+The data that I have is already somewhat processed, so this pre-processing pipeline will change almost entirely once I have the new data. The data I have is already read in (the seascape_dat df). I will thus skip straight to pre-processing. 
+
+```{r}
+# experimental populations
+exp_pops <- read.csv("experiment/eelgrass_exp_sites.csv")
+
+# seascape already read in
+seascape_dat
+```
+
+### Setup and formatting
+
+Here I will subset the data that I already have. I start by subsetting the df to include only populations that were included in the experiment.
+
+```{r}
+# check experimental populations
+(exp_pops)
+
+# check which of these are in seascape df
+seascape_dat[which(seascape_dat$Pop %in% exp_pops$site_abbrev),] # six pops!
+
+# subset to these sites
+exp_site_envorig <- seascape_dat[which(seascape_dat$Pop %in% exp_pops$site_abbrev),]
+
+exp_site_envorig
+colnames(exp_site_envorig) <- c("region","site_full","pop","long","lat","temp_curr","sal_curr","temp_8.5","sal_8.5","max_temp_curr","min_sal_curr")
+```
+
+Now I need to expand this dataframe to match up with all of the individuals used in the experiment. The "exp_df" df created as part of the hobo logger processing has the information for all experimental individuals.
+
+```{r}
+exp_df
+exp_site_envorig
+
+# merge to expand to all inds
+exp_site_envorig_mg <- merge(exp_df, exp_site_envorig, by = "pop")
+
+# trim to keep just current data
+exp_site_envorig_curr <- exp_site_envorig_mg[,c("pop","bagnum","tank","genet","trt","ind","region","site_full","lat","long","temp_curr","sal_curr","max_temp_curr","min_sal_curr")]
+```
+
+
+And finally standardize the data.
+
+```{r}
+# quick data inspection
+(exp_site_envorig_curr)
+
+# oops, all our env data is coded as characters!
+exp_site_envorig_curr$temp_curr <- as.numeric(exp_site_envorig_curr$temp_curr)
+exp_site_envorig_curr$sal_curr <- as.numeric(exp_site_envorig_curr$sal_curr)
+exp_site_envorig_curr$max_temp_curr <- as.numeric(exp_site_envorig_curr$max_temp_curr)
+exp_site_envorig_curr$min_sal_curr <- as.numeric(exp_site_envorig_curr$min_sal_curr)
+
+# scale
+curr_std_envorig <- scale(exp_site_envorig_curr[,11:14])
+colnames(curr_std_envorig) <- c("temp_scaled", "sal_scaled", "max_temp_scaled", "min_sal_scaled")
+
+# attach scaled information back to env dfs
+curr_std_envorig_scaled <- as.data.frame(cbind(exp_site_envorig_curr[,1:10], curr_std_envorig))
+
+# keep track of scaling factors
+curr_scale_envorig_scaled <- attr(curr_std_envorig_scaled, "scaled:scale")
+curr_center_envorig_scaled <- attr(curr_std_envorig_scaled, "scaled:center")
+
+# put those scaling factors into their own df
+scaling <- as.data.frame(rbind(curr_scale_envorig_scaled, curr_center_envorig_scaled))
+scaling$factor_type <- rownames(scaling)
+rownames(scaling) <- NULL
+scaling
+
+# write all of this information out to csv for any future analysis
+write.csv(curr_std_envorig_scaled, "EnvDat/EnvOrig_Exp_031825.csv")
+write.csv(scaling, "EnvDat/EnvOrig_Exp_Scaling_031825.csv")
+```
+
+
+### Formatting for LEA
+
+```{r}
+# prep as matrix
+ind_exporig_mat <- as.matrix(curr_std_envorig_scaled[,11:14])
+
+# and convert to env format
+write.env(ind_exporig_mat, "EnvDat/Ind_ExpOrig_Env_031825.env")
+```
+
+
+### Formatting for RDA & GF
+
+RDA needs information in the exact format I already had it in, so no need to do any further processing - just know that I will use the csv for RDA. When I go to run RDA, I will likely also want to correct for population structure by including PCs from a PCA, but this will come when the analysis is actually run.
+
+GF requires environmental data in the same format as RDA, just a regular table format. However, the authors suggest using PCNMs to integrate spatial variation, rather than just latitude and longitude. I will go ahead and do this now, rather than as part of the script for training and running GF models. 
+
+```{r}
+# isolate coordinates
+coord_envorig <- curr_std_envorig_scaled[,c("long", "lat")]
+
+# generate PCNMs
+pcnm_envorig <- pcnm(dist(coord_envorig))
+
+# keep half of positive PCNMs as suggest by authors (determine which authors, I am using following tutorial https://github.com/pgugger/LandscapeGenomics/blob/master/2018_China/Exercise3.md)
+keep_envorig <- round(length(which(pcnm_envorig$value < 0))/2)
+pcnm_keep_envorig <- scores(pcnm_envorig)[,1:keep_envorig]
+
+# create file output that contains just climate and pcnm spatial variables, i.e. no lat long
+write.csv(cbind(curr_std_envorig_scaled[,1], pcnm_keep_envorig, curr_std_envorig_scaled[,11:14]), "EnvDat/current_envorig_gf.csv")
+
+# also make a version of this dataset at the population level
+envorig_pop <- cbind(pcnm_keep_envorig, curr_std_envorig_scaled)
+envorig_pop_rm <- envorig_pop[!duplicated(envorig_pop$pop),]
+
+# save these
+envorig_pop_rm_save <- envorig_pop_rm[,c("pop","pcnm_keep_envorig","temp_scaled","max_temp_scaled","sal_scaled","min_sal_scaled")]
+write.csv(envorig_pop_rm_save,"EnvDat/curr_pop_envorig_gf.csv")
+```
+
+### Remaining Sites
+
+For the two sites that were not previously sampled, I will need to actually extract environmental data from rasterstacks, requiring more packages and data than previous parts of this script.
+
+### Downloading Data
+
+I want to make sure I download data in the exact same way and from the same sources as those used to generate the seascape environmental data. This [document](https://docs.google.com/document/d/1J54wsnxtk5UFdv5PXPYA2CnWi6fN4DvJ/edit) contains a lot of information about how the seascape data was compiled, and I will follow these steps now to get the environmental data for the experimental populations. 
+
+```{r}
+
+```
