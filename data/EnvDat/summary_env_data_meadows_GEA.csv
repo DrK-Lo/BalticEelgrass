@@ -1,0 +1,41 @@
+,,,,,adjusted coastal,adjusted coastal,adjusted coastal,adjusted coastal,max T copernicus,min sal Copernicus
+region,site_full,site,lon,lat,Temp today,Sal today,Temp RCP8.5,Sal RCP 8.5,Max Temp today,Min Sal today
+Germany,Kiel,KIE,"10,154972","54,345615",19,12,22,10,25,10
+Kosterhavet,Koster donor site,KOD,"10,991989","58,882538",18,22,20,20,23,10
+Kosterhavet,Gåsholmen ,GAS,"11,134688","58,878628",17,22,19,21,23,9
+Grebbestad-Fjällbacka,Kämpersvik,KAV,"11,27672","58,64622",18,21,21,20,23,15
+Ellös-Havstenfjord,Väst Hjältön,VHA,"11,60238","58,25641",16,25,18,24,25,13
+Hake-Älgöfjorden,Stenungsund,STE,"11,81013","58,05143",18,22,20,20,23,12
+Sälöfjorden,N. Överön,NOV,"11,728779","57,795244",19,18,21,17,23,6
+Göteborgs S skärgård,S. Brännö,SBR,"11,79115","57,64159",19,17,21,16,23,1
+Kungsbacka,Gottskär,GOT,"12,02123","57,39626",17,19,20,18,24,10
+Lahalmsbukten,Grötvik,GRO,"12,78014","56,64116",19,13,21,12,23,9
+Södra Höganäs,Höganäs,HOG,"12,55141","56,1969",18,17,20,15,22,7
+Øresund,Ålabadarna,ÅLA,"12,771034","55,940683",17,16,20,15,23,7
+Barsebäck,Barsebäck hamn,BAR,"12,90189","55,75528",17,16,19,15,23,7
+Lomma,South Lomma Bay,LOM,"13,05485","55,67242",18,9,20,7,23,7
+Trelleborg,Kurland,KUR,"12,982861","55,395972",18,8,20,7,23,7
+Gamla Staden-Sandskogen,Ystad,YST,"13,84636159","55,42155879",17,8,19,6,23,7
+Skillinge,Skillinge,SKI,"14,2785","55,457556",13,8,15,6,23,7
+Kristianstad,Åhus,AHU,"14,402056","55,973569",16,7,18,6,24,6
+Pukaviksbukten,Furumon,FUR,"14,72029998","56,0954",15,7,17,6,23,6
+Karlskrona,Björkenäs,BJN,"15,925111","56,159447",15,7,17,6,24,6
+Öland,Bläsinge,BLA,"16,704923","56,621246",12,7,14,6,24,6
+Kalmar,Kalmarsund,KAL,"16,351908","56,654431",19,7,22,6,25,6
+Öland,Kårehamn,KAR,"16,912377","56,969566",16,7,19,5,25,6
+Oskarshamn,Oskarshamn,OSK,"16,583068","57,031518",15,7,17,6,24,6
+Gotland,Burgsvik,BUR,"18,223786","57,032289",18,7,21,5,26,6
+Öland,Bödagården,BÅD,"17,058547","57,259256",17,7,19,5,24,6
+Gotland,Ljugarn,LJU,"18,695397","57,319176",16,7,19,5,25,6
+Gotland,Klintehamn,KLI,"18,152719","57,401162",17,7,21,5,26,6
+Hornsudde,Hornsudde,HOR,"16,730625","57,695151",15,7,18,5,24,6
+Gotland,Slite,SLI,"18,831167","57,713318",16,7,19,5,25,6
+Valdemarsvik,Ekön,EKO,"16,854798","58,175265",12,7,15,5,24,6
+Tystberga,Krampö,KRA,"17,4658689","58,690647",13,7,16,5,24,5
+Nynäshamn,Nynäshamn,NYN,"17,9542217","58,8811079",11,7,13,5,24,5
+Haninge,Gålö,GAL,"18,32692339","59,09087305",19,6,21,5,24,5
+Östersjö,Björkö,BJO,"19,07867998","59,83484289",16,5,20,4,22,4
+Finland,Rauma,RAU,"21,319105","61,052267",16,5,19,4,23,5
+Finland,Hanko,HAN,"22,990247","59,824232",15,6,18,4,24,4
+Finland,Ingå,ING,"24,039419","59,9906558",16,6,18,4,24,4
+Estonia,Tallinn,TAL,"24,5688","59,4576",17,6,21,4,24,4
