@@ -1,0 +1,431 @@
+---
+title: "eelgrass_fitness_offsets"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Eelgrass/BalticEelgrass/data")
+```
+
+# Fitness Offsets
+
+This script is intended to process raw fitness (survival and growth) data from the 2024 eelgrass mesocosm experiments in order to calculate absolute and relative fitness, as well as absolute and relative common-garden/current-future fitness offsets. 
+
+A fitness offset is a change in fitness of an individual or population in a new environment compared to some reference. Fitness offsets can be delineated into “current-future” fitness offsets, which aim to forecast the change in fitness of a genotype in a future environment relative to its current environment, and “common garden” fitness offsets, which aim to forecast the difference between foreign genotypes and local genotypes in a common environment.
+
+## Pre-processing
+
+I need to first pre-process data to combine pop/trt/mort/growth data into a single workable data frame. 
+
+```{r}
+# read in data
+setup <- read.csv("experiment/GOEEL-eelgrass-Sweden-exp - Setup.csv")
+takedown <- read.csv("experiment/GO_eelgrass_mesocosm_takedown_data.csv")
+head(setup)
+head(takedown)
+
+# remove practice rows (bagKey F054C074) & trim dataset
+setup_rm <- setup[!setup$bagKey == "F054C074",]
+setup_rm2 <- setup_rm[,c("setupKey","setupLabel","bagKey","setupTimestamp","nbr_leaves",
+                         "sideShoot","nbr_sideShootLeaves","length_longest_leaf",
+                         "leaf_width_hole","weight","IsBlackLesions")]
+
+# get more meaningful labels in setup
+dim(setup_rm2)
+setup_rm2[,12:15] <- str_split_fixed(setup_rm$setupLabel, "_", 5)[,1:4]
+colnames(setup_rm2) <- c("setupKey","setupLabel","bagKey","setupTimestamp","nbr_leaves_start","sideShoot","nbr_sideShootLeaves_start","length_longest_leaf_start","leaf_width_hole","weight_start","IsBlackLesions_start","bagnum","tank_ID","pop","genet")
+
+# match setup and takedown
+# can do this using "DNA_label" stuctured like HOR_gen-01
+setup_rm2$DNA_label <- paste0(setup_rm2$pop,"_",setup_rm2$genet)
+
+# check this 
+head(setup_rm2)
+
+# we also had to get rid of one individual because of planting error - ind 274
+setup_rm3 <- setup_rm2[!setup_rm2$bagnum == 274,]
+
+# now put together setup and takedown data
+full_dat <- merge(setup_rm3, takedown, by = c("DNA_label", "tank_ID"))
+dim(full_dat) # we've lost two individuals... one was the guy we had to remove
+
+# which individual was not supposed to be lost?
+setup_rm3[which(!(setup_rm3$DNA_label %in% takedown$DNA_label)),]
+# VAT_gen-13 is missing from takedown data, confirmed by inspecting data sheet - we will have to do without this individual
+
+takedown[which(!(takedown$DNA_label %in% setup_rm3$DNA_label)),]
+# bagnum 274 is missing, which it should be since we removed it
+
+# is there a different one that was duplicated in takedown? in setup?
+which(duplicated(takedown$DNA_label)) # nope
+which(duplicated(setup_rm3$DNA_label)) # nope
+
+# back to our full dataset
+full_dat # looks good, but still need treatment information
+full_dat$trt <- paste0(full_dat$temp_full, "_", full_dat$sal_full)
+write.csv(full_dat, "experiment/eelgrass_mesocosm_start_end_complete.csv")
+```
+
+
+## Absolute & Relative Fitness Data
+
+I will start by processing raw fitness data to calculate survival and growth metrics. Survival is straightforward, but I will also calculate growth both by length (as the length of new leaves + growth in old leaves) and weight (as the difference in weight pre/post experiment). 
+
+### Raw Survival Data - Absolute Fitness
+
+To start, I will calculate the proportion of surviving individuals in each tank/treatment/population. This will be our "Absolute Fitness". For now, I won't bother calculating relative fitness for these data, as I will calculate relative fitness offsets later.
+
+```{r}
+# pops
+pops <- levels(as.factor(full_dat$pop))
+
+# trts
+trts <- levels(as.factor(full_dat$trt))
+
+# set up mortality matrix
+# mortality by pop
+# set up df
+mort_pop <- matrix(data = NA, nrow = length(pops), ncol = 2)
+
+# calc
+for (i in 1:length(pops)) {
+  # split pops
+  split_mort = full_dat[full_dat$pop == pops[i],]
+  mort_pop[i,1] = pops[i]
+  # number that survived
+  mort_pop[i,2] = length(split_mort[split_mort$isAlive == "TRUE",]$isAlive)/length(split_mort$isAlive)
+}
+
+# clean up
+mort_pop <- as.data.frame(mort_pop)
+colnames(mort_pop) <- c("pop","surv")
+mort_pop$surv <- as.numeric(mort_pop$surv)
+
+# mortality by treatment
+mort_trt <- matrix(data = NA, nrow = length(trts), ncol = 2)
+for (i in 1:length(trts)) {
+  # split pops
+  split_mort = full_dat[full_dat$trt == trts[i],]
+  mort_trt[i,1] = trts[i]
+  # number that survived
+  mort_trt[i,2] = length(split_mort[split_mort$isAlive == "TRUE",]$isAlive)/length(split_mort$isAlive)
+}
+mort_trt <- as.data.frame(mort_trt)
+colnames(mort_trt) <- c("trt","surv")
+mort_trt$surv <- as.numeric(mort_trt$surv)
+
+# mortality by population & treatment
+# add trt_pop column
+full_dat$trt_pop <- paste0(full_dat$trt,"-",full_dat$pop)
+trt_pop <- levels(as.factor(full_dat$trt_pop))
+
+# calc
+mort_trt_pop <- matrix(data = NA, nrow = length(trt_pop), ncol = 2)
+for (i in 1:length(trt_pop)) {
+  # split pops
+  split_mort = full_dat[full_dat$trt_pop == trt_pop[i],]
+  mort_trt_pop[i,1] = trt_pop[i]
+  # number that survived
+  mort_trt_pop[i,2] = length(split_mort[split_mort$isAlive == "TRUE",]$isAlive)/length(split_mort$isAlive)
+}
+mort_trt_pop <- as.data.frame(mort_trt_pop)
+colnames(mort_trt_pop) <- c("trt_pop","surv")
+mort_trt_pop$surv <- as.numeric(mort_trt_pop$surv)
+
+# add in trt and pop as separate columns
+mort_trt_pop[,3:4] <- str_split_fixed(mort_trt_pop$trt_pop, "-", 2)
+colnames(mort_trt_pop) <- c("trt_pop","surv","trt","pop")
+
+# population order
+pop_order <- data.frame(pop = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO"), 
+                        order = c(1:8))
+
+mort_trt_pop_mg <- merge(mort_trt_pop, pop_order, by = "pop")
+
+# by coast?
+mort_trt_pop_mg$coast <- ifelse(mort_trt_pop_mg$order >= 5, "East", "West")
+
+# more informative trt names
+trt <- levels(as.factor(mort_trt_pop_mg$trt))
+names <- c("Current W Coast", "Current E Coast", "Future W Coast", "Future E Coast")
+trt_nm <- data.frame(trt = trt, trt_name = names)
+mort_trt_pop_mg <- merge(mort_trt_pop_mg, trt_nm, by = "trt")
+
+# calc by coast
+mortality_coasttrt_surv <- mort_trt_pop_mg %>% group_by(coast,trt) %>%
+  summarise(mean_surv = mean(as.numeric(surv)), 
+            sd_surv = sd(as.numeric(surv)),
+            se_surv = std.error(as.numeric(surv)),
+            .groups = 'drop')
+mortality_coasttrt_surv <- merge(mortality_coasttrt_surv, trt_nm, by = "trt")
+mortality_coasttrt_surv$CurrFut <- str_split_fixed(as.character(mortality_coasttrt_surv$trt_name)," ",2)[,1]
+
+mort_pop
+mort_trt
+mort_trt_pop_mg
+mortality_coasttrt_surv
+
+write.csv(mort_trt_pop_mg, "experiment/survival_dat_trt_pop.csv")
+```
+
+### Raw Length Data - Absolute Fitness
+
+Here I will calculate two growth metrics: length grown and weight grown for each tank/treatment/population. This will be the "Absolute Fitness". Again, I won't bother calculating relative fitness for these data, as I will calculate relative fitness offsets later.
+
+Length grown will be determined by summing together the growth on old leaves with the length of any new leaves or shoots.
+
+Weight grown will be determined by subtracting the weight at the beginning of the experiment from the weight at the end of the experiment. 
+
+It's important to note that there are a LOT of NAs in this dataset, but they aren't errors or data that we missed - rather these reflect biological differences in the plants. 
+
+```{r}
+# again using the full_dat data frame
+full_dat
+summary(full_dat)
+
+# we only want to work with plants that are still alive
+full_dat_alive <- full_dat[full_dat$isAlive == T,]
+
+# I'm also going to remove flowering plants from this analysis
+full_dat_alive_nofl <- full_dat_alive[is.na(full_dat_alive$Length_flower1),]
+
+# let's start by getting length growth for each plant
+colnames(full_dat_alive_nofl) # check which columns are relevant for length growth
+full_dat_alive_nofl$length_growth <- rowSums(full_dat_alive_nofl[,c("Growth_leaf1","Growth_leaf2","Growth_leaf3","Growth_leaf4","Growth_leaf5","Growth_leaf6","Growth_leaf7","Length_new_leaf1","Length_new_leaf2","Length_new_leaf3","Length_new_leaf4","Length_new_leaf5","Length_new_leaf6","Length_new_shoot1_leaf1","Length_new_shoot1_leaf2","Length_new_shoot1_leaf3","Length_new_shoot1_leaf4","Length_new_shoot1_leaf5","Length_new_shoot1_leaf6","Length_new_shoot2_leaf1","Length_new_shoot2_leaf2","Length_new_shoot2_leaf3","Length_new_shoot2_leaf4","Length_new_shoot2_leaf5")], na.rm = T)
+
+# and weights
+full_dat_alive_nofl$weight_growth <- full_dat_alive_nofl[,c("total_weight")] - full_dat_alive_nofl[,c("weight_start")]
+# note that weight change can be negative if more biomass was lost than gained
+
+# length growth vs weight change
+ggplot(full_dat_alive_nofl, aes(x = length_growth, y = weight_growth)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  theme_classic()
+cor(full_dat_alive_nofl$length_growth, full_dat_alive_nofl$total_weight) # pearson corr = 0.6192
+
+# now we can calculate averages across populations and treatments
+growth_pop <- full_dat_alive_nofl %>% group_by(pop) %>%
+  summarise(mean_len_growth = mean(as.numeric(length_growth)), 
+            sd_len_growth = sd(as.numeric(length_growth)),
+            se_len_growth = std.error(as.numeric(length_growth)),
+            mean_weight = mean(as.numeric(weight_growth)), 
+            sd_weight = sd(as.numeric(weight_growth)),
+            se_weight = std.error(as.numeric(weight_growth)),
+            .groups = 'drop')
+growth_trt <- full_dat_alive_nofl %>% group_by(trt) %>%
+  summarise(mean_len_growth = mean(as.numeric(length_growth)), 
+            sd_len_growth = sd(as.numeric(length_growth)),
+            se_len_growth = std.error(as.numeric(length_growth)),
+            mean_weight = mean(as.numeric(weight_growth)), 
+            sd_weight = sd(as.numeric(weight_growth)),
+            se_weight = std.error(as.numeric(weight_growth)),
+            .groups = 'drop')
+growth_pop_trt <- full_dat_alive_nofl %>% group_by(pop,trt) %>%
+  summarise(mean_len_growth = mean(as.numeric(length_growth)), 
+            sd_len_growth = sd(as.numeric(length_growth)),
+            se_len_growth = std.error(as.numeric(length_growth)),
+            mean_weight = mean(as.numeric(weight_growth)), 
+            sd_weight = sd(as.numeric(weight_growth)),
+            se_weight = std.error(as.numeric(weight_growth)),
+            .groups = 'drop')
+
+# plot of length
+len_plot_eel <- ggplot(full_dat_alive_nofl, aes(x = trt, y = length_growth, fill = pop)) +
+  geom_boxplot(position=position_dodge(0.8),
+               width = 0.6) +
+  #  geom_dotplot(binaxis='y', stackdir='center', 
+  #             position=position_dodge(0.8),
+  #             dotsize = 0.5) +
+  scale_fill_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  ggtitle("Length Growth vs Treatment") +
+  theme_classic()
+len_plot_eel
+
+# plot of weight
+wght_plot_eel <- ggplot(full_dat_alive_nofl, aes(x = trt, y = weight_growth, fill = pop)) +
+  geom_boxplot(position = position_dodge(0.8, preserve = "single"),
+               width = 0.6) +
+#  geom_dotplot(binaxis='y', stackdir='center', 
+#               position= position_dodge(0.8), # need to change smth here
+#               dotsize = 0.6) +
+  scale_fill_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  ggtitle("Weight Change vs Treatment") +
+  theme_classic()
+wght_plot_eel
+```
+
+
+## Fitness Offsets
+
+Now that I have calculated absolute (and not yet relative) fitness using both survival and growth metrics, I can use this to calculate common garden and current-future fitness offsets. 
+
+Note that for these fitness offsets, I have more populations than I have treatments - that is, populations are assigned a "home" or "local" treatment that is broadly representative of their true home/local conditions, but not an exact match. In order to appropriately account for this detail, I need to scale calculated fitness offsets by environmental distance. Thus, my first step here is actually to calculate environmental distance between experimental treatments and experimental populations' environment-of-origin.
+
+```{r}
+# put together env of origin and treatment data - COME BACK HERE
+env_trt_site <- cbind()
+
+# calculate environmental distance
+library(vegan)
+env_dist <- round(vegdist(env_trt_site[,3:8], method = "euclidian",
+                          upper = FALSE, diag = TRUE), 4)
+env_dist_mal <- round(vegdist(env_trt_site[,3:8], method = "mahalanobis",
+                              upper = FALSE, diag = TRUE), 4)
+env_dist_df <- as.data.frame(as.matrix(env_dist))
+env_dist_mal_df <- as.data.frame(as.matrix(env_dist_mal))
+colnames(env_dist_df) <- rownames(env_dist_df) <- colnames(env_dist_mal_df) <- rownames(env_dist_mal_df) <- env_trt_site$site_name
+env_dist_df
+env_dist_mal_df
+```
+
+### Common Garden Fitness Offset
+
+Common garden fitness offset is the fitness difference between foreign genotypes and local genotypes in a common environment. I will calculate both absolute and relative common garden fitness offset here. Importantly, I will treat E. coast pops as local to the current E. coast treatment and W. coast pops as local to the current W. coast treatment - no populations will be "local" to either of the future treatments. Additionally, because no population is from the exact conditions represented in the mesocosm treatment, I will scale fitness offsets for each population by the environmental distance between its environment-of-origin and the actual treatment environment.  
+
+```{r}
+# fake data
+fake_fit <- data.frame(population = rep(c("A","B","C","D"),2), trt = c(rep("trt-1", 4), rep("trt-2", 4)), fitness = c(1, 0.8, 0.3, 0.4, 0.2, 0.5, 0.9, 0.8), envOrg = c("lcl","lcl","frn","frn","frn","frn","lcl","lcl"), envdist = c(0.1, 1.3, 8.8, 9.1, 10, 9.4, 1, 0))
+fake_fit
+
+# # start by separating out "local" and "foreign"
+# fit_frn <- data.frame(pop_trt = paste0(fake_fit[fake_fit$envOrg == "frn",]$population, "_", fake_fit[fake_fit$envOrg == "frn",]$trt), fit = fake_fit[fake_fit$envOrg == "frn",]$fitness)
+# fit_lcl <- data.frame(pop_trt = paste0(fake_fit[fake_fit$envOrg == "lcl",]$population, "_", fake_fit[fake_fit$envOrg == "lcl",]$trt), fit = fake_fit[fake_fit$envOrg == "lcl",]$fitness)
+
+# I need to scale these data now by environmental distance before calculating fitness offset
+
+
+# from Katie's paper
+# This is a more general function for real data
+# At least a 3x3 reciprocal transplant is needed
+ExploreCorrsFlex <- function(W, main){
+  # `main` is the name or title of the situation modeled
+  # W is a nxn reciprocal transplant matrix with genotypes in columns and common gardents in rows
+  
+  print("Absolute fitness")
+  print(W)
+  par(mar=c(4,0,0,1))
+
+  LocalAdaptation_SA <- mean(diag(W)) - mean(W[lower.tri(W) | upper.tri(W)])
+   print(c("Delta-SA is", LocalAdaptation_SA))
+   
+  colors = grey(seq(0.1,0.9, length=nrow(W)))
+   
+#  pdf(paste0("figs/", main, "_LApatterns.pdf"), height=4, width=5)
+  # Make reciprocal transplant plot
+    par(mar=c(4,4,1,1))
+    barplot(t(W), ylim=c(0,max(W)*1.5), 
+        lwd=4, bty="n", beside=TRUE,
+         xlab="Site", ylab="Absolute fitness", col=colors)
+    legend("topright",legend=c(colnames(W)), fill=colors)
+  #dev.off()
+
+  #Home-away fitness offset
+    offset_HA <- t(t(W)-diag(W))
+  #Home-away relative fitness
+    w_HA <- t(t(W)/diag(W))
+  #Home-away relative fitness offset
+    offset_HA_relative <- t(t(offset_HA)/diag(W))
+  
+  #Local-foreign fitness offset
+    offset_LF <- W - diag(W)
+  #Local-foreign relative fitness
+    w_LF <- W/diag(W)
+  #Local-foreign relative fitness offset
+    offset_LF_relative <- offset_LF/diag(W)
+  # 
+  df <- data.frame(as.numeric(W), 
+                   as.numeric(offset_HA), 
+                  # as.numeric(w_HA), 
+                   as.numeric(offset_HA_relative),
+                   as.numeric(offset_LF), 
+                  # as.numeric(w_LF),
+                   as.numeric(offset_LF_relative))
+  
+#  pdf(paste0("figs/", main, "_RelFitpatterns.pdf"), height=4, width=5)
+    # Make reciprocal transplant plot
+    par(mar=c(4,4,1,1))
+    barplot(t(w_LF), ylim=c(min(c(w_LF,0)),max(w_LF)*1.5), 
+        lwd=4, bty="n", beside=TRUE,
+         xlab="Site", ylab="Local-foreign relative fitness",
+        col=colors)
+    legend("topright",legend=c(colnames(W)), fill=colors)
+    
+    barplot(w_HA, ylim=c(min(c(w_HA,0)),max(w_HA)*1.5), 
+        lwd=4, bty="n", beside=TRUE,
+         xlab="Site", ylab="Home-away relative fitness", col=colors)
+    legend("topright",legend=c(rownames(W)), fill=colors)
+    
+ # dev.off()
+  
+  
+  
+  colnames(df)<-c("Absolute fitness",
+                  "Home-away fitness offset",
+                #  "Home-away relative fitness",
+                  "Home-away relative fitness offset",
+                  "Local-foreign fitness offset",
+               #   "Local-foreign relative fitness",
+                  "Local-foreign relative fitness offset")
+  
+  # Plot a heatmap of the correlations among the matrices
+  col <- colorRampPalette(c("#BB4444", "#EE9988",
+                            "white",  "#77AADD", "#4477AA"))
+ # pdf(paste0("figs/", main, "_corr.pdf"), height=8 , width=8)
+  par(mar=c(0,0,2,2))
+  corrplot(round(cor(df),2), method="color", col=col(100),
+           type="upper", 
+           addCoef.col="black", tl.col="black", 
+           tl.cex=1, main=main, tl.srt=45, mar=c(0,0,2,2))
+ # dev.off()
+  return(list(W=W, offset_HA=offset_HA,
+              offset_HA_relative=offset_HA_relative, 
+              w_HA = w_HA,
+              offset_LF=offset_LF,
+              offset_LF_relative=offset_LF_relative, 
+              w_LF = w_LF,
+              cor_mat = cor(df),
+              Delta_SA = LocalAdaptation_SA))
+
+} #end function
+
+### I THINK TO USE THE ABOVE FUNCTION, I NEED TO COERCE MY FITNESS DATA TO FIT WITHIN THE RECIPROCAL GARDEN FRAMEWORK - I ALSO NEED TO SCALE MY FITNESS DATA BY ENVIRONMENTAL DISTANCE BEFORE USING THIS FUNCTION
+
+# # need to start by making a function to calculate the fitness offset
+# commGardFit <- function(fit_df) {
+#   fit_frn = fit_df[fit_df$envOrg == "frn",]$fitness
+#   fit_lcl = fit_df[fit_df$envOrg == "lcl",]$fitness
+#   fit_matrix = matrix(nrow = (length(fit_frn) + length(fit_lcl)), ncol = 2)
+#   for (i in (length(fit_frn) + length(fit_lcl))) { # change fit frn and fit lcl to be rows in some dataframe that labels things as local or foreign
+#     env_dist = fit_df 
+#     fit = fit_lcl[i,2] - sum(fit_frn[i,2])
+#     fit_scale = fit * (1 + env_dist) # 1 + dist so that we don't run into problems when env dist is 0
+#     fit_matrix[i,1] = 
+#     fit_matrix[i,2] = fit_scale
+#   }
+#   return(fit_scale)
+# }
+# 
+# commGardFit(fake_fit)
+```
+
+TO DISCUSS WITH KATIE - HOW CAN I CALCULATE FITNESS OFFSETS WHEN NO INDIVIDUALS ARE LOCAL TO FUTURE TREATMENTS??? DOES IT COME BACK TO SCALING BY ENV DIST AGAIN?
+
+### Current-Future Fitness Offset
+
+Current-future fitness offset is the fitness difference between a genotype in some future environment compared to its current environment. I will calculate both absolute and relative current-future fitness offset here. Importantly, I will treat E. coast pops as being home in the current E. coast treatment and W. coast pops as being home in the current W. coast treatment - no populations will be "home" in either of the future treatments. Additionally, because no population is from the exact conditions represented in the mesocosm treatment, I will scale fitness offsets for each population by the environmental distance between its environment-of-origin and the actual treatment environment.  
+
+```{r}
+
+```
+
+

@@ -32,6 +32,7 @@ library(vegan) # environmental data cleaning
 library(tidyr) # data cleaning
 library(dplyr) # data cleaning
 library(stringr) # data cleaning
+library(vcfR) # for vcf
 library(ggplot2) # plotting
 library(s2) # mapping
 library(rnaturalearth) # mapping
@@ -42,6 +43,7 @@ library(ggspatial) # mapping
 # data
 seascape_dat <- read.csv("EnvDat/summary_env_data_meadows_GEA.csv") # seascape env data
 indiv_list <- read_excel("seascape_data/MLL_per_individual_list.xlsx") # seascape individuals data
+eelgrass_vcf_MLL <- read.vcfR("seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")# read in vcf eelgrass mll
 
 # seascape env data reads in funky, change column names and remove first row
 colnames(seascape_dat) <- seascape_dat[1,]
@@ -572,7 +574,7 @@ write.csv(scaling, "EnvDat/Env_Exp_ScalingFactors_030725.csv")
 
 ### Environmental Distance
 
-I need to calculate environmental distance between the tanks and the site-of-origin for the experimental populations. 
+I need to calculate environmental distance between the tanks and the site-of-origin for the experimental populations.
 
 The treatment data is stored in pop_trt_env object from above, while the population site of origin data is stored in ...
 
@@ -619,7 +621,7 @@ rownames(euc_dists_df) <- colnames(euc_dists_df) <- env_dist_dat_prep[,1]
 write.csv(euc_dists_df, "EnvDat/euclidian_trt_v_origin.csv")
 
 # just pops in experiment
-pops_in_exp <- c("BJO","GAS","GOT","HOG","HOR","KAL","TempControl-21psu","TempControl-7psu","TempWarm-16psu","TempWarm-5psu") 
+pops_in_exp <- c("GAS","GOT","HOG","HOR","KAL","BJO","TempControl-21psu","TempControl-7psu","TempWarm-16psu","TempWarm-5psu")
 
 # visualize distances for these groups
 euc_dists_df_exp <- euc_dists_df[rownames(euc_dists_df) %in% pops_in_exp, colnames(euc_dists_df) %in% pops_in_exp]
@@ -657,8 +659,70 @@ Distance", limits = c(0, 7.5))+
         legend.title = element_text(size = 14),
         legend.position = "right", legend.justification = "top")
 euc_dist_trtpop
-```
 
+# also try a PCA of the different sites together - ideally I would use raw data from all sites to do this, but I don't have that resolution for any of the seascape sites so I will leave that out
+# this is the standardized dataset I need, I just want to add a column for the site or trt
+env_dist_dat_std$poptrt <- rownames(euc_dists_df)
+head(env_dist_dat_std)
+
+# rotate for pca
+env_dat_std_rot <- t(env_dist_dat_std[,1:4])
+colnames(env_dat_std_rot) <- env_dist_dat_std$poptrt
+env_dat_std_rot
+
+# now pca
+pca_env_poptrt <- prcomp(env_dist_dat_std[,1:4]) # no need to center and scale as these have already been done
+
+# plot
+plot(pca_env_poptrt, type = "l")
+
+# more detailed plot
+poptrts <- colnames(env_dat_std_rot)
+
+library(ggbiplot)
+pca_envs_plot <- ggbiplot(pca_env_poptrt, obs.scale = 1, var.scale = 1,
+              groups = poptrts, ellipse = F,
+              circle = T) + 
+  scale_color_discrete(name = "") + 
+  theme(legend.direction = "horizontal",
+               legend.position = "top") +
+  theme_classic()
+
+pca_envs_plot # too few plots to make ellipses, so we set ellipse = F
+
+# lets do this just for the experimental sites vs the treatments by doing a pca of just these sites
+pca_env_poptrt_red <- prcomp(env_dist_dat_std[env_dist_dat_std$poptrt %in% pops_in_exp,1:4]) # no need to center and scale as these have already been done
+
+# plot briefly
+plot(pca_env_poptrt_red, type = "l")
+
+library(scales)
+show_col(viridis_pal()(12))
+
+order_pops <- c("VAT","VIK","HOG","BAR","KUR","KAL","HOR","BJO","TempControl-21psu","TempControl-7psu","TempWarm-16psu","TempWarm-5psu")
+
+# order pops_in_exp & set explicit colors
+pops_in_df <- data.frame(poptrt = order_pops, order = 1:12, cols = viridis_pal()(12), coast = c(rep("West",4), rep("East",4),rep("trt",4)))
+
+# keep this order df for other purposes
+write.csv(pops_in_df, "experiment/poptrts_df.csv")
+
+# trim to just what we have in the current df
+pops_in_df[pops_in_df$poptrt %in% pops_in_exp,] # UH OH! it looks like GAS and GOT are somehow not in the plan here, but i have been operating as if they are - I actually need to go back now and make sure i update EVERYTHING oops
+mll_curr[which(mll_curr$Pop %in% order_pops),] # these are which sites are actually in the overall df
+
+
+# plot of pops
+pca_envs_plot_red <- ggbiplot(pca_env_poptrt_red, obs.scale = 1, var.scale = 1,
+              groups = pops_in_exp, ellipse = F,
+              circle = T, ) + 
+  geom_point(aes(color = pops_in_exp), size = 2) +
+  scale_color_manual(values = c()) + 
+  theme(legend.direction = "horizontal",
+               legend.position = "top") +
+  theme_classic()
+pca_envs_plot_red # too few plots to make ellipses, so we set ellipse = F
+```
 
 ### Formatting for LEA
 

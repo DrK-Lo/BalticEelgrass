@@ -1,0 +1,6 @@
+new("snmfClass", directory = "K21/run1/", snmfClass.file = "zostera_230619_seascape_miss25_sorted_95_MLL.recode_r1.21.snmfClass", 
+    K = 21L, run = 1L, CPU = 1L, seed = 430550342L, alpha = 10, 
+    percentage = 0.05, I = 0L, iterations = 200L, entropy = TRUE, 
+    tolerance = 1e-05, crossEntropy = 0.080521165154131, ploidy = 2L, 
+    Q.input.file = "", Q.output.file = "zostera_230619_seascape_miss25_sorted_95_MLL.recode_r1.21.Q", 
+    G.output.file = "zostera_230619_seascape_miss25_sorted_95_MLL.recode_r1.21.G")

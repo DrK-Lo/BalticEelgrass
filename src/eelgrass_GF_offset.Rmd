@@ -1,0 +1,450 @@
+---
+title: "Eelgrass_GF_offset"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Eelgrass/BalticEelgrass/data")
+```
+
+# Offset Modeling with Gradient Forest
+
+This script is for offset calculation using GradientForest, specifically for the project "VR_Zostera_genomic_offset." It includes training of the models using seascape genomic data, as well as calculation of genomic offset for experimental populations in each mesocosm treatment.
+
+## Seascape Model Training
+
+Seascape genomic data comes from Steffi Ries and Marlene Jahnke at the University of Gothenburg, who had already processed the genomic dataset to do XX (check what part of bioinformatic pipeline had been done already).
+
+### Setup & Formatting
+
+I have already set my working directory in the setup chunk to be the "data" folder in the larger eelgrass directory. Now I need to include certain libraries and load relevant data files.
+
+```{r Setup, echo = F}
+# packages
+library(BiocManager) # needed to download specific packages
+library(readxl) # reading xlsx files
+library(raster) # for environmental pixels
+library(ggplot2) # for plotting
+library(magrittr) # unsure
+library(geosphere) # unsure
+library(gdm) # unsure
+library(foreach) # unsure
+library(parallel) # for parallelizing processes
+library(doParallel) # for parallelizing processes 
+library(gradientForest) # for running gradient forest
+library(fields) # unsure
+library(sf) # for spatial files
+
+# data
+## genomic data
+eelgrass_vcf_full <- read.vcfR(
+  "seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.vcf")
+eelgrass_vcf_mll <- read.vcfR(
+  "seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")
+# read in lfmm data
+eelgrass_lfmm_full <- read.lfmm("seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.lfmm")
+eelgrass_lfmm_mll <- read.lfmm("seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.lfmm")
+
+## individuals & populations
+indiv_list <- read_excel("seascape_data/MLL_per_individual_list.xlsx")
+pop_list <- read.csv("seascape_data/population_data.csv")
+
+## environmental data
+curr_full_env_gf <- read.csv("EnvDat/current_full_env_gf.csv")[,-1]
+curr_mll_env_gf <- read.csv("EnvDat/current_mll_env_gf.csv")[,-1]
+
+curr_pop_env_gf <- read.csv("EnvDat/curr_pop_env_gf.csv")[,-1]
+fut_pop_env_gf <- read.csv("EnvDat/fut_pop_env_gf.csv")[,-1]
+
+trt_full_env_gf <- read.csv("EnvDat/fut_full_env_gf.csv")[,-1] # replace with treatment data once possible
+trt_mll_env_gf <- read.csv("EnvDat/fut_full_env_gf.csv")[,-1] # replace with treatment data once possible
+
+expOrig_inds <- read.csv("EnvDat/current_envorig_gf.csv")[,-1]
+expOrig_pop <- read.csv("EnvDat/curr_pop_envorig_gf.csv")[,-1]
+
+exp_trt_inds_env <- read.csv("EnvDat/Ind_Exp_Env_030725.csv")[,-1]
+```
+
+Environmental data has been processed in other scripts, so no need to do anything more with that. I will do some pre-processing of genomic data and individual data, which I intend to move to a separate script at a later date as this data needs to be consistent across genomic offset methods.
+
+Here I start by processing individual data:
+
+```{r Individual Data}
+# process individuals list
+# how many individuals in each population?
+head(indiv_list)
+pops_split <- stringr::str_split_fixed(indiv_list$`Indv #`, "-", 2) # split Indv # to have population in a seperate column
+indiv_list_full <- cbind(indiv_list, pops_split) # add this info back to original file
+colnames(indiv_list_full) <- c("mll_no","indv_no","pop","pop_no")
+table(indiv_list_full$pop) # between 4 and 20 individuals in each pop - most 17+ inds
+
+# need indiv data for mll dataset
+# individuals are stored in column names of vcf - isolate these names
+colnames(eelgrass_vcf_mll@gt)
+mll_split <- stringr::str_split_fixed(colnames(eelgrass_vcf_mll@gt), "-", 3)
+mll_inds <- mll_split[-1,3]
+
+# now get subsetted indiv dataframe from indiv list full
+indiv_list_mll <- indiv_list_full[indiv_list_full$indv_no %in% mll_inds,]
+```
+
+Next I deal with the SNP data:
+
+I think??? That the way the genomic data works is that you figure out the allele frequencies for each population at each SNP and put this in csv format with SNPs as rows and populations as columns. It's kind of unclear. This may need to happen in bash using vcftools, command for this is:
+
+``` text
+code();
+vcftools --vcf your_vcf_file.vcf --freq --out output_file
+```
+
+The only thing I'm not sure about is whether this allows me to output allele frequencies on a population level. I also remember writing a custom script for calculating allele frequencies some time ago, I will look for that script as it could be an alternative to vcftools. **NOTE** I have found that script and implemented it here to calculate allele frequencies.
+
+```{r SNP Data}
+# convert lfmm data to dataframe
+eel_full_df <- as.data.frame(eelgrass_lfmm_full)
+eel_mll_df <- as.data.frame(eelgrass_lfmm_mll)
+
+# rotate df so rows are now columns (we want individuals as columns, alleles as rows)
+eel_full_df_t <- as.matrix(t(eel_full_df))
+eel_mll_df_t <- as.matrix(t(eel_mll_df))
+
+# replace 9/-9 with NA
+eel_full_df_t[eel_full_df_t == 9] <- NA
+eel_mll_df_t[eel_mll_df_t == 9] <- NA
+# check it worked
+sum((eel_full_df_t == 9)) # returns NA - good
+sum((eel_full_df_t == 9)) # returns NA - good
+
+# get vector of populations
+pop_vector_full <- indiv_list_full$pop
+pop_vector_mll <- indiv_list_mll$pop
+
+# add pop data to genomic data
+colnames(eel_full_df_t) <- pop_vector_full
+colnames(eel_mll_df_t) <- pop_vector_mll
+
+# function to calculate allele frequency @ single locus
+calc_freq <- function(x){
+  a <- sum(x, na.rm=TRUE)
+  b <- (2*length(na.omit(x)))
+  a/b
+}
+
+# function extending this to calculate allele frequencies across whole pop
+calcfreq <- function(a, pop){
+  tapply(a, pop, calc_freq)
+}
+
+# full dataset
+freqs_full <- apply(t(eel_full_df_t), 2, calcfreq, pop_vector_full)
+str(freqs_full)
+
+# MLL dataset
+freqs_mll <- apply(t(eel_mll_df_t), 2, calcfreq, pop_vector_mll)
+str(freqs_mll)
+
+# transform this back to columns as populations and snps as rows for gf
+snp_full <- t(freqs_full)
+snp_mll <- t(freqs_mll)
+```
+
+### Train models
+
+To train the models, I will be using the seascape genomic dataset that we processed in the above chunk, as well as the current environmental data files produced using "EnvDatProcess.Rmd."
+
+```{r}
+# start by defining a maximum number of splits
+maxLevel_full <- log2(0.368*nrow(curr_full_env_gf)/2)
+maxLevel_mll <- log2(0.368*nrow(curr_mll_env_gf)/2)
+
+colnames(curr_pop_env_gf) <- colnames(curr_mll_env_gf) <- colnames(curr_full_env_gf) <- c("pcnm", "temp_scaled", "max_temp_scaled", "sal_scaled", "min_sal_scaled")
+
+# run gradient forest
+# with pcnm
+gf_full_af <- gradientForest(cbind(curr_pop_env_gf, freqs_full), predictor.vars=colnames(curr_pop_env_gf), response.vars=colnames(freqs_full), ntree=500, maxLevel=maxLevel_full, trace=T, corr.threshold=0.50) # tons of warnings here
+# could ask brandon about the warnings here
+gf_mll_af <- gradientForest(cbind(curr_pop_env_gf, freqs_mll), predictor.vars=colnames(curr_pop_env_gf), response.vars=colnames(freqs_mll), ntree=500, maxLevel=maxLevel_mll, trace=T, corr.threshold=0.50) # tons of warnings here
+gf_full_geno <- gradientForest(cbind(curr_full_env_gf, eel_full_df), predictor.vars=colnames(curr_full_env_gf), response.vars=colnames(eel_full_df), ntree=500, maxLevel=maxLevel_full, trace=T, corr.threshold=0.50)
+gf_mll_geno <- gradientForest(cbind(curr_mll_env_gf, eel_mll_df), predictor.vars=colnames(curr_mll_env_gf), response.vars=colnames(eel_mll_df), ntree=500, maxLevel=maxLevel_mll, trace=T, corr.threshold=0.50)
+
+# with no pcnm
+gf_full_af_nopcnm <- gradientForest(cbind(curr_pop_env_gf[,2:5], freqs_full), predictor.vars=colnames(curr_pop_env_gf[,2:5]), response.vars=colnames(freqs_full), ntree=500, maxLevel=maxLevel_full, trace=T, corr.threshold=0.50) # tons of warnings here
+# could ask brandon about the warnings here
+gf_mll_af_nopcnm <- gradientForest(cbind(curr_pop_env_gf[,2:5], freqs_mll), predictor.vars=colnames(curr_pop_env_gf[,2:5]), response.vars=colnames(freqs_mll), ntree=500, maxLevel=maxLevel_mll, trace=T, corr.threshold=0.50) # tons of warnings here
+gf_full_geno_nopcnm <- gradientForest(cbind(curr_full_env_gf[,2:5], eel_full_df), predictor.vars=colnames(curr_full_env_gf[,2:5]), response.vars=colnames(eel_full_df), ntree=500, maxLevel=maxLevel_full, trace=T, corr.threshold=0.50)
+gf_mll_geno_nopcnm <- gradientForest(cbind(curr_mll_env_gf[,2:5], eel_mll_df), predictor.vars=colnames(curr_mll_env_gf[,2:5]), response.vars=colnames(eel_mll_df), ntree=500, maxLevel=maxLevel_mll, trace=T, corr.threshold=0.50)
+
+# plot bar graphs depicting importance of each spatial and climate variable
+plot(gf_full_af, plot.type = "O")
+plot(gf_mll_af, plot.type = "O")
+plot(gf_full_geno, plot.type = "O")
+plot(gf_mll_geno, plot.type = "O")
+
+plot(gf_full_af_nopcnm, plot.type = "O")
+plot(gf_mll_af_nopcnm, plot.type = "O")
+plot(gf_full_geno_nopcnm, plot.type = "O")
+plot(gf_mll_geno_nopcnm, plot.type = "O")
+
+# plots of turnover functions for individual loci - now having issues with ylim
+plot(gf_full_af, plot.type = "C", imp.vars = gf_full_af$imp.vars, show.overall = T, legend = T, leg.posn = "topleft", leg.nspecies = 5)
+plot(gf_mll_af, plot.type = "C", imp.vars = gf_mll_af$imp.vars, show.overall = F, legend = T, leg.posn = "topleft", leg.nspecies = 5, cex.lab = 0.7, cex.legend = 0.4, cex.axis = 0.6, line.ylab = 0.9, par.args = list(mgp = c(1.5, 0.5, 0), mar = c(2.5, 1, 0.1, 0.5), omi = c(0, 0.3, 0, 0)))
+plot(gf_full_geno, plot.type = "C", imp.vars = gf_full_af$imp.vars, show.overall = T, legend = T, leg.posn = "topleft", leg.nspecies = 5)
+plot(gf_mll_geno, plot.type = "C", imp.vars = gf_mll_af$imp.vars, show.overall = F, legend = T, leg.posn = "topleft", leg.nspecies = 5, cex.lab = 0.7, cex.legend = 0.4, cex.axis = 0.6, line.ylab = 0.9, par.args = list(mgp = c(1.5, 0.5, 0), mar = c(2.5, 1, 0.1, 0.5), omi = c(0, 0.3, 0, 0)))
+
+# other plots????
+```
+
+It looks like salinity mean and minimum are the most important climate variables in the allele frequency-based model, regardless of whether we use the full or mll data set. The spatial variable (pcnm) is the next most important in these models, followed by maximum temperature and finally mean temperature.
+
+Using the genotype based model, we get a completely different picture. Here, in the full genomic data set model, the spatial pcnm variable is by far the most important, followed by mean temperature, max temperature, and finally mean then minimum salinity. In the mll genomic data set model, pcnm is still the most important variable, then mean temperature, but then mean salinity comes out as important. After that is maximum temperature and finally minimum salinity.
+
+For both training runs, it's important to note that I had a significant number of warning messages - specifically:
+
+"Warning in randomForest.default(x = X, y = spec_vec, maxLevel = maxLevel, : The response has five or fewer unique values. Are you sure you want to do regression?"
+
+I think this is coming from non-variable genomic sites, which I could trim in future iterations of this model. Brandon has encountered this issue before and seems to think that the warning is internal to extendedForests (pckg for implementing random forests), and refers to number of unique AFs for a given locus.
+
+### Predict Offset
+
+Now that we have trained our gradient forest models, we need to use these to predict performance in the mesocosm treatments. This requires no new genomic data, just new environmental data that corresponds to each of the treatments and to the sites these populations originated from. Importantly, this new environmental data set must use the same column names as the data set used for training. We will ensure data compatibility below.
+
+```{r}
+# FOR FUTURE DATA
+#################
+# first check column names of environmental datasets
+head(curr_pop_env_gf) 
+head(curr_full_env_gf)
+head(curr_mll_env_gf)
+head(fut_pop_env_gf)
+head(trt_full_env_gf)
+head(trt_mll_env_gf)
+
+# change column names to match
+colnames(fut_pop_env_gf) <- colnames(trt_full_env_gf) <- c("pcnm_keep_full","temp_scaled","sal_scaled")
+
+colnames(trt_mll_env_gf) <- c("pcnm_keep_mll","temp_scaled","sal_scaled")
+
+# set up pipeline with future data for now, which doesn't have the mins or maxes - need to get rid of these
+curr_pop_env_gf_red <- subset(curr_pop_env_gf, select = c("pcnm_keep_full", "temp_scaled","sal_scaled"))
+curr_full_env_gf_red <- subset(curr_full_env_gf, select = c("pcnm_keep_full", "temp_scaled","sal_scaled"))
+curr_mll_env_gf_red <- subset(curr_mll_env_gf, select = c("pcnm_keep_mll", "temp_scaled","sal_scaled"))
+#################
+
+# FOR EXPERIMENTAL DATA
+#######################
+# check columns
+head(expOrig_inds)
+head(expOrig_pop)
+head(exp_trt_inds_env)
+
+# trt reduced version of exp_trt_inds_env
+exp_trt_red_env <- exp_trt_inds_env[!duplicated(exp_trt_inds_env$trt),c("trt","temp_scaled","max_temp_scaled","sal_scaled","min_sal_scaled")]
+
+# change colnames of env orig dfs to match
+colnames(expOrig_inds) <- colnames(expOrig_pop) <- c("pop","pcnm","temp_scaled","sal_scaled","max_temp_scaled","min_sal_scaled")
+#######################
+```
+
+Now I can predict offset using these different methods (genotype and allele frequency based, MLL and full).
+
+```{r}
+# PREDICTIONS FUTURE
+####################
+# predictions current day
+pred_full_af <- predict(gf_full_af, curr_pop_env_gf_red)
+pred_mll_af <- predict(gf_mll_af, curr_pop_env_gf_red)
+pred_full_geno <- predict(gf_full_geno, curr_full_env_gf_red)
+pred_mll_geno <- predict(gf_mll_geno, curr_mll_env_gf_red)
+
+# predictions to trts
+pred_full_af_fut <- predict(gf_full_af, fut_pop_env_gf)
+pred_mll_af_fut <- predict(gf_mll_af, fut_pop_env_gf)
+pred_full_geno_fut <- predict(gf_full_geno, trt_full_env_gf)
+pred_mll_geno_fut <- predict(gf_mll_geno, trt_mll_env_gf)
+
+# We now compute the euclidean distance between current and new cumulative importance
+nb_ind_af <- nrow(pred_full_af)
+nb_ind_full <- nrow(pred_full_geno)
+nb_ind_mll <- nrow(pred_mll_geno)
+
+# calculate offsets - FIX THIS FUNCTION, CHECK https://github.com/bcm-uga/geneticgap/blob/master/R/offset.R
+euclidean <- function(a, b) sqrt(sum((a - b)^2)) # Euclidean distance for genetic offset
+
+# full af
+df_full_af <- data.frame() # df
+for (i in 1:nb_ind_af){ # calc offset
+  ec_dist <- euclidean(pred_full_af[i,], pred_full_af_fut[i,]) %>% as.data.frame()
+  df_full_af <- rbind(df_full_af, ec_dist)
+}
+colnames(df_full_af) <- "offset_full_af"
+af_full_offset_complete <- cbind(pop_list, df_full_af) # associate metadata with offset calculation
+
+# mll af
+df_mll_af <- data.frame() # df
+for (i in 1:nb_ind_af){ # calc offset
+  ec_dist <- euclidean(pred_mll_af[i,], pred_mll_af_fut[i,]) %>% as.data.frame()
+  df_mll_af <- rbind(df_mll_af, ec_dist)
+}
+colnames(df_mll_af) <- "offset_mll_af"
+af_mll_offset_complete <- cbind(pop_list, df_mll_af) # associate metadata with offset calculation
+
+# compare the two
+af_all_offset <- merge(af_full_offset_complete[,-1], af_mll_offset_complete[,-1], by = c("region","site_full","Pop","long","lat"))
+af_all_offset
+ggplot(af_all_offset, aes(x = offset_full_af, y = offset_mll_af)) + geom_point() + geom_smooth(method="lm") + theme_classic()
+# mll and full predictions line up almost perfectly, both in magnitude and rank
+
+# full geno
+df_full_geno <- data.frame() # df
+for (i in 1:nb_ind_full){ # calc offset
+  ec_dist <- euclidean(pred_full_geno[i,], pred_full_geno_fut[i,]) %>% as.data.frame()
+  df_full_geno <- rbind(df_full_geno, ec_dist)
+}
+colnames(df_full_geno) <- "offset_full_geno"
+geno_full_offset_complete <- cbind(indiv_list_full, df_full_geno) # associate metadata with offset calculation
+
+# mll geno
+df_mll_geno <- data.frame() # df
+for (i in 1:nb_ind_mll){ # calc offset
+  ec_dist <- euclidean(pred_mll_geno[i,], pred_mll_geno_fut[i,]) %>% as.data.frame()
+  df_mll_geno <- rbind(df_mll_geno, ec_dist)
+}
+colnames(df_mll_geno) <- "offset_mll_geno"
+geno_mll_offset_complete <- cbind(indiv_list_mll, df_mll_geno) # associate metadata with offset calculation
+
+# use these to calculate population level offsets
+geno_full_offset_pop <- geno_full_offset_complete %>% group_by(pop) %>%
+  summarise(pop_offset_full_geno = mean(offset_full_geno))
+geno_mll_offset_pop <- geno_mll_offset_complete %>% group_by(pop) %>%
+  summarise(pop_offset_mll_geno = mean(offset_mll_geno))
+
+# compare the two 
+geno_full_offset_pop
+geno_mll_offset_pop
+
+geno_all_offset <- merge(geno_full_offset_pop,geno_mll_offset_pop, by = "pop")
+ggplot(geno_all_offset, aes(x = pop_offset_full_geno, y = pop_offset_mll_geno)) + geom_point() + geom_smooth(method="lm") + theme_classic()
+# geno predictions are wayyy more all over the place...
+
+# how do the geno predictions line up with the af predictions?
+geno_all_offset
+colnames(geno_all_offset) <- c("Pop", "offset_full_geno", "offset_mll_geno")
+af_all_offset
+all_offsets_poplvl <- merge(af_all_offset, geno_all_offset, by = c("Pop"))
+
+ggplot(all_offsets_poplvl, aes(x = offset_full_geno, y = offset_full_af)) + geom_point() + geom_smooth(method="lm") + theme_classic() # full
+ggplot(all_offsets_poplvl, aes(x = offset_mll_geno, y = offset_mll_af)) + geom_point() + geom_smooth(method="lm") + theme_classic() # mll
+ggplot(all_offsets_poplvl, aes(x = offset_full_geno, y = offset_mll_af)) + geom_point() + geom_smooth(method="lm") + theme_classic() # full geno vs af mll
+ggplot(all_offsets_poplvl, aes(x = offset_full_af, y = offset_mll_geno)) + geom_point() + geom_smooth(method="lm") + theme_classic() # full af vs mll geno
+####################
+
+# PREDICTIONS EXP
+#################
+# predictions current loc
+pred_full_af_exporg <- predict(gf_full_af_nopcnm, expOrig_pop[,3:6])
+pred_mll_af_exporg <- predict(gf_mll_af_nopcnm, expOrig_pop[,3:6])
+pred_full_geno_exporg <- predict(gf_full_geno_nopcnm, expOrig_inds[,3:6])
+pred_mll_geno_exporg <- predict(gf_mll_geno_nopcnm, expOrig_inds[,3:6])
+
+# predictions to treatments
+pred_full_af_exptrt <- predict(gf_full_af_nopcnm, exp_trt_red_env[,2:5])
+pred_mll_af_exptrt <- predict(gf_mll_af_nopcnm, exp_trt_red_env[,2:5]) # something is going wrong here
+pred_full_geno_exptrt <- predict(gf_full_geno_nopcnm, exp_trt_red_env[,2:5])
+pred_mll_geno_exptrt <- predict(gf_mll_geno_nopcnm, exp_trt_red_env[,2:5])
+
+# We now compute the euclidean distance between current and new cumulative importance
+nb_ind_af_nopcnm <- nrow(pred_full_af_exporg)
+nb_ind_full_nopcnm <- nrow(pred_full_geno_exporg)
+nb_ind_mll_nopcnm <- nrow(pred_mll_geno_exporg)
+
+# calculate offsets - FIX THIS FUNCTION, CHECK https://github.com/bcm-uga/geneticgap/blob/master/R/offset.R
+euclidean <- function(a, b) sqrt(sum((a - b)^2)) # Euclidean distance for genetic offset
+
+# full af
+df_full_af_trt <- data.frame() # df
+for (i in 1:nb_ind_af_nopcnm){ # calc offset
+  ec_dist <- euclidean(pred_full_af_exporg[i,], pred_full_af_exptrt[i,]) %>% as.data.frame()
+  df_full_af_trt <- rbind(df_full_af_trt, ec_dist)
+}
+colnames(df_full_af_trt) <- "offset_full_af_trt"
+af_full_offset_complete <- cbind(pop_list[,-1], df_full_af) # associate metadata with offset calculation
+
+# mll af
+df_mll_af_exp <- data.frame() # df
+for (i in 1:nb_ind_af_nopcnm){ # calc offset
+  ec_dist <- euclidean(pred_mll_af_exporg[i,], pred_mll_af_exptrt[i,]) %>% as.data.frame()
+  df_mll_af_trt <- rbind(df_mll_af_exp, ec_dist) # this part isn't working, gives NA
+}
+colnames(df_mll_af_trt) <- "offset_mll_af"
+af_mll_offset_complete <- cbind(df_mll_af_trt) # associate metadata with offset calculation
+
+# compare the two
+af_all_offset <- merge(af_full_offset_complete[,-1], af_mll_offset_complete[,-1], by = c("region","site_full","Pop","long","lat"))
+af_all_offset
+ggplot(af_all_offset, aes(x = offset_full_af, y = offset_mll_af)) + geom_point() + geom_smooth(method="lm") + theme_classic()
+# mll and full predictions line up almost perfectly, both in magnitude and rank
+
+# full geno
+df_full_geno <- data.frame() # df
+for (i in 1:nb_ind_full){ # calc offset
+  ec_dist <- euclidean(pred_full_geno[i,], pred_full_geno_fut[i,]) %>% as.data.frame()
+  df_full_geno <- rbind(df_full_geno, ec_dist)
+}
+colnames(df_full_geno) <- "offset_full_geno"
+geno_full_offset_complete <- cbind(indiv_list_full, df_full_geno) # associate metadata with offset calculation
+
+# mll geno
+df_mll_geno <- data.frame() # df
+for (i in 1:nb_ind_mll){ # calc offset
+  ec_dist <- euclidean(pred_mll_geno[i,], pred_mll_geno_fut[i,]) %>% as.data.frame()
+  df_mll_geno <- rbind(df_mll_geno, ec_dist)
+}
+colnames(df_mll_geno) <- "offset_mll_geno"
+geno_mll_offset_complete <- cbind(indiv_list_mll, df_mll_geno) # associate metadata with offset calculation
+
+# use these to calculate population level offsets
+geno_full_offset_pop <- geno_full_offset_complete %>% group_by(pop) %>%
+  summarise(pop_offset_full_geno = mean(offset_full_geno))
+geno_mll_offset_pop <- geno_mll_offset_complete %>% group_by(pop) %>%
+  summarise(pop_offset_mll_geno = mean(offset_mll_geno))
+
+# compare the two 
+geno_full_offset_pop
+geno_mll_offset_pop
+
+geno_all_offset <- merge(geno_full_offset_pop,geno_mll_offset_pop, by = "pop")
+ggplot(geno_all_offset, aes(x = pop_offset_full_geno, y = pop_offset_mll_geno)) + geom_point() + geom_smooth(method="lm") + theme_classic()
+# geno predictions are wayyy more all over the place...
+
+# how do the geno predictions line up with the af predictions?
+geno_all_offset
+colnames(geno_all_offset) <- c("Pop", "offset_full_geno", "offset_mll_geno")
+af_all_offset
+all_offsets_poplvl <- merge(af_all_offset, geno_all_offset, by = c("Pop"))
+
+ggplot(all_offsets_poplvl, aes(x = offset_full_geno, y = offset_full_af)) + geom_point() + geom_smooth(method="lm") + theme_classic() # full
+ggplot(all_offsets_poplvl, aes(x = offset_mll_geno, y = offset_mll_af)) + geom_point() + geom_smooth(method="lm") + theme_classic() # mll
+ggplot(all_offsets_poplvl, aes(x = offset_full_geno, y = offset_mll_af)) + geom_point() + geom_smooth(method="lm") + theme_classic() # full geno vs af mll
+ggplot(all_offsets_poplvl, aes(x = offset_full_af, y = offset_mll_geno)) + geom_point() + geom_smooth(method="lm") + theme_classic() # full af vs mll geno
+#################
+```
+
+These predictions need to be converted into multivariate space and converted to a color scale for mapping. One way is to use principal components analysis and use the first three axes to define red, green, and blue color scales respectively. Once done, the colors can be stacked and mapped.
+
+```{r}
+# get PCs
+PCs_full_af <- prcomp(pred_full_af, center=T, scale.=F)
+PCs_mll_af <-prcomp(pred_mll_af, center=T, scale.=F)
+PCs_full_geno <- prcomp(pred_full_geno, center=T, scale.=F)
+PCs_mll_geno <- prcomp(pred_mll_geno, center=T, scale.=F)
+
+# 
+```
+
+Question for the paper: do we want to predict to the future environments?
+
+Could show differences in weighting, but maybe don't want to include if they don't predict well to the treatments.
+
