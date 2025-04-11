@@ -286,6 +286,7 @@ I need to first clean the dataset to only contain the dates when the experiment 
 colnames(gas) <- colnames(A1a) <- colnames(A1b) <- colnames(A1c) <- colnames(A2a) <- colnames(A2b) <- colnames(A2c) <- colnames(A3a) <- colnames(A3b) <- colnames(A3c) <- colnames(A4a) <- colnames(A4b) <- colnames(A4c) <- colnames(B1a) <- colnames(B1b) <- colnames(B1c) <- colnames(B2a) <- colnames(B2b) <- colnames(B2c) <- colnames(B3a) <- colnames(B3b) <- colnames(B3c) <- colnames(B4a) <- colnames(B4b) <- colnames(B4c) <- colnames(C1a) <- colnames(C1b) <- colnames(C1c) <- colnames(C2a) <- colnames(C2b) <- colnames(C2c) <- colnames(C3a) <- colnames(C3b) <- colnames(C3c) <- colnames(C4a) <- colnames(C4b) <- colnames(C4c) <- c("datetime","temp","light")
 
 # trim
+library(lubridate)
 A1a_trim <- A1a %>% 
   filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
 A1b_trim <- A1b %>% 
@@ -641,6 +642,7 @@ euc_dists_long_mg <- merge(popsdf1[,c("pops1","order1")], euc_dists_long, by = "
 euc_dists_long_mg2 <- merge(popsdf2[,c("pops2","order2")], euc_dists_long_mg, by = "pops2")
 
 library(viridis)
+library(forcats)
 euc_dist_trtpop <- ggplot(euc_dists_long_mg2, aes(x = fct_reorder(pops1, order1), 
                               y = fct_reorder(pops2, order2), 
                               fill = distances))+
@@ -717,7 +719,7 @@ pca_envs_plot_red <- ggbiplot(pca_env_poptrt_red, obs.scale = 1, var.scale = 1,
               groups = pops_in_exp, ellipse = F,
               circle = T, ) + 
   geom_point(aes(color = pops_in_exp), size = 2) +
-  scale_color_manual(values = c()) + 
+  scale_color_manual(values = pops_in_df[,c("cols")]) + 
   theme(legend.direction = "horizontal",
                legend.position = "top") +
   theme_classic()

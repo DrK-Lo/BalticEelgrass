@@ -193,3 +193,4 @@ dim(sites_temps)
 # put it together and save
 eelgrass_sites_copernicus <- merge(sites_sals, sites_temps, by = c("Site_code"))
 write.csv(eelgrass_sites_copernicus, "EnvDat/eelgrass_exppops_copernicus.csv")
+
