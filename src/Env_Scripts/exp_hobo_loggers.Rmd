@@ -74,6 +74,8 @@ I need to first clean the dataset to only contain the dates when the experiment 
 # change colnames to be more usable
 colnames(gas) <- colnames(A1a) <- colnames(A1b) <- colnames(A1c) <- colnames(A2a) <- colnames(A2b) <- colnames(A2c) <- colnames(A3a) <- colnames(A3b) <- colnames(A3c) <- colnames(A4a) <- colnames(A4b) <- colnames(A4c) <- colnames(B1a) <- colnames(B1b) <- colnames(B1c) <- colnames(B2a) <- colnames(B2b) <- colnames(B2c) <- colnames(B3a) <- colnames(B3b) <- colnames(B3c) <- colnames(B4a) <- colnames(B4b) <- colnames(B4c) <- colnames(C1a) <- colnames(C1b) <- colnames(C1c) <- colnames(C2a) <- colnames(C2b) <- colnames(C2c) <- colnames(C3a) <- colnames(C3b) <- colnames(C3c) <- colnames(C4a) <- colnames(C4b) <- colnames(C4c) <- c("datetime","temp","light")
 
+library(lubridate)
+
 # trim
 A1a_trim <- A1a %>% 
   filter(between(datetime, ymd_hms("2024-07-03 09:00:00"), ymd_hms("2024-08-07 09:00:00")))
@@ -304,7 +306,7 @@ colnames(exp_df) <- c("bagnum","tank","pop","genet","trt")
 exp_df$ind <- paste0(exp_df$pop,"_",exp_df$genet)
 
 # now format environmental data by treatment
-trt_env_dat <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"), max_temp = c(temps_trt_sum[temps_trt_sum$trt == "ctrl",]$max_temp, temps_trt_sum[temps_trt_sum$trt == "ctrl",]$max_temp, temps_trt_sum[temps_trt_sum$trt == "heat",]$max_temp, temps_trt_sum[temps_trt_sum$trt == "heat",]$max_temp), avg_temp = c(temps_trt_sum[temps_trt_sum$trt == "ctrl",]$avg_temp, temps_trt_sum[temps_trt_sum$trt == "ctrl",]$avg_temp, temps_trt_sum[temps_trt_sum$trt == "heat",]$avg_temp, temps_trt_sum[temps_trt_sum$trt == "heat",]$avg_temp), min_sal = c(21, 7, 16, 5), avg_sal = c(21, 7, 16, 5))
+trt_env_dat <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"), max_temp = c(trt_temps[trt_temps$trt == "ctrl",]$max_temp, trt_temps[trt_temps$trt == "ctrl",]$max_temp, trt_temps[trt_temps$trt == "heat",]$max_temp, trt_temps[trt_temps$trt == "heat",]$max_temp), avg_temp = c(trt_temps[trt_temps$trt == "ctrl",]$mean_temp, trt_temps[trt_temps$trt == "ctrl",]$mean_temp, trt_temps[trt_temps$trt == "heat",]$mean_temp, trt_temps[trt_temps$trt == "heat",]$mean_temp), min_sal = c(21, 7, 16, 5), avg_sal = c(21, 7, 16, 5))
 
 # and combine
 exp_ind_env <- merge(exp_df, trt_env_dat, by = c("trt"))
@@ -353,7 +355,7 @@ rownames(scaling) <- NULL
 scaling
 
 # write all of this information out to csv for any future analysis
-write.csv(exp_env_ord_scaled, "EnvDat/Ind_Exp_Env_030725.csv")
-write.csv(pop_trt_env_scaled, "EnvDat/Pop_Exp_Env_030725.csv")
-write.csv(scaling, "EnvDat/Env_Exp_ScalingFactors_030725.csv")
+write.csv(exp_env_ord_scaled, paste0("EnvDat/Ind_Exp_Env_",Sys.Date(),".csv"))
+write.csv(pop_trt_env_scaled, paste0("EnvDat/Pop_Exp_Env_",Sys.Date(),".csv"))
+write.csv(scaling, paste0("EnvDat/Env_Exp_ScalingFactors_",Sys.Date(),".csv"))
 ```
