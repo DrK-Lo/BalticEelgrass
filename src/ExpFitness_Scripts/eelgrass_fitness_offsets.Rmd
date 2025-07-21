@@ -208,6 +208,8 @@ ggplot(full_dat_alive_nofl, aes(x = length_growth, y = weight_growth)) +
 cor(full_dat_alive_nofl$length_growth, full_dat_alive_nofl$total_weight) # pearson corr = 0.6192
 
 # now we can calculate averages across populations and treatments
+library(plotrix)
+
 growth_pop <- full_dat_alive_nofl %>% group_by(pop) %>%
   summarise(mean_len_growth = mean(as.numeric(length_growth)), 
             sd_len_growth = sd(as.numeric(length_growth)),
@@ -272,6 +274,11 @@ Now that I have calculated absolute (and not yet relative) fitness using both su
 Note that for these fitness offsets, I have more populations than I have treatments - that is, populations are assigned a "home" or "local" treatment that is broadly representative of their true home/local conditions, but not an exact match. In order to appropriately account for this detail, I need to scale calculated fitness offsets by environmental distance. Thus, my first step here is actually to calculate environmental distance between experimental treatments and experimental populations' environment-of-origin.
 
 ```{r}
+# treatment environmental data
+ind_env_trt <- read.csv("EnvDat/Ind_Exp_Env_072125.csv")
+pop_env_trt <- read.csv("EnvDat/Pop_Exp_Env_072125.csv")
+
+
 # put together env of origin and treatment data - COME BACK HERE
 env_trt_site <- cbind()
 
@@ -297,128 +304,129 @@ Common garden fitness offset is the fitness difference between foreign genotypes
 fake_fit <- data.frame(population = rep(c("A","B","C","D"),2), trt = c(rep("trt-1", 4), rep("trt-2", 4)), fitness = c(1, 0.8, 0.3, 0.4, 0.2, 0.5, 0.9, 0.8), envOrg = c("lcl","lcl","frn","frn","frn","frn","lcl","lcl"), envdist = c(0.1, 1.3, 8.8, 9.1, 10, 9.4, 1, 0))
 fake_fit
 
-# # start by separating out "local" and "foreign"
-# fit_frn <- data.frame(pop_trt = paste0(fake_fit[fake_fit$envOrg == "frn",]$population, "_", fake_fit[fake_fit$envOrg == "frn",]$trt), fit = fake_fit[fake_fit$envOrg == "frn",]$fitness)
-# fit_lcl <- data.frame(pop_trt = paste0(fake_fit[fake_fit$envOrg == "lcl",]$population, "_", fake_fit[fake_fit$envOrg == "lcl",]$trt), fit = fake_fit[fake_fit$envOrg == "lcl",]$fitness)
+# start by separating out "local" and "foreign"
+fit_frn <- data.frame(pop_trt = paste0(fake_fit[fake_fit$envOrg == "frn",]$population, "_", fake_fit[fake_fit$envOrg == "frn",]$trt), fit = fake_fit[fake_fit$envOrg == "frn",]$fitness)
+fit_lcl <- data.frame(pop_trt = paste0(fake_fit[fake_fit$envOrg == "lcl",]$population, "_", fake_fit[fake_fit$envOrg == "lcl",]$trt), fit = fake_fit[fake_fit$envOrg == "lcl",]$fitness)
 
 # I need to scale these data now by environmental distance before calculating fitness offset
 
 
-# from Katie's paper
-# This is a more general function for real data
-# At least a 3x3 reciprocal transplant is needed
-ExploreCorrsFlex <- function(W, main){
-  # `main` is the name or title of the situation modeled
-  # W is a nxn reciprocal transplant matrix with genotypes in columns and common gardents in rows
-  
-  print("Absolute fitness")
-  print(W)
-  par(mar=c(4,0,0,1))
-
-  LocalAdaptation_SA <- mean(diag(W)) - mean(W[lower.tri(W) | upper.tri(W)])
-   print(c("Delta-SA is", LocalAdaptation_SA))
-   
-  colors = grey(seq(0.1,0.9, length=nrow(W)))
-   
-#  pdf(paste0("figs/", main, "_LApatterns.pdf"), height=4, width=5)
-  # Make reciprocal transplant plot
-    par(mar=c(4,4,1,1))
-    barplot(t(W), ylim=c(0,max(W)*1.5), 
-        lwd=4, bty="n", beside=TRUE,
-         xlab="Site", ylab="Absolute fitness", col=colors)
-    legend("topright",legend=c(colnames(W)), fill=colors)
-  #dev.off()
-
-  #Home-away fitness offset
-    offset_HA <- t(t(W)-diag(W))
-  #Home-away relative fitness
-    w_HA <- t(t(W)/diag(W))
-  #Home-away relative fitness offset
-    offset_HA_relative <- t(t(offset_HA)/diag(W))
-  
-  #Local-foreign fitness offset
-    offset_LF <- W - diag(W)
-  #Local-foreign relative fitness
-    w_LF <- W/diag(W)
-  #Local-foreign relative fitness offset
-    offset_LF_relative <- offset_LF/diag(W)
-  # 
-  df <- data.frame(as.numeric(W), 
-                   as.numeric(offset_HA), 
-                  # as.numeric(w_HA), 
-                   as.numeric(offset_HA_relative),
-                   as.numeric(offset_LF), 
-                  # as.numeric(w_LF),
-                   as.numeric(offset_LF_relative))
-  
-#  pdf(paste0("figs/", main, "_RelFitpatterns.pdf"), height=4, width=5)
-    # Make reciprocal transplant plot
-    par(mar=c(4,4,1,1))
-    barplot(t(w_LF), ylim=c(min(c(w_LF,0)),max(w_LF)*1.5), 
-        lwd=4, bty="n", beside=TRUE,
-         xlab="Site", ylab="Local-foreign relative fitness",
-        col=colors)
-    legend("topright",legend=c(colnames(W)), fill=colors)
-    
-    barplot(w_HA, ylim=c(min(c(w_HA,0)),max(w_HA)*1.5), 
-        lwd=4, bty="n", beside=TRUE,
-         xlab="Site", ylab="Home-away relative fitness", col=colors)
-    legend("topright",legend=c(rownames(W)), fill=colors)
-    
- # dev.off()
-  
-  
-  
-  colnames(df)<-c("Absolute fitness",
-                  "Home-away fitness offset",
-                #  "Home-away relative fitness",
-                  "Home-away relative fitness offset",
-                  "Local-foreign fitness offset",
-               #   "Local-foreign relative fitness",
-                  "Local-foreign relative fitness offset")
-  
-  # Plot a heatmap of the correlations among the matrices
-  col <- colorRampPalette(c("#BB4444", "#EE9988",
-                            "white",  "#77AADD", "#4477AA"))
- # pdf(paste0("figs/", main, "_corr.pdf"), height=8 , width=8)
-  par(mar=c(0,0,2,2))
-  corrplot(round(cor(df),2), method="color", col=col(100),
-           type="upper", 
-           addCoef.col="black", tl.col="black", 
-           tl.cex=1, main=main, tl.srt=45, mar=c(0,0,2,2))
- # dev.off()
-  return(list(W=W, offset_HA=offset_HA,
-              offset_HA_relative=offset_HA_relative, 
-              w_HA = w_HA,
-              offset_LF=offset_LF,
-              offset_LF_relative=offset_LF_relative, 
-              w_LF = w_LF,
-              cor_mat = cor(df),
-              Delta_SA = LocalAdaptation_SA))
-
-} #end function
-
-### I THINK TO USE THE ABOVE FUNCTION, I NEED TO COERCE MY FITNESS DATA TO FIT WITHIN THE RECIPROCAL GARDEN FRAMEWORK - I ALSO NEED TO SCALE MY FITNESS DATA BY ENVIRONMENTAL DISTANCE BEFORE USING THIS FUNCTION
-
-# # need to start by making a function to calculate the fitness offset
-# commGardFit <- function(fit_df) {
-#   fit_frn = fit_df[fit_df$envOrg == "frn",]$fitness
-#   fit_lcl = fit_df[fit_df$envOrg == "lcl",]$fitness
-#   fit_matrix = matrix(nrow = (length(fit_frn) + length(fit_lcl)), ncol = 2)
-#   for (i in (length(fit_frn) + length(fit_lcl))) { # change fit frn and fit lcl to be rows in some dataframe that labels things as local or foreign
-#     env_dist = fit_df 
-#     fit = fit_lcl[i,2] - sum(fit_frn[i,2])
-#     fit_scale = fit * (1 + env_dist) # 1 + dist so that we don't run into problems when env dist is 0
-#     fit_matrix[i,1] = 
-#     fit_matrix[i,2] = fit_scale
-#   }
-#   return(fit_scale)
-# }
+# # from Katie's paper
+# # This is a more general function for real data
+# # At least a 3x3 reciprocal transplant is needed - WE DO NOT HAVE THIS DESIGN
+# ExploreCorrsFlex <- function(W, main){
+#   # `main` is the name or title of the situation modeled
+#   # W is a nxn reciprocal transplant matrix with genotypes in columns and common gardents in rows
+#   
+#   print("Absolute fitness")
+#   print(W)
+#   par(mar=c(4,0,0,1))
 # 
-# commGardFit(fake_fit)
+#   LocalAdaptation_SA <- mean(diag(W)) - mean(W[lower.tri(W) | upper.tri(W)])
+#    print(c("Delta-SA is", LocalAdaptation_SA))
+#    
+#   colors = grey(seq(0.1,0.9, length=nrow(W)))
+#    
+# #  pdf(paste0("figs/", main, "_LApatterns.pdf"), height=4, width=5)
+#   # Make reciprocal transplant plot
+#     par(mar=c(4,4,1,1))
+#     barplot(t(W), ylim=c(0,max(W)*1.5), 
+#         lwd=4, bty="n", beside=TRUE,
+#          xlab="Site", ylab="Absolute fitness", col=colors)
+#     legend("topright",legend=c(colnames(W)), fill=colors)
+#   #dev.off()
+# 
+#   #Home-away fitness offset
+#     offset_HA <- t(t(W)-diag(W))
+#   #Home-away relative fitness
+#     w_HA <- t(t(W)/diag(W))
+#   #Home-away relative fitness offset
+#     offset_HA_relative <- t(t(offset_HA)/diag(W))
+#   
+#   #Local-foreign fitness offset
+#     offset_LF <- W - diag(W)
+#   #Local-foreign relative fitness
+#     w_LF <- W/diag(W)
+#   #Local-foreign relative fitness offset
+#     offset_LF_relative <- offset_LF/diag(W)
+#   # 
+#   df <- data.frame(as.numeric(W), 
+#                    as.numeric(offset_HA), 
+#                   # as.numeric(w_HA), 
+#                    as.numeric(offset_HA_relative),
+#                    as.numeric(offset_LF), 
+#                   # as.numeric(w_LF),
+#                    as.numeric(offset_LF_relative))
+#   
+# #  pdf(paste0("figs/", main, "_RelFitpatterns.pdf"), height=4, width=5)
+#     # Make reciprocal transplant plot
+#     par(mar=c(4,4,1,1))
+#     barplot(t(w_LF), ylim=c(min(c(w_LF,0)),max(w_LF)*1.5), 
+#         lwd=4, bty="n", beside=TRUE,
+#          xlab="Site", ylab="Local-foreign relative fitness",
+#         col=colors)
+#     legend("topright",legend=c(colnames(W)), fill=colors)
+#     
+#     barplot(w_HA, ylim=c(min(c(w_HA,0)),max(w_HA)*1.5), 
+#         lwd=4, bty="n", beside=TRUE,
+#          xlab="Site", ylab="Home-away relative fitness", col=colors)
+#     legend("topright",legend=c(rownames(W)), fill=colors)
+#     
+#  # dev.off()
+#   
+#   
+#   
+#   colnames(df)<-c("Absolute fitness",
+#                   "Home-away fitness offset",
+#                 #  "Home-away relative fitness",
+#                   "Home-away relative fitness offset",
+#                   "Local-foreign fitness offset",
+#                #   "Local-foreign relative fitness",
+#                   "Local-foreign relative fitness offset")
+#   
+#   # Plot a heatmap of the correlations among the matrices
+#   col <- colorRampPalette(c("#BB4444", "#EE9988",
+#                             "white",  "#77AADD", "#4477AA"))
+#  # pdf(paste0("figs/", main, "_corr.pdf"), height=8 , width=8)
+#   par(mar=c(0,0,2,2))
+#   corrplot(round(cor(df),2), method="color", col=col(100),
+#            type="upper", 
+#            addCoef.col="black", tl.col="black", 
+#            tl.cex=1, main=main, tl.srt=45, mar=c(0,0,2,2))
+#  # dev.off()
+#   return(list(W=W, offset_HA=offset_HA,
+#               offset_HA_relative=offset_HA_relative, 
+#               w_HA = w_HA,
+#               offset_LF=offset_LF,
+#               offset_LF_relative=offset_LF_relative, 
+#               w_LF = w_LF,
+#               cor_mat = cor(df),
+#               Delta_SA = LocalAdaptation_SA))
+# 
+# } #end function
+
+### I THINK TO USE THE ABOVE FUNCTION, I NEED TO COERCE MY FITNESS DATA TO FIT WITHIN THE RECIPROCAL GARDEN FRAMEWORK, WHICH DOESN'T REALLY WORK ESPECIALLY AS I DON'T HAVE A 3X3 DESIGN - I ALSO NEED TO SCALE MY FITNESS DATA BY ENVIRONMENTAL DISTANCE BEFORE USING THIS FUNCTION
+
+# need to start by making a function to calculate the fitness offset - WORKING ON THIS!!!!! doesn't work yet
+commGardFit <- function(fit_df) {
+  fit_frn = fit_df[fit_df$envOrg == "frn",]
+  fit_lcl = fit_df[fit_df$envOrg == "lcl",]
+  fit_matrix = matrix(nrow = (length(fit_frn$fitness) + length(fit_lcl$fitness)), ncol = 2)
+  for (i in (length(fit_frn$fitness) + length(fit_lcl$fitness))) {
+    env_dist = fit_df[i,"envdist"]
+    fit = fit_lcl[i,3] - mean(fit_frn[,3])
+    fit_scale = fit * (1/(0+1)) # using 0 as a placeholder in denominator, will use scaled 0-1 mahalanobis distance once available
+    fit_matrix[i,1] = fit_df[i,"population"]
+    fit_matrix[i,2] = fit_scale
+  }
+  return(fit_scale)
+}
+
+commGardFit(fake_fit)
+
+
 ```
 
-TO DISCUSS WITH KATIE - HOW CAN I CALCULATE FITNESS OFFSETS WHEN NO INDIVIDUALS ARE LOCAL TO FUTURE TREATMENTS??? DOES IT COME BACK TO SCALING BY ENV DIST AGAIN?
 
 ### Current-Future Fitness Offset
 
