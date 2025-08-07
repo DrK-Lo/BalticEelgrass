@@ -1,0 +1,186 @@
+---
+title: "Seagrass experimental design"
+author: "KE Lotterhos"
+date: "2024-04-12"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+This code balances populations among blocks and tanks
+ while randomizing ramets within tanks
+It wasn't easy to develop so edit carefully!
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+```
+
+
+```{r}
+# Set up genotypes
+pop <- paste0("pop-", LETTERS[1:8]) # 8 populations
+gen <- paste0("gen-", 1:12) # 12 genotypes per population
+rep <- paste0("rep-", letters[1:4])# 4 reps per genotype
+
+# Use expand grid to create the 384 ramets
+gens <- expand.grid(pop=pop, gen=gen,rep=rep)
+head(gens)
+gens <- gens[order(gens$pop,gens$gen,gens$rep),]
+gens$genet <- paste0(substr(gens$pop,5,6),substr(gens$gen,5,6))
+gens$ramet <- paste0(substr(gens$pop,5,5),substr(gens$gen,5,5), substr(gens$rep,5,5))
+head(gens)
+dim(gens)
+
+## Set up tanks
+tankID <- paste0("tank-", 1:12)
+temp <- rep(c("TempWarm", "TempControl"), each=6)
+tankTrt <- paste0(tankID,"_", temp)
+tankTrt
+
+salinity_warm <- c("16psu", "5psu")
+salinity_cool <- c("21psu", "7psu")
+
+
+# Set up positions
+bagnum <- 1:384
+bagID <- paste0("bagID-", 1:384)
+y_pos <- rep(1:16, 24)
+x_pos <- rep(1:24, each=16)
+
+# Position data frame
+pos_df <- data.frame(bagID,bagnum,  x_pos, y_pos)
+
+ggplot(pos_df) + geom_point(aes(x=x_pos, y=y_pos, color=bagnum)) 
+
+# Set up temp for each bag
+pos_df$temp <- NA
+pos_df$temp[1:128] <- rep(c("TempWarm", "TempControl"), each=8)
+pos_df$temp[129:256] <- rep(c("TempControl", "TempWarm"), each=8)
+pos_df$temp[257:384] <- rep(c("TempWarm", "TempControl"), each=8)
+
+ggplot(pos_df) + geom_point(aes(x=x_pos, y=y_pos, color=temp)) 
+
+# Set up salinity for bag
+pos_df$sal <- NA
+pos_df$sal[pos_df$temp=="TempWarm"] <- rep(salinity_warm, each=2)
+pos_df$sal[pos_df$temp=="TempControl"] <- rep(salinity_cool, each=2)
+
+# Set up tank_block
+pos_df$tank_block <- NA
+pos_df$tank_block[1:128] <- rep(rep(paste0("block",1:2), each=8), 8)
+pos_df$tank_block[129:256] <- rep(rep(paste0("block",3:4), each=8), 8)
+pos_df$tank_block[257:384] <- rep(rep(paste0("block",5:6), each=8), 8)
+
+# Set up tank_ID
+pos_df$tank_ID <- NA
+pos_df$tank_ID[1:128] <- rep(rep(paste0("tank",1:4), each=4), 8)
+pos_df$tank_ID[129:256] <- rep(rep(paste0("tank",5:8), each=4), 8)
+pos_df$tank_ID[257:384] <- rep(rep(paste0("tank",9:12), each=4), 8)
+
+
+ggplot(pos_df) + geom_point(aes(x=x_pos, y=y_pos, color=temp, pch=sal)) + 
+  ggtitle("treatment") + scale_color_manual(values=c("cornflowerblue","red"))
+
+ggplot(pos_df) + geom_point(aes(x=x_pos, y=y_pos, color=temp, pch=tank_block)) + 
+  ggtitle("block") + scale_color_manual(values=c("cornflowerblue","red"))
+
+ggplot(pos_df) + geom_point(aes(x=x_pos, y=y_pos, color=tank_ID)) + 
+  ggtitle("tank") 
+
+
+# check the position and table
+pos_df$xy <- paste(pos_df$x_pos, pos_df$y_pos, sep="_") # this will be a key for pos_df
+dim(pos_df)
+table(pos_df$tank_block)
+table(pos_df$tank_ID)
+table(pos_df$temp, pos_df$sal)
+
+head(pos_df)
+
+head(gens) #make sure this is in order!
+# the ramet is the key for the gens_df  
+
+
+pos_df$treatment <- paste(pos_df$tank_block,
+                          pos_df$temp,
+                          pos_df$sal, sep="_")
+
+head(gens)
+
+# This block structure will repeat 4 times
+# for the 12 genets and 36 ramets
+
+gens$treatment <- c(
+"block1_TempWarm_5psu", #- A1a
+"block2_TempControl_21psu", #- A1b
+"block3_TempControl_7psu", #- A1c
+"block4_TempWarm_16psu", #- A1d
+"block5_TempWarm_5psu", #- B1a
+"block6_TempControl_21psu", #- B1b
+
+"block1_TempWarm_16psu", #- B1c
+"block2_TempControl_7psu", #- B1d
+"block3_TempControl_21psu", #- C1a
+"block4_TempWarm_5psu", #- C1b
+"block5_TempWarm_16psu", #- C1c
+"block6_TempControl_7psu" #- C1d
+)
+
+head(gens)
+
+# now randomly allocate ramets to locations
+# to do so, I will scramble the pos_df and
+# then reorder by block and treatment and tank, such that
+# the locations within a tank are random
+# then I will reorder the gens table by
+# block and treatment and combine the tables
+
+set.seed(345998345) # makes code reproducible
+pos_df_ran <- pos_df[sample(1:nrow(pos_df)),]
+str(pos_df_ran)
+pos_df_ran_ord <- pos_df_ran[order(pos_df_ran$treatment,
+                                   pos_df_ran$tank_ID),]
+
+head(pos_df_ran_ord, 20)
+
+gens_ord <- gens[order(gens$treatment),]
+
+# do a unit test to make sure the treatments line up
+# this should be true
+identical(gens_ord$treatment, pos_df_ran_ord$treatment)
+
+# we use a cbind and not a merge because there 
+# are not unique keys and the datasets are aligned
+design <- cbind(pos_df_ran_ord,gens_ord )
+head(design)
+
+which(is.na(design$ramet)) # check no NA
+
+# check that each genet has 1 ramet in each treatment
+design$trt <- paste(design$temp, design$sal, sep="_")
+table(design$trt, design$genet)
+table(design$trt, design$pop)
+
+# check that each genet is spread across different blocks
+table(design$tank_block, design$genet)
+
+# check spread of populations across different blocks
+table(design$tank_block, design$pop)
+
+# check spread of populations across different tanks
+table(design$tank_ID, design$pop)
+
+design <- design[order(as.numeric(design$bagnum)),]
+design <- design[,-which(colnames(design)=="treatment")[1]]
+head(design)
+
+# graph the design
+ggplot(design) + 
+  geom_point(aes(x=x_pos, y=y_pos, color=temp, pch=sal)) + 
+  ggtitle("treatment") + 
+  scale_color_manual(values=c("cornflowerblue","red")) +
+  geom_text(aes(x=x_pos, y=y_pos+0.3, label=ramet), size=2)
+
+write.csv(design, file = "SeagrassDesign.csv")
+```
