@@ -65,7 +65,7 @@ trt_mll_env_gf <- read.csv("EnvDat/fut_full_env_gf.csv")[,-1] # replace with tre
 expOrig_inds <- read.csv("EnvDat/current_envorig_gf.csv")[,-1]
 expOrig_pop <- read.csv("EnvDat/curr_pop_envorig_gf.csv")[,-1]
 
-exp_trt_inds_env <- read.csv("EnvDat/Ind_Exp_Env_030725.csv")[,-1]
+exp_trt_inds_env <- read.csv("EnvDat/Ind_Exp_Env_072125.csv")[,-1]
 ```
 
 Environmental data has been processed in other scripts, so no need to do anything more with that. I will do some pre-processing of genomic data and individual data, which I intend to move to a separate script at a later date as this data needs to be consistent across genomic offset methods.
@@ -228,9 +228,9 @@ colnames(fut_pop_env_gf) <- colnames(trt_full_env_gf) <- c("pcnm_keep_full","tem
 colnames(trt_mll_env_gf) <- c("pcnm_keep_mll","temp_scaled","sal_scaled")
 
 # set up pipeline with future data for now, which doesn't have the mins or maxes - need to get rid of these
-curr_pop_env_gf_red <- subset(curr_pop_env_gf, select = c("pcnm_keep_full", "temp_scaled","sal_scaled"))
-curr_full_env_gf_red <- subset(curr_full_env_gf, select = c("pcnm_keep_full", "temp_scaled","sal_scaled"))
-curr_mll_env_gf_red <- subset(curr_mll_env_gf, select = c("pcnm_keep_mll", "temp_scaled","sal_scaled"))
+#curr_pop_env_gf_red <- subset(curr_pop_env_gf, select = c("pcnm_keep_full", "temp_scaled","sal_scaled"))
+#curr_full_env_gf_red <- subset(curr_full_env_gf, select = c("pcnm_keep_full", "temp_scaled","sal_scaled"))
+#curr_mll_env_gf_red <- subset(curr_mll_env_gf, select = c("pcnm_keep_mll", "temp_scaled","sal_scaled"))
 #################
 
 # FOR EXPERIMENTAL DATA
@@ -253,11 +253,17 @@ Now I can predict offset using these different methods (genotype and allele freq
 ```{r}
 # PREDICTIONS FUTURE
 ####################
+# names
+names(curr_pop_env_gf_red) <- names(curr_full_env_gf_red) <- names(curr_mll_env_gf_red) <- c("pcnm","temp_scaled","sal_scaled")
+
 # predictions current day
 pred_full_af <- predict(gf_full_af, curr_pop_env_gf_red)
 pred_mll_af <- predict(gf_mll_af, curr_pop_env_gf_red)
 pred_full_geno <- predict(gf_full_geno, curr_full_env_gf_red)
 pred_mll_geno <- predict(gf_mll_geno, curr_mll_env_gf_red)
+
+# names
+names(fut_pop_env_gf) <- names(trt_full_env_gf) <- names(trt_mll_env_gf) <- c("pcnm","temp_scaled","sal_scaled")
 
 # predictions to trts
 pred_full_af_fut <- predict(gf_full_af, fut_pop_env_gf)
@@ -363,14 +369,17 @@ nb_ind_mll_nopcnm <- nrow(pred_mll_geno_exporg)
 # calculate offsets - FIX THIS FUNCTION, CHECK https://github.com/bcm-uga/geneticgap/blob/master/R/offset.R
 euclidean <- function(a, b) sqrt(sum((a - b)^2)) # Euclidean distance for genetic offset
 
-# full af
+# full af - this is not giving the offset to each treatment
 df_full_af_trt <- data.frame() # df
 for (i in 1:nb_ind_af_nopcnm){ # calc offset
-  ec_dist <- euclidean(pred_full_af_exporg[i,], pred_full_af_exptrt[i,]) %>% as.data.frame()
+  df_temp_trt <- data.frame()
+  ec_dist <- euclidean(pred_full_af_exporg[i,], pred_full_af_exptrt[1,]) %>% as.data.frame()
   df_full_af_trt <- rbind(df_full_af_trt, ec_dist)
 }
 colnames(df_full_af_trt) <- "offset_full_af_trt"
-af_full_offset_complete <- cbind(pop_list[,-1], df_full_af) # associate metadata with offset calculation
+# df of pops
+pop_df_rep <- pop_list[,-1] %>% slice(rep(1:n(), each = 4))
+af_full_offset_complete <- cbind(pop_df_rep, df_full_af) # associate metadata with offset calculation
 
 # mll af
 df_mll_af_exp <- data.frame() # df
@@ -431,6 +440,34 @@ ggplot(all_offsets_poplvl, aes(x = offset_full_geno, y = offset_mll_af)) + geom_
 ggplot(all_offsets_poplvl, aes(x = offset_full_af, y = offset_mll_geno)) + geom_point() + geom_smooth(method="lm") + theme_classic() # full af vs mll geno
 #################
 ```
+
+I'm going to visualize offsets first as points on a map before trying to project them as a gradient.
+
+
+```{r}
+# put together full df
+all_offsets_poplvl
+
+# set s2 false
+sf::sf_use_s2(FALSE) # sf package doesn't work
+
+# set object
+world <- ne_countries(scale = "medium", returnclass = "sf")
+world_crop <- sf::st_crop(world, c(xmin =.3 , xmax = 33.5, ymin = 53.1, ymax = 66.1))
+
+map_full_af <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = all_offsets_poplvl, aes(x=long, y=lat, 
+                                   fill = log(offset_full_af)), 
+             shape = 21, size = 4)+
+  scale_fill_gradient(low = "green", high = "red", space = "Lab", limits = c(-9.5,-4.4))+
+  theme(plot.title = element_text(size = 24), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+        labs(title = "Genomic Offset of Baltic \nEelgrass (GF, Full, AF)", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset")
+(map_full_af)
+```
+
 
 These predictions need to be converted into multivariate space and converted to a color scale for mapping. One way is to use principal components analysis and use the first three axes to define red, green, and blue color scales respectively. Once done, the colors can be stacked and mapped.
 
