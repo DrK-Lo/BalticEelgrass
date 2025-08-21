@@ -41,9 +41,9 @@ library(maps) # mapping
 library(ggspatial) # mapping
 
 # data
-seascape_dat <- read.csv("EnvDat/summary_env_data_meadows_GEA.csv") # seascape env data
-indiv_list <- read_excel("seascape_data/MLL_per_individual_list.xlsx") # seascape individuals data
-eelgrass_vcf_MLL <- read.vcfR("seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")# read in vcf eelgrass mll
+seascape_dat <- read.csv("data/EnvDat/summary_env_data_meadows_GEA.csv") # seascape env data
+indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx") # seascape individuals data
+eelgrass_vcf_MLL <- read.vcfR("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")# read in vcf eelgrass mll
 
 # seascape env data reads in funky, change column names and remove first row
 colnames(seascape_dat) <- seascape_dat[1,]
