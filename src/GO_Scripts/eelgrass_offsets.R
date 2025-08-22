@@ -30,15 +30,15 @@ library(ggspatial) # mapping - NOT LOADING IN CLUSTER
 ## DATA
 #######
 # read in data
-sites <- read.csv("seascape_data/sampling_sites_coordinates_Baltic_Sea.csv")
-indiv_list <- read_excel("seascape_data/MLL_per_individual_list.xlsx")
-gen_div <- read_excel("seascape_data/Gen_div_table.xlsx")
+sites <- read.csv("data/seascape_data/sampling_sites_coordinates_Baltic_Sea.csv")
+indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx")
+gen_div <- read_excel("data/seascape_data/Gen_div_table.xlsx")
 
 # read in vcf data
 eelgrass_vcf_MLL <- read.vcfR(
-  "seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")
+  "data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")
 eelgrass_vcf_full <- read.vcfR(
-  "seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.vcf")
+  "data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.vcf")
 #######
 
 ## GEN DATA PREP
@@ -82,15 +82,15 @@ indiv_list_MLL <- indiv_list_full[indiv_list_full$Indv_no %in% MLL_inds,]
 ## LFMM & GENO FORMATS
 ######################
 # convert vcf files to lfmm file format
-eelgrass_lfmm_MLL <- vcf2lfmm("seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")
-eelgrass_lfmm_full <- vcf2lfmm("seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.vcf")
+eelgrass_lfmm_MLL <- vcf2lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")
+eelgrass_lfmm_full <- vcf2lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.vcf")
 
 # read in geno and lfmm files
-eelgrass_lfmm_MLL <- read.lfmm("seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.lfmm")
-eelgrass_geno_MLL <- read.geno("seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.geno")
-eelgrass_lfmm_full <- read.lfmm("seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.lfmm")
-eelgrass_geno_full <- read.geno("seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.geno")
-eelgrass_lfmm_full_rm <- read.lfmm("seascape_data/eel_full_rm.lfmm")
+eelgrass_lfmm_MLL <- read.lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.lfmm")
+eelgrass_geno_MLL <- read.geno("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.geno")
+eelgrass_lfmm_full <- read.lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.lfmm")
+eelgrass_geno_full <- read.geno("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.geno")
+eelgrass_lfmm_full_rm <- read.lfmm("data/seascape_data/eel_full_rm.lfmm")
 
 # check for missing data
 sum((eelgrass_lfmm_MLL == 9)) # 16894/174269 missing data (~9.7% missing data)
@@ -113,16 +113,16 @@ gen_MLL_imp_trim <- Filter(var, gen_MLL_imp_df)
 gen_MLL_imp_mat <- as.matrix(gen_MLL_imp_trim)
 
 # re-write lfmm files
-write.lfmm(gen_full_imp_mat, "seascape_data/gen_full_rm_imp_mat.lfmm")
-write.lfmm(gen_MLL_imp_mat, "seascape_data/gen_MLL_imp_mat.lfmm")
+write.lfmm(gen_full_imp_mat, "data/seascape_data/gen_full_rm_imp_mat.lfmm")
+write.lfmm(gen_MLL_imp_mat, "data/seascape_data/gen_MLL_imp_mat.lfmm")
 
 # also re-write geno files
-write.geno(gen_full_imp_mat, "seascape_data/gen_full_rm_imp_mat.geno")
-write.geno(gen_MLL_imp_mat, "seascape_data/gen_MLL_imp_mat.geno")
+write.geno(gen_full_imp_mat, "data/seascape_data/gen_full_rm_imp_mat.geno")
+write.geno(gen_MLL_imp_mat, "data/seascape_data/gen_MLL_imp_mat.geno")
 
 # read in lfmm files
-gen_full <- read.lfmm("seascape_data/gen_full_rm_imp_mat.lfmm") # has 3264 SNPs after filtering
-gen_MLL <- read.lfmm("seascape_data/gen_MLL_imp_mat.lfmm") # has 3036 SNPs after filtering
+gen_full <- read.lfmm("data/seascape_data/gen_full_rm_imp_mat.lfmm") # has 3264 SNPs after filtering
+gen_MLL <- read.lfmm("data/seascape_data/gen_MLL_imp_mat.lfmm") # has 3036 SNPs after filtering
 ######################
 
 ## ANCESTRY
@@ -310,10 +310,10 @@ future_full_mat <- as.matrix(pred_scaled_fullF)
 future_MLL_mat <- as.matrix(pred_scaled_MLLF)
 
 # and convert to env format
-write.env(current_full_mat, "seascape_data/current_full_env.env")
-write.env(current_MLL_mat, "seascape_data/current_MLL_env.env")
-write.env(future_full_mat, "seascape_data/future_full_env.env")
-write.env(future_MLL_mat, "seascape_data/future_MLL_env.env")
+write.env(current_full_mat, "data/seascape_data/current_full_env.env")
+write.env(current_MLL_mat, "data/seascape_data/current_MLL_env.env")
+write.env(future_full_mat, "data/seascape_data/future_full_env.env")
+write.env(future_MLL_mat, "data/seascape_data/future_MLL_env.env")
 #################
 
 #########################
@@ -324,8 +324,8 @@ write.env(future_MLL_mat, "seascape_data/future_MLL_env.env")
 #################
 # I'm going to use lfmm to do this initially, will add other methods later
 # read in current env data
-current_full_env <- read.env("seascape_data/current_full_env.env")
-current_MLL_env <- read.env("seascape_data/current_MLL_env.env")
+current_full_env <- read.env("data/seascape_data/current_full_env.env")
+current_MLL_env <- read.env("data/seascape_data/current_MLL_env.env")
 
 # double check genomic data
 gen_full
@@ -413,8 +413,6 @@ which(FDR_cands_full %in% FDR_cands_MLL)
 length(which(FDR_cands_full %in% FDR_cands_MLL)) # 3 SNPs overlap
 
 # manhattan plots
-# man_full <- ggplot(cand_df_full, aes(x = pos, y = -log10(pvals)))+
-#   theme_classic()
 plot(cand_df_full$pos, -log10(cand_df_full$pvals), 
      pch = 19, col = "darkslategray4",
      main = "Candidate SNPs Full Dataset",
@@ -423,7 +421,7 @@ plot(cand_df_full$pos, -log10(cand_df_full$pvals),
 points(cand_df_full$pos[cand_df_full$qvals < 0.01], 
        -log10(cand_df_full$pvals[cand_df_full$qvals < 0.01]),
        pch = 19,
-       col = "hotpink")
+       col = "magenta4")
 
 plot(cand_df_full_K12$pos, -log10(cand_df_full_K12$pvals), 
      pch = 19, col = "darkslategray4",
@@ -433,7 +431,7 @@ plot(cand_df_full_K12$pos, -log10(cand_df_full_K12$pvals),
 points(cand_df_full_K12$pos[cand_df_full_K12$qvals < 0.01], 
        -log10(cand_df_full_K12$pvals[cand_df_full_K12$qvals < 0.01]),
        pch = 19,
-       col = "hotpink")
+       col = "magenta4")
 
 plot(cand_df_MLL$pos, -log10(cand_df_MLL$pvals), 
      pch = 19, col = "darkslategray4",
@@ -443,7 +441,60 @@ plot(cand_df_MLL$pos, -log10(cand_df_MLL$pvals),
 points(cand_df_MLL$pos[cand_df_MLL$qvals < 0.01], 
        -log10(cand_df_MLL$pvals[cand_df_MLL$qvals < 0.01]),
        pch = 19,
-       col = "hotpink")
+       col = "magenta4")
+
+# nicer plots
+# first we need chromosome assignments, should be in the vcf
+mll_posinfo <- as.data.frame(eelgrass_vcf_MLL@fix[,1:2])
+full_posinfo <- as.data.frame(eelgrass_vcf_full@fix[,1:2])
+mll_posinfo$POS <- as.numeric(mll_posinfo$POS)
+full_posinfo$POS <- as.numeric(full_posinfo$POS)
+
+mll_gtinfo <- eelgrass_vcf_MLL@gt
+full_gtinfo <- eelgrass_vcf_full@gt
+
+names_mll <- c()
+for (i in 1:nrow(mll_gtinfo)) {
+  name = paste0("V",i)
+  names_mll = c(names_mll, name)
+}
+names_full <- c()
+for (i in 1:nrow(full_gtinfo)) {
+  name = paste0("V",i)
+  names_full = c(names_full, name)
+}
+
+rownames(mll_gtinfo) <- names_mll
+rownames(full_gtinfo) <- names_full
+
+# find the names that are not in the filtered version
+nonvar_mll <- which(!rownames(mll_gtinfo) %in% colnames(gen_MLL_imp_trim))
+nonvar_full <- which(!rownames(full_gtinfo) %in% colnames(gen_full_imp_trim))
+
+# remove from pos df
+mll_posinfo_rm <- mll_posinfo[-(nonvar_mll),]
+full_posinfo_rm <- full_posinfo[-(nonvar_full),]
+
+# now bind with candidate dfs
+mll_poscands <- cbind(mll_posinfo_rm, cand_df_MLL)
+full_poscands <- cbind(full_posinfo_rm, cand_df_full_K12)
+
+# now plot
+# mll_plot <- ggplot(mll_poscands, aes(x = as.numeric(pos), y = -log10(pvals)))+
+#   theme_bw()+
+#   geom_point(mll_poscands, aes(x = as.numeric(pos), y = -log10(pvals)), colour = as.factor(mll_poscands$CHROM), alpha=0.8, size=1.3) +
+#   scale_color_manual(values = rep(c("cadetblue", "skyblue"), 68))+
+#   geom_point(mll_poscands[mll_poscands$qvals < .01,], aes(x = as.numeric(pos), y = -log10(pvals), colour = "magenta4"))+
+#   theme(axis.text.x=element_text(angle = 90, vjust = 0.5), legend.position = "none")+
+#   ggtitle("Candidate Loci (Clone-corrected)")
+# 
+# full_plot <- ggplot(full_poscands, aes(x=POS, y=-log10(sst.pval)))+
+#   theme_bw()+
+#   geom_point(aes(color=as.factor(CHROM), alpha=0.8, size=1.3)) +
+#   scale_color_manual(values = rep(c("cadetblue", "skyblue"), 68 ))+
+#   geom_point(pos.df.ordered[pos.df.ordered$sst.qval < .05,], aes(x=index, y=-log10(sst.pval)), color = "magenta4")+
+#   theme(axis.text.x=element_text(angle = 90, vjust = 0.5), legend.position = "none")+
+#   ggtitle("Mean SST Manhattan Plot")
 #################
 
 ## OFFSETS

@@ -39,6 +39,8 @@ library(rnaturalearth) # mapping
 library(rnaturalearthdata) # mapping
 library(maps) # mapping
 library(ggspatial) # mapping
+library(ncdf4) # for nc data
+library(raster) # for nc data
 
 # data
 seascape_dat <- read.csv("data/EnvDat/summary_env_data_meadows_GEA.csv") # seascape env data

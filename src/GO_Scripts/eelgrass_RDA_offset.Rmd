@@ -1,0 +1,98 @@
+---
+title: "Eelgrass_RDA_offset"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Eelgrass/BalticEelgrass/")
+```
+
+# Offset Modeling with Gradient Forest
+
+This script is for offset calculation using RDAdapt, specifically for the project "VR_Zostera_genomic_offset." It includes training of the models using seascape genomic data, as well as calculation of genomic offset for experimental populations in each mesocosm treatment. 
+
+### Setup & Formatting
+
+```{r Setup, echo = F}
+# packages
+library(BiocManager) # needed to download specific packages
+library(readxl) # reading xlsx files
+library(raster) # for environmental pixels
+library(ggplot2) # for plotting
+library(magrittr) # unsure
+library(geosphere) # unsure
+library(gdm) # unsure
+library(foreach) # unsure
+library(parallel) # for parallelizing processes
+library(doParallel) # for parallelizing processes 
+library(gradientForest) # for running gradient forest
+library(fields) # unsure
+library(sf) # for spatial files
+
+# data
+## genomic data
+eelgrass_vcf_full <- read.vcfR(
+  "seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.vcf")
+eelgrass_vcf_mll <- read.vcfR(
+  "seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")
+# read in lfmm data
+eelgrass_lfmm_full <- read.lfmm("seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.lfmm")
+eelgrass_lfmm_mll <- read.lfmm("seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.lfmm")
+
+## individuals & populations
+indiv_list <- read_excel("seascape_data/MLL_per_individual_list.xlsx")
+pop_list <- read.csv("seascape_data/population_data.csv")
+
+## environmental data
+curr_full_env_gf <- read.csv("EnvDat/current_full_env_gf.csv")[,-1]
+curr_mll_env_gf <- read.csv("EnvDat/current_mll_env_gf.csv")[,-1]
+
+curr_pop_env_gf <- read.csv("EnvDat/curr_pop_env_gf.csv")[,-1]
+fut_pop_env_gf <- read.csv("EnvDat/fut_pop_env_gf.csv")[,-1]
+
+trt_full_env_gf <- read.csv("EnvDat/fut_full_env_gf.csv")[,-1] # replace with treatment data once possible
+trt_mll_env_gf <- read.csv("EnvDat/fut_full_env_gf.csv")[,-1] # replace with treatment data once possible
+
+expOrig_inds <- read.csv("EnvDat/current_envorig_gf.csv")[,-1]
+expOrig_pop <- read.csv("EnvDat/curr_pop_envorig_gf.csv")[,-1]
+
+exp_trt_inds_env <- read.csv("EnvDat/Ind_Exp_Env_072125.csv")[,-1]
+
+
+## RDA seascape
+###############
+# read in imputed geno format data
+geno_imp_full <- read.geno("data/seascape_data/gen_full_rm_imp_mat.geno")
+geno_imp_mll <- read.geno("data/seascape_data/gen_MLL_imp_mat.geno")
+
+# missing data has already been imputed, trimmed for MAF
+
+# check env data
+curr_full <- as.data.frame(current_full_env)
+curr_mll <- as.data.frame(current_MLL_env)
+fut_full <- as.data.frame(future_full_env)
+fut_mll <- as.data.frame(future_MLL_env)
+
+colnames(curr_full) <- colnames(curr_mll) <- colnames(fut_full) <- 
+  colnames(fut_mll) <- c("sal","sstmax","sstmin","sstrange")
+
+# approximate pop structure using pca
+pca_full <- rda(geno_imp_full, scale=T)
+pca_mll <- rda(geno_imp_mll, scale=T)
+screeplot(pca_full, type = "barplot", npcs=10, main="PCA Eigenvalues")
+screeplot(pca_mll, type = "barplot", npcs=10, main="PCA Eigenvalues")
+
+# keep first three pcs for downstream analysis in both cases
+
+
+# putting together all the environmental data
+current_full <- cbind(pred_scaled_full,)
+pred_scaled_full
+sites_environment
+###############
+```
+
+
