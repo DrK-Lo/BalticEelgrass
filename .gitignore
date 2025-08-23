@@ -3,7 +3,7 @@
 .Rapp.history
 
 # ignore large data
-data/large_data/*
+data/largeDat/*
 
 # Session Data files
 .RData
