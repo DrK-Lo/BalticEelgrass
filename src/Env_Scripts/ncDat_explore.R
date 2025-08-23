@@ -9,11 +9,13 @@ library(terra)
 exp_pops <- read.csv("data/experiment/eelgrass_exp_sites.csv")
 
 # set up objects
-sal_complete <- c()
-temp_complete <- c()
+sal_complete <- matrix(nrow = 8)
+temp_complete <- matrix(nrow = 8)
 
 # daily data for summer months 2011-2021
 for (year in c(2011:2021)) {
+  print(paste0("Starting year ",year))
+  
   name = paste0("data/largeDat/cmems_mod_bal_phy_my_P1D-m_", year, ".nc")
   nc_year <- nc_open(name)
   
@@ -85,5 +87,35 @@ for (year in c(2011:2021)) {
   temp_complete <- cbind(temp_complete, temp_sites)
 }
 
-sal_complete
-temp_complete
+sal_complete_df <- as.data.frame(sal_complete)
+temp_complete_df <- as.data.frame(temp_complete)
+
+# add sites
+sal_complete_df$sal_complete <- temp_complete_df$temp_complete <- exp_pops$site_abbrev
+saldf <- sal_complete_df[,!names(sal_complete_df) %in% "ID"]
+tempdf <- temp_complete_df[,!names(temp_complete_df) %in% "ID"]
+
+# add dates
+colnamesdf <- c(seq(as.Date("2011-06-01"), as.Date("2011-08-31"), by="days"), 
+                seq(as.Date("2012-06-01"), as.Date("2012-08-31"), by="days"),
+                seq(as.Date("2013-06-01"), as.Date("2013-08-31"), by="days"),
+                seq(as.Date("2014-06-01"), as.Date("2014-08-31"), by="days"),
+                seq(as.Date("2015-06-01"), as.Date("2015-08-31"), by="days"),
+                seq(as.Date("2016-06-01"), as.Date("2016-08-31"), by="days"),
+                seq(as.Date("2017-06-01"), as.Date("2017-08-31"), by="days"),
+                seq(as.Date("2018-06-01"), as.Date("2018-08-31"), by="days"),
+                seq(as.Date("2019-06-01"), as.Date("2019-08-31"), by="days"),
+                seq(as.Date("2020-06-01"), as.Date("2020-08-31"), by="days"),
+                seq(as.Date("2021-06-01"), as.Date("2021-08-31"), by="days"))
+colnamesdf <- as.character(colnamesdf)
+colnamesdf <- c("site_name", colnamesdf)
+
+colnames(saldf) <- colnames(tempdf) <- colnamesdf
+
+# save these objects
+write.csv(saldf, 
+          paste0("data/EnvDat/salinity_expSites_copernicus_", Sys.Date(),".csv"), 
+          row.names = F)
+write.csv(tempdf, 
+          paste0("data/EnvDat/temperature_expSites_copernicus_", Sys.Date(),".csv"), 
+          row.names = F)
