@@ -1,6 +1,7 @@
 ## For working with netcdf data
 
 library(dplyr)
+library(tidyr)
 library(ncdf4)
 library(raster)
 library(terra)
@@ -119,3 +120,99 @@ write.csv(saldf,
 write.csv(tempdf, 
           paste0("data/EnvDat/temperature_expSites_copernicus_", Sys.Date(),".csv"), 
           row.names = F)
+
+# overall stats
+saldf_sum <- data.frame(sal_mean = apply(saldf[,-1],1,mean), 
+                        sal_min = apply(saldf[,-1],1,min),
+                        sal_max = apply(saldf[,-1],1,max),
+                        sal_quant01 = apply(saldf[,-1],1,function (x) {quantile(x,0.01)}),
+                        sal_quant99 = apply(saldf[,-1],1,function (x) {quantile(x,0.99)})) 
+tempdf_sum <- data.frame(temp_mean = apply(tempdf[,-1],1,mean), 
+                        temp_min = apply(tempdf[,-1],1,min),
+                        temp_max = apply(tempdf[,-1],1,max),
+                        temp_quant01 = apply(tempdf[,-1],1,function (x) {quantile(x,0.01)}),
+                        temp_quant99 = apply(tempdf[,-1],1,function (x) {quantile(x,0.99)})) 
+
+# put together df
+site_abbrev <- rownames(saldf_sum)
+copernicus_df <- cbind(site_abbrev, saldf_sum, tempdf_sum)
+write.csv(copernicus_df, paste0("data/EnvDat/complete_expSites_copernicus", Sys.Date(), ".csv"))
+
+# expand to long format df to calculate monthly/annual trends
+sal_expanded <- saldf %>% 
+  pivot_longer(
+    cols = "2011-06-01":"2021-08-31", 
+    names_to = "date",
+    values_to = "salinity"
+  ) %>% as.data.frame()
+temp_expanded <- tempdf %>% 
+  pivot_longer(
+    cols = "2011-06-01":"2021-08-31", 
+    names_to = "date",
+    values_to = "temperature"
+  ) %>% as.data.frame()
+
+# split date info
+dates <- str_split_fixed(sal_expanded$date, "-", 3)
+colnames(dates) <- c("year", "month", "day")
+copernicus_expanded <- cbind(sal_expanded, temp_expanded$temperature, dates)
+colnames(copernicus_expanded) <- c("site_name","date","sal","temp","year","month","day")
+copernicus_expanded$date <- as.Date(copernicus_expanded$date)
+
+# annual and monthly trends
+annual_trends <- copernicus_expanded %>% group_by(site_name,year) %>%
+  summarise(mean_temp = mean(temp),
+            min_temp = min(temp),
+            max_temp = max(temp),
+            med_temp = median(temp),
+            sd_temp = sd(temp),
+            mean_sal = mean(sal),
+            min_sal = min(sal),
+            max_sal = max(sal),
+            med_sal = median(sal),
+            sd_sal = sd(sal),
+            .groups = "drop")
+annual_trends
+
+monthly_trends <- copernicus_expanded %>% group_by(site_name,month) %>%
+  summarise(mean_temp = mean(temp),
+            min_temp = min(temp),
+            max_temp = max(temp),
+            med_temp = median(temp),
+            sd_temp = sd(temp),
+            mean_sal = mean(sal),
+            min_sal = min(sal),
+            max_sal = max(sal),
+            med_sal = median(sal),
+            sd_sal = sd(sal),
+            .groups = "drop")
+monthly_trends
+
+overall_trends <- copernicus_expanded %>% group_by(site_name,month,year) %>%
+  summarise(mean_temp = mean(temp),
+            min_temp = min(temp),
+            max_temp = max(temp),
+            med_temp = median(temp),
+            sd_temp = sd(temp),
+            mean_sal = mean(sal),
+            min_sal = min(sal),
+            max_sal = max(sal),
+            med_sal = median(sal),
+            sd_sal = sd(sal),
+            .groups = "drop")
+overall_trends
+
+# plot the data by group
+ggplot(copernicus_expanded, 
+       aes(x = date, y = sal, fill = site_name, col = site_name)) +
+  geom_smooth() +
+  labs(title = "Salinity at Experimental Sites 2011-2021",
+       x = "Date", y = "Salinity", color = "Site", fill = "Site") +
+  theme_bw()
+
+ggplot(copernicus_expanded, 
+       aes(x = date, y = temp, fill = site_name, col = site_name)) +
+  geom_smooth() +
+  labs(title = "Temperature at Experimental Sites 2011-2021",
+       x = "Date", y = "Temperature", color = "Site", fill = "Site") +
+  theme_bw()
