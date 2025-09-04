@@ -44,17 +44,19 @@ library(raster) # for nc data
 
 # data
 seascape_dat <- read.csv("data/EnvDat/summary_env_data_meadows_GEA.csv") # seascape env data
+exp_dat <- read.csv("data/EnvDat/complete_expSites_copernicus2025-08-25.csv")[,-1]
+exp_dat_cop <- read_excel("data/EnvDat/Camille_env_data_experiment.xlsx")
 indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx") # seascape individuals data
 eelgrass_vcf_MLL <- read.vcfR("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")# read in vcf eelgrass mll
-
-# seascape env data reads in funky, change column names and remove first row
-colnames(seascape_dat) <- seascape_dat[1,]
-seascape_dat <- seascape_dat[-1,]
 ```
 
 Data is now loaded, but I need make some formatting changes so that it's more usable.
 
 ```{r}
+# seascape env data reads in funky, change column names and remove first row
+colnames(seascape_dat) <- seascape_dat[1,]
+seascape_dat <- seascape_dat[-1,]
+
 # the column names have spaces in them, change names to be more code friendly
 colnames(seascape_dat) <- c("region","site_full","Pop","long","lat","temp_curr","sal_curr","temp_8.5","sal_8.5","max_temp_curr","min_sal_curr")
 
@@ -70,20 +72,55 @@ seascape_dat$Pop[seascape_dat$Pop == "BÅD"] <- "BAD"
 
 ### Pre-processing
 
-Now that I have environmental data for all my sites in a coding-friendly format, I need to figure out which of these variables should be included in my model. To do so, I will make sure that I don't have any variables that are too correlated. I should also separate out the "future" environmental data from the dataset I want to use for training offsets.
+Now that I have environmental data for all my sites in a coding-friendly format, I need to figure out which of these variables should be included in my model. To do so, I will make sure that I don't have any variables that are too correlated. I should also separate out the "future" environmental data from the dataset I want to use for training offsets. Here I will start with the seascape data and the experimental data (i.e. everything from various environmental models)
 
 ```{r}
 # start by splitting current and future data
-curr <- seascape_dat[,c("region","site_full","Pop","long","lat","temp_curr","max_temp_curr","sal_curr","min_sal_curr")]
-fut <- seascape_dat[,c("region","site_full","Pop","long","lat","temp_8.5","sal_8.5")]
+curr_sea <- seascape_dat[,c("region","site_full","Pop","long","lat","temp_curr","max_temp_curr","sal_curr","min_sal_curr")]
+fut_sea <- seascape_dat[,c("region","site_full","Pop","long","lat","temp_8.5","sal_8.5")]
 
 # let's also keep a df with the population data only
-pop <- curr[,c("region","site_full","Pop","long","lat")]
-write.csv(pop,"seascape_data/population_data.csv")
+pop_sea <- curr_sea[,c("region","site_full","Pop","long","lat")]
+#write.csv(pop,"data/seascape_data/population_data.csv")
 
 # now I need to look at variable correlation
-pairs.panels(curr[,6:9]) # perfect, nothing is too correlated! probably Steffi already did this step :)
+pairs.panels(curr_sea[,6:9]) # perfect, nothing is too correlated! probably Steffi already did this step :)
+
+# now look at the sites for experimental pops
+exp_dat
+names(exp_dat)[names(exp_dat) == "site_abbrev"] <- "Pop"
+exp_dat_cop
+colnames(exp_dat_cop) <- c("site_full","Pop","long","lat","temp_mean_cop","temp_4.5","temp_8.5","sal_mean_cop","sal_4.5","sal_8.5","temp_4.5_med_chg","temp_8.5_med_chg","sal_4.5_med_chg","sal_8.5_med_chg","temp_4.5_max_chg","temp_8.5_max_chg","sal_4.5_max_chg","sal_8.5_max_chg")
+
+# merge the experimental pop data
+(ex_pop_dat <- merge(exp_dat_cop, exp_dat, by = c("Pop")))
 ```
+
+I need to adjust the environmental data for the site-of-origin for experimental pops according to the procedure outlined [here](docs.google.com/document/d/1J54wsnxtk5UFdv5PXPYA2CnWi6fN4DvJ/view). Specifically, I will adjust to use data from symphony +4C for all mean temps and -5psu for W coast mean salinities.
+
+```{r}
+# first trim to just relevant variables
+exp_pop_dat_trim <- ex_pop_dat[,c("Pop","long","lat","temp_mean_cop","temp_min","temp_max","sal_mean_cop","sal_min","sal_max")]
+
+# adjust temp
+exp_pop_dat_trim$temp_mean_adjust <- (exp_pop_dat_trim$temp_mean_cop + 4)
+
+# add a coast identifier
+exp_pop_dat_trim$coast <- ifelse(exp_pop_dat_trim$Pop %in% c("VIK","VAT","HOG","HOR"), "West", "East")
+
+# adjust salinity
+exp_pop_dat_trim$sal_mean_adjust <- ifelse(exp_pop_dat_trim$coast == "West", exp_pop_dat_trim$sal_mean_cop - 5, exp_pop_dat_trim$sal_mean_cop)
+
+# look at the correlations between variables
+pairs.panels(exp_pop_dat_trim[,c("temp_min", "temp_max", "temp_mean_adjust", "sal_min", "sal_max", "sal_mean_adjust")])
+
+# remove overly correlated variables
+exp_pop_env <- exp_pop_dat_trim[,c("Pop","coast","lat","long","temp_mean_adjust","temp_max","temp_mean_adjust","sal_min","sal_mean_adjust")]
+
+# rename variables to match seascape
+colnames(exp_pop_env) <- c("Pop","coast","lat","long","tempcurr","max_temp_curr","sal_curr","min_sal_curr")
+```
+
 
 Everything is looking good! I want to make sure now that my environmental data will match my genomic data by having one row in my environmental dataset for each individual in my genomic dataset. To do so, I will need to process the individual data and pair this with my environmental data.
 
@@ -101,16 +138,16 @@ MLL_inds <- MLL_split[-1,3]
 indiv_list_MLL <- indiv_list_full[indiv_list_full$Indv_no %in% MLL_inds,]
 
 # now put this together with the environmental dataset
-head(curr)
+head(curr_sea)
 head(indiv_list_full)
 
 # oops! our environmental data is listed as character when I want it numeric
-curr$temp_curr <- as.numeric(curr$temp_curr)
-curr$max_temp_curr <- as.numeric(curr$max_temp_curr)
-curr$sal_curr <- as.numeric(curr$sal_curr)
-curr$min_sal_curr <- as.numeric(curr$min_sal_curr)
-fut$temp_8.5 <- as.numeric(fut$temp_8.5)
-fut$sal_8.5 <- as.numeric(fut$sal_8.5)
+curr_sea$temp_curr <- as.numeric(curr_sea$temp_curr)
+curr_sea$max_temp_curr <- as.numeric(curr_sea$max_temp_curr)
+curr_sea$sal_curr <- as.numeric(curr_sea$sal_curr)
+curr_sea$min_sal_curr <- as.numeric(curr_sea$min_sal_curr)
+fut_sea$temp_8.5 <- as.numeric(fut_sea$temp_8.5)
+fut_sea$sal_8.5 <- as.numeric(fut_sea$sal_8.5)
 
 # I can put it together using "Pop"
 full_curr <- merge(indiv_list_full, curr, by = c("Pop"))
