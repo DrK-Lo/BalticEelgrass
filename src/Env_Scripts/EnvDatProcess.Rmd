@@ -122,6 +122,15 @@ colnames(exp_pop_env) <- c("Pop","coast","lat","long","tempcurr","max_temp_curr"
 ```
 
 
+Before I can scale any environmental data, I need to also add in the environments I want to predict to (i.e. experimental site of origin, experimental treatments, future environment). I will thus process all of these data as well before coming back to scale and standardize everything. 
+
+Pre-processing of these data has happened in other scripts - the experimental treatment data is prepped in "exp_hobo_loggers.R", and the experimental site of origin data is prepped in "ncDat_explore.R".
+
+```{r}
+
+```
+
+
 Everything is looking good! I want to make sure now that my environmental data will match my genomic data by having one row in my environmental dataset for each individual in my genomic dataset. To do so, I will need to process the individual data and pair this with my environmental data.
 
 ```{r}
@@ -150,55 +159,53 @@ fut_sea$temp_8.5 <- as.numeric(fut_sea$temp_8.5)
 fut_sea$sal_8.5 <- as.numeric(fut_sea$sal_8.5)
 
 # I can put it together using "Pop"
-full_curr <- merge(indiv_list_full, curr, by = c("Pop"))
-mll_curr <- merge(indiv_list_MLL, curr, by = c("Pop"))
-full_fut <- merge(indiv_list_full, fut, by = c("Pop"))
-mll_fut <- merge(indiv_list_MLL, fut, by = c("Pop"))
+full_sea <- merge(indiv_list_full, curr_sea, by = c("Pop"))
+mll_sea <- merge(indiv_list_MLL, curr_sea, by = c("Pop"))
+full_fut <- merge(indiv_list_full, fut_sea, by = c("Pop"))
+mll_fut <- merge(indiv_list_MLL, fut_sea, by = c("Pop"))
+full_exp <- merge(indiv_list_full, exp_pop_env, by = c("Pop"))
+mll_exp <- merge(indiv_list_MLL, exp_pop_env, by = c("Pop"))
 ```
 
-Perfect, now I have an entry for every individual in the seascape dataset. Finally, I should standardize all of the environmental data.
+Perfect, now I have an entry for every individual in the genomic datasets. Finally, I should standardize all of the environmental data.
 
 ```{r}
 # quick data inspection
-head(full_curr)
+head(full_sea)
 head(full_fut)
+head(full_exp)
+head(mll_sea)
+head(mll_fut)
+head(mll_exp)
 
 # scale
-curr_std_full <- scale(full_curr[,9:12])
-curr_std_mll <- scale(mll_curr[,9:12])
-fut_std_full <- scale(full_fut[,9:10])
-fut_std_mll <- scale(mll_fut[,9:10])
-colnames(curr_std_full) <- colnames(curr_std_mll) <-  c("temp_scaled","max_temp_scaled","sal_scaled","min_sal_scaled")
-colnames(fut_std_full) <- colnames(fut_std_mll) <- c("temp_scaled8.5","sal_scaled8.5")
+full_sea_std <- scale(full_sea[,c("temp_curr", "max_temp_curr","sal_curr","min_sal_curr")])
+mll_sea_std <- scale(mll_sea[,c("temp_curr", "max_temp_curr","sal_curr","min_sal_curr")])
+full_fut_std <- scale(full_fut[,c("temp_8.5","sal_8.5")])
+mll_fut_std <- scale(mll_fut[,c("temp_8.5","sal_8.5")])
+full_exp_std <- scale(full_exp[,c("temp_mean_adjust", "temp_max","sal_mean_adjust","sal_min")])
+mll_exp_std <- scale(mll_exp[,c("temp_mean_adjust", "temp_max","sal_mean_adjust","sal_min")])
+colnames(full_sea_std) <- c("temp_sea","max_temp_sea","sal_sea","min_sal_sea")
+colnames(mll_sea_std) <- 
+colnames(full_exp_std) <- 
+colnames(mll_exp_std) <-  c("temp_scaled","max_temp_scaled","sal_scaled","min_sal_scaled")
+colnames(full_fut_std) <- colnames(mll_fut_std) <- c("temp_scaled_fut","sal_scaled_fut")
 
 # attach scaled information back to env dfs
-curr_full_scaled <- as.data.frame(cbind(full_curr[,1:8], curr_std_full))
-curr_mll_scaled <- as.data.frame(cbind(mll_curr[,1:8], curr_std_mll))
-fut_full_scaled <- as.data.frame(cbind(full_fut[,1:8], fut_std_full))
-fut_mll_scaled <- as.data.frame(cbind(mll_fut[,1:8], fut_std_mll))
-
-# keep track of scaling factors
-curr_scale_env_full <- attr(curr_std_full, "scaled:scale")
-curr_center_env_full <- attr(curr_std_full, "scaled:center")
-curr_scale_env_mll <- attr(curr_std_mll, "scaled:scale")
-curr_center_env_mll <- attr(curr_std_mll, "scaled:center")
-fut_scale_env_full <- attr(fut_std_full, "scaled:scale")
-fut_center_env_full <- attr(fut_std_full, "scaled:center")
-fut_scale_env_mll <- attr(fut_std_mll, "scaled:scale")
-fut_center_env_mll <- attr(fut_std_mll, "scaled:center")
-
-# put those scaling factors into their own df
-scaling <- as.data.frame(rbind(curr_scale_env_full, curr_center_env_full, curr_scale_env_mll, curr_center_env_mll,fut_scale_env_full,fut_center_env_full,fut_scale_env_mll,fut_center_env_mll))
-scaling$factor_type <- rownames(scaling)
-rownames(scaling) <- NULL
-scaling
+full_sea_scaled <- as.data.frame(cbind(full_sea, full_sea_std))
+mll_sea_scaled <- as.data.frame(cbind(mll_sea, mll_sea_std))
+full_exp_scaled <- as.data.frame(cbind(full_exp, full_exp_std))
+mll_exp_scaled <- as.data.frame(cbind(mll_exp, mll_exp_std))
+full_fut_scaled <- as.data.frame(cbind(full_fut, full_fut_std))
+mll_fut_scaled <- as.data.frame(cbind(mll_fut, mll_fut_std))
 
 # write all of this information out to csv for any future analysis
-write.csv(curr_full_scaled, "EnvDat/Full_CurrEnv_Seascape_031825.csv")
-write.csv(curr_mll_scaled, "EnvDat/MLL_CurrEnv_Seascape_031825.csv")
-write.csv(fut_full_scaled, "EnvDat/Full_FutEnv_Seascape_031825.csv")
-write.csv(fut_mll_scaled, "EnvDat/MLL_FutEnv_Seascape_031825.csv")
-write.csv(scaling, "EnvDat/Env_Seascape_ScalingFactors_031825.csv")
+write.csv(full_sea_scaled, paste0("data/EnvDat/full_seascapeEnv_", Sys.Date(), ".csv"))
+write.csv(mll_sea_scaled, paste0("data/EnvDat/mll_seascapeEnv_", Sys.Date(), ".csv"))
+write.csv(full_exp_scaled, paste0("data/EnvDat/full_expEnv_", Sys.Date(), ".csv"))
+write.csv(mll_exp_scaled, paste0("data/EnvDat/mll_expEnv_", Sys.Date(), ".csv"))
+write.csv(full_fut_scaled, paste0("data/EnvDat/full_futEnv_", Sys.Date(), ".csv"))
+write.csv(mll_fut_scaled, paste0("data/EnvDat/mll_futEnv_", Sys.Date(), ".csv"))
 ```
 
 ### Formatting for LEA
@@ -207,16 +214,20 @@ LEA requires environmental data be formatted as a .env file type.
 
 ```{r}
 # prep as matrix
-current_full_mat <- as.matrix(curr_full_scaled[,9:12])
-current_mll_mat <- as.matrix(curr_mll_scaled[,9:12])
-future_full_mat <- as.matrix(fut_full_scaled[,9:10])
-future_mll_mat <- as.matrix(fut_mll_scaled[,9:10])
+mat1 <- as.matrix(full_sea_scaled[,c("temp_scaled", "max_temp_scaled", "sal_scaled", "min_sal_scaled")])
+mat2 <- as.matrix(mll_sea_scaled[,c("temp_scaled", "max_temp_scaled", "sal_scaled", "min_sal_scaled")])
+mat3 <- as.matrix(full_exp_scaled[,c("temp_scaled", "max_temp_scaled", "sal_scaled", "min_sal_scaled")])
+mat4 <- as.matrix(mll_exp_scaled[,c("temp_scaled", "max_temp_scaled", "sal_scaled", "min_sal_scaled")])
+mat5 <- as.matrix(full_fut_scaled[,c("temp_scaled", "sal_scaled")])
+mat6 <- as.matrix(mll_fut_scaled[,c("temp_scaled", "sal_scaled")])
 
 # and convert to env format
-write.env(current_full_mat, "EnvDat/current_full_env.env")
-write.env(current_MLL_mat, "EnvDat/current_MLL_env.env")
-write.env(future_full_mat, "EnvDat/future_full_env.env")
-write.env(future_MLL_mat, "EnvDat/future_MLL_env.env")
+write.env(mat1, paste0("data/EnvDat/full_seascapeEnv_", Sys.Date(), ".env"))
+write.env(mat2, paste0("data/EnvDat/mll_seascapeEnv_", Sys.Date(), ".env"))
+write.env(mat3, paste0("data/EnvDat/full_expEnv_", Sys.Date(), ".env"))
+write.env(mat4, paste0("data/EnvDat/mll_expEnv_", Sys.Date(), ".env"))
+write.env(mat5, paste0("data/EnvDat/full_futEnv_", Sys.Date(), ".env"))
+write.env(mat6, paste0("data/EnvDat/mll_futEnv_", Sys.Date(), ".env"))
 ```
 
 ### Formatting for RDA & GF
@@ -227,24 +238,33 @@ GF requires environmental data in the same format as RDA, just a regular table f
 
 ```{r}
 # isolate coordinates
-coord_full <- curr_full_scaled[,c("long", "lat")]
-coord_mll <- curr_mll_scaled[,c("long", "lat")]
+coord_fullsea <- full_sea[,c("long", "lat")]
+coord_mllsea <- mll_sea[,c("long", "lat")]
+coord_fullexp <- full_exp[,c("long","lat")]
+coord_mllexp <- mll_exp[,c("long","lat")]
 
-# generate PCNMs
-pcnm_full <- pcnm(dist(coord_full))
-pcnm_mll <- pcnm(dist(coord_mll))
+# generate PCNMs (don't need to do both seascape current and future since these are the same)
+pcnm_fullsea <- pcnm(dist(coord_fullsea))
+pcnm_mllsea <- pcnm(dist(coord_mllsea))
+pcnm_fullexp <- pcnm(dist(coord_fullexp))
+pcnm_mllexp <- pcnm(dist(coord_mllexp))
+
 
 # keep half of positive PCNMs as suggest by authors (determine which authors, I am using following tutorial https://github.com/pgugger/LandscapeGenomics/blob/master/2018_China/Exercise3.md)
-keep_full <- round(length(which(pcnm_full$value < 0))/2)
-keep_mll <- round(length(which(pcnm_mll$value < 0))/2)
-pcnm_keep_full <- scores(pcnm_full)[,1:keep_full]
-pcnm_keep_mll <- scores(pcnm_mll)[,1:keep_mll]
+keep_full_sea <- round(length(which(pcnm_fullsea$value < 0))/2)
+keep_mll_sea <- round(length(which(pcnm_mllsea$value < 0))/2)
+keep_full_exp <- round(length(which(pcnm_fullexp$value < 0))/2)
+keep_mll_exp <- round(length(which(pcnm_mllexp$value < 0))/2)
+pcnm_keep_full_sea <- scores(pcnm_fullsea)[,1:keep_full_sea]
+pcnm_keep_mll_sea <- scores(pcnm_mllsea)[,1:keep_mll_sea]
+pcnm_keep_full_exp <- scores(pcnm_fullexp)[,1:keep_full_exp]
+pcnm_keep_full_exp <- scores(pcnm_mllsea)[,1:keep_mll_exp]
 
 # create file output that contains just climate and pcnm spatial variables, i.e. no lat long
-write.csv(cbind(pcnm_keep_full, curr_full_scaled[,9:12]), "EnvDat/current_full_env_gf.csv")
-write.csv(cbind(pcnm_keep_mll, curr_mll_scaled[,9:12]), "EnvDat/current_mll_env_gf.csv")
-write.csv(cbind(pcnm_keep_full, fut_full_scaled[,9:10]), "EnvDat/fut_full_env_gf.csv")
-write.csv(cbind(pcnm_keep_mll, fut_mll_scaled[,9:10]), "EnvDat/fut_mll_env_gf.csv")
+write.csv(cbind(pcnm_keep_full_sea, curr_full_scaled[,9:12]), "EnvDat/current_full_env_gf.csv")
+write.csv(cbind(pcnm_keep_mll_sea, curr_mll_scaled[,9:12]), "EnvDat/current_mll_env_gf.csv")
+write.csv(cbind(pcnm_keep_full_exp, fut_full_scaled[,9:10]), "EnvDat/fut_full_env_gf.csv")
+write.csv(cbind(pcnm_keep_full_exp, fut_mll_scaled[,9:10]), "EnvDat/fut_mll_env_gf.csv")
 
 # also make a version of this dataset at the population level - note mll vs full doesn't matter here, as everything is at the population level
 curr_pop <- cbind(pcnm_keep_full, curr_full_scaled)
