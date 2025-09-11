@@ -52,7 +52,6 @@ C4a <- as.data.frame(read_excel("data/EnvDat/HOBOloggers_GOeelgrass2024/C4a.xlsx
 C4b <- as.data.frame(read_excel("data/EnvDat/HOBOloggers_GOeelgrass2024/C4b.xlsx"))[,-1]
 C4c <- as.data.frame(read_excel("data/EnvDat/HOBOloggers_GOeelgrass2024/C4c.xlsx"))[,-1]
 gas <- as.data.frame(read_excel("data/EnvDat/HOBOloggers_GOeelgrass2024/gas2024.xlsx"))[,-1]
-calibrate <- as.data.frame(read_excel())
 ########
 
 ## data pre-cleaning
@@ -67,7 +66,6 @@ colnames(gas) <- colnames(A1a) <- colnames(A1b) <- colnames(A1c) <- colnames(A2a
   colnames(C2c) <- colnames(C3a) <- colnames(C3b) <- colnames(C3c) <- colnames(C4a) <- 
   colnames(C4b) <- colnames(C4c) <- c("datetime","temp","light")
 
-
 # filter by time for all df
 # time range
 start <- ymd_hms("2024-07-03 09:00:00")
@@ -79,7 +77,8 @@ log_names <- c("A1a", "A1b", "A1c", "A2a", "A2b", "A2c",
               "B1a", "B1b", "B1c", "B2a", "B2b", "B2c",
               "B3a", "B3b", "B3c", "B4a", "B4b", "B4c",
               "C1a", "C1b", "C1c", "C2a", "C2b", "C2c", 
-              "C3a", "C3b", "C3c", "C4a", "C4b", "C4c")
+              "C3a", "C3b", "C3c", "C4a", "C4b", "C4c",
+              "gas")
 
 # filtering
 for (logger in log_names) {
@@ -127,19 +126,17 @@ trt_temps <- all_tanks_trim %>% group_by(trt) %>%
             sd_temp = sd(temp))
 
 # save these data
-write.csv(tank_temps, "EnvDat/temp_tanks_summary.csv")
-write.csv(trt_temps, "EnvDat/temp_trts_summary.csv")
+write.csv(tank_temps, paste0("data/EnvDat/temp_tanks_summary_", Sys.Date() ,".csv"), row.names = F)
+write.csv(trt_temps, paste0("data/EnvDat/temp_trts_summary_", Sys.Date() ,".csv"), row.names = F)
 
 # compare to meadow
 gas_temps <- data.frame(meadow = "gas", min_temp = min(gas_trim$temp), max_temp = max(gas_trim$temp), avg_temp = mean(gas_trim$temp), sd_temp = sd(gas_trim$temp))
 
 # we have a small time series where the logger experienced temps 10 degrees above any other recorded and light was high enough to suggest it was out of the water, remove these
-gas_temps <- data.frame(meadow = "gas", min_temp = min(gas_trim[which(gas_trim$temp < 35),]$temp), max_temp = max(gas_trim[which(gas_trim$temp < 35),]$temp), avg_temp = mean(gas_trim[which(gas_trim$temp < 35),]$temp), sd_temp = sd(gas_trim[which(gas_trim$temp < 35),]$temp))
-
-gas_temps # everything lines up well with the control tanks!
-
-# individuals are stored in setup data
-setup
+gas_temps <- data.frame(meadow = "gas", min_temp = min(gas_trim[which(gas_trim$temp < 35),]$temp), 
+                        max_temp = max(gas_trim[which(gas_trim$temp < 35),]$temp), 
+                        avg_temp = mean(gas_trim[which(gas_trim$temp < 35),]$temp), 
+                        sd_temp = sd(gas_trim[which(gas_trim$temp < 35),]$temp)) # looks good!
 
 # remove practice
 setup_trim <- setup[!setup$bagKey == "F054C074", c("setupKey","setupLabel","bagKey")]
@@ -169,5 +166,5 @@ colnames(pop_trt_df) <- c("pop","trt")
 pop_trt_env <- merge(pop_trt_df, trt_env_dat, by = c("trt"))
 
 # save both the indiv and pop level env dfs
-write.csv(exp_env_ord, "EnvDat/indiv_trt_env_dat.csv")
-write.csv(pop_trt_env, "EnvDat/pop_trt_env_dat.csv")
+write.csv(exp_env_ord, paste0("data/EnvDat/indiv_trt_env_dat_", Sys.Date(), ".csv"), row.names = F)
+write.csv(pop_trt_env, paste0("data/EnvDat/pop_trt_env_dat_", Sys.Date(), ".csv"), row.names = F)

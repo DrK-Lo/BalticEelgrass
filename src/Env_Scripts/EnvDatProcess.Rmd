@@ -44,8 +44,9 @@ library(raster) # for nc data
 
 # data
 seascape_dat <- read.csv("data/EnvDat/summary_env_data_meadows_GEA.csv") # seascape env data
-exp_dat <- read.csv("data/EnvDat/complete_expSites_copernicus2025-08-25.csv")[,-1]
+exp_dat <- read.csv("data/EnvDat/complete_expSites_copernicus_2025-08-25.csv")[,-1]
 exp_dat_cop <- read_excel("data/EnvDat/Camille_env_data_experiment.xlsx")
+trt_dat <- read.csv("data/EnvDat/pop_trt_env_dat_2025-09-10.csv")
 indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx") # seascape individuals data
 eelgrass_vcf_MLL <- read.vcfR("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")# read in vcf eelgrass mll
 ```
@@ -122,16 +123,66 @@ colnames(exp_pop_env) <- c("Pop","coast","lat","long","tempcurr","max_temp_curr"
 ```
 
 
-Before I can scale any environmental data, I need to also add in the environments I want to predict to (i.e. experimental site of origin, experimental treatments, future environment). I will thus process all of these data as well before coming back to scale and standardize everything. 
+Before I can scale any environmental data, I need to also add in the environments I want to predict to (i.e. experimental site of origin, experimental treatments). I will thus process all of these data as well, then scale and standardize everything. 
 
 Pre-processing of these data has happened in other scripts - the experimental treatment data is prepped in "exp_hobo_loggers.R", and the experimental site of origin data is prepped in "ncDat_explore.R".
 
 ```{r}
+# inspect our datasets
+trt_dat
+exp_pop_env
+seascape_dat
 
+# make sure values look consistent across dfs
+exp_pop_env
+seascape_dat[seascape_dat$Pop %in% c("BAR", "BJO", "HOG", "HOR", "KAL", "KUR", "VAT", "VIK"),]
+
+# remove duplicates in exp and sea dfs
+seascape_dat2 <- seascape_dat[!(seascape_dat$Pop %in% c("BAR", "BJO", "HOG", "HOR", "KAL", "KUR", "VAT", "VIK")),]
+
+# trt dat doesn't need to be on pop level yet
+trt_dat_red <- trt_dat[!duplicated(trt_dat$trt),c("trt","avg_temp","max_temp","avg_sal","min_sal")]
+
+# line up all the mins/maxes/averages for both temp and salinity
+trt_env <- trt_dat_red[,c("avg_temp","max_temp","avg_sal","min_sal")]
+trt_env$df <- "treatment"
+exp_env <- exp_pop_env[,c("temp_mean_adjust","temp_max","sal_mean_adjust","sal_min")]
+exp_env$df <- "experiment"
+sea_env <- seascape_dat2[,c("temp_curr","max_temp_curr","sal_curr","min_sal_curr")]
+sea_env$df <- "seascape"
+colnames(trt_env) <- colnames(exp_env) <- colnames(sea_env) <- c("temp","max_temp","sal","min_sal","df")
+all_env <- rbind(trt_env, exp_env, sea_env)
+
+# ensure proper data types
+all_env$temp <- as.numeric(all_env$temp)
+all_env$max_temp <- as.numeric(all_env$max_temp)
+all_env$sal <- as.numeric(all_env$sal)
+all_env$min_sal <- as.numeric(all_env$min_sal)
+
+# now scale and standardize
+std <- scale(all_env[,c("temp","max_temp","sal","min_sal")])
+colnames(std) <-  c("temp_scaled","max_temp_scaled","sal_scaled","min_sal_scaled")
+all_env2 <- cbind(all_env, std)
+
+# put together with original dfs
+trt_scaled <- cbind(trt_dat_red, all_env2[all_env2$df == "treatment", c("temp_scaled", "max_temp_scaled", "sal_scaled", "min_sal_scaled")])
+exp_scaled <- cbind(exp_pop_env, all_env2[all_env2$df == "experiment", c("temp_scaled", "max_temp_scaled", "sal_scaled", "min_sal_scaled")])
+
+# to get seascape need to add back in the exp sites
+exp_scaled0 <- exp_scaled[exp_scaled$Pop %in% c(seascape_dat$Pop),]
+sea_exp <- seascape_dat[seascape_dat$Pop %in% exp_dat$Pop, ]
+sea_scaled0 <- merge(sea_exp, exp_scaled0[,c("Pop", "temp_scaled", "max_temp_scaled", "sal_scaled", "min_sal_scaled")], by = c("Pop"))
+sea_scaled1 <- cbind(seascape_dat2, all_env2[all_env2$df == "seascape", c("temp_scaled", "max_temp_scaled", "sal_scaled", "min_sal_scaled")])
+sea_scaled <- rbind(sea_scaled1, sea_scaled0)
+
+# save all these datasets
+write.csv(trt_scaled, paste0("data/EnvDat/trt_scaled_envdat_", Sys.Date(), ".csv"), row.names = F)
+write.csv(exp_scaled, paste0("data/EnvDat/exp_scaled_envdat_", Sys.Date(), ".csv"), row.names = F)
+write.csv(sea_scaled, paste0("data/EnvDat/sea_scaled_envdat_", Sys.Date(), ".csv"), row.names = F)
 ```
 
 
-Everything is looking good! I want to make sure now that my environmental data will match my genomic data by having one row in my environmental dataset for each individual in my genomic dataset. To do so, I will need to process the individual data and pair this with my environmental data.
+Everything is looking good! I want to make sure now that my environmental data will match my genomic data by having one row in my seascape environmental dataset for each individual in my genomic data set. To do so, I will need to process the individual data and pair this with my environmental data.
 
 ```{r}
 # deal with individual data
@@ -142,71 +193,28 @@ colnames(indiv_list_full) <- c("MLL_no","Indv_no","Pop","Pop_no")
 table(indiv_list_full$Pop) # between 4 and 20 individuals in each pop - most 17+ inds
 
 # also put together an mll dataset
-MLL_split <- stringr::str_split_fixed(colnames(eelgrass_vcf_MLL@gt), "-", 3)
-MLL_inds <- MLL_split[-1,3]
-indiv_list_MLL <- indiv_list_full[indiv_list_full$Indv_no %in% MLL_inds,]
+mll_split <- stringr::str_split_fixed(colnames(eelgrass_vcf_MLL@gt), "-", 3)
+mll_inds <- mll_split[-1,3]
+indiv_list_mll <- indiv_list_full[indiv_list_full$Indv_no %in% MLL_inds,]
 
 # now put this together with the environmental dataset
-head(curr_sea)
+head(sea_scaled)
 head(indiv_list_full)
+head(indiv_list_mll)
 
-# oops! our environmental data is listed as character when I want it numeric
-curr_sea$temp_curr <- as.numeric(curr_sea$temp_curr)
-curr_sea$max_temp_curr <- as.numeric(curr_sea$max_temp_curr)
-curr_sea$sal_curr <- as.numeric(curr_sea$sal_curr)
-curr_sea$min_sal_curr <- as.numeric(curr_sea$min_sal_curr)
-fut_sea$temp_8.5 <- as.numeric(fut_sea$temp_8.5)
-fut_sea$sal_8.5 <- as.numeric(fut_sea$sal_8.5)
+# oops! some of our environmental data is listed as character when I want it numeric
+sea_scaled$temp_curr <- as.numeric(curr_sea$temp_curr)
+sea_scaled$max_temp_curr <- as.numeric(curr_sea$max_temp_curr)
+sea_scaled$sal_curr <- as.numeric(curr_sea$sal_curr)
+sea_scaled$min_sal_curr <- as.numeric(curr_sea$min_sal_curr)
+sea_scaled$temp_8.5 <- as.numeric(fut_sea$temp_8.5)
+sea_scaled$sal_8.5 <- as.numeric(fut_sea$sal_8.5)
 
 # I can put it together using "Pop"
-full_sea <- merge(indiv_list_full, curr_sea, by = c("Pop"))
-mll_sea <- merge(indiv_list_MLL, curr_sea, by = c("Pop"))
-full_fut <- merge(indiv_list_full, fut_sea, by = c("Pop"))
-mll_fut <- merge(indiv_list_MLL, fut_sea, by = c("Pop"))
-full_exp <- merge(indiv_list_full, exp_pop_env, by = c("Pop"))
-mll_exp <- merge(indiv_list_MLL, exp_pop_env, by = c("Pop"))
+full_sea <- merge(indiv_list_full, sea_scaled, by = c("Pop"))
+mll_sea <- merge(indiv_list_MLL, sea_scaled, by = c("Pop"))
 ```
 
-Perfect, now I have an entry for every individual in the genomic datasets. Finally, I should standardize all of the environmental data.
-
-```{r}
-# quick data inspection
-head(full_sea)
-head(full_fut)
-head(full_exp)
-head(mll_sea)
-head(mll_fut)
-head(mll_exp)
-
-# scale
-full_sea_std <- scale(full_sea[,c("temp_curr", "max_temp_curr","sal_curr","min_sal_curr")])
-mll_sea_std <- scale(mll_sea[,c("temp_curr", "max_temp_curr","sal_curr","min_sal_curr")])
-full_fut_std <- scale(full_fut[,c("temp_8.5","sal_8.5")])
-mll_fut_std <- scale(mll_fut[,c("temp_8.5","sal_8.5")])
-full_exp_std <- scale(full_exp[,c("temp_mean_adjust", "temp_max","sal_mean_adjust","sal_min")])
-mll_exp_std <- scale(mll_exp[,c("temp_mean_adjust", "temp_max","sal_mean_adjust","sal_min")])
-colnames(full_sea_std) <- c("temp_sea","max_temp_sea","sal_sea","min_sal_sea")
-colnames(mll_sea_std) <- 
-colnames(full_exp_std) <- 
-colnames(mll_exp_std) <-  c("temp_scaled","max_temp_scaled","sal_scaled","min_sal_scaled")
-colnames(full_fut_std) <- colnames(mll_fut_std) <- c("temp_scaled_fut","sal_scaled_fut")
-
-# attach scaled information back to env dfs
-full_sea_scaled <- as.data.frame(cbind(full_sea, full_sea_std))
-mll_sea_scaled <- as.data.frame(cbind(mll_sea, mll_sea_std))
-full_exp_scaled <- as.data.frame(cbind(full_exp, full_exp_std))
-mll_exp_scaled <- as.data.frame(cbind(mll_exp, mll_exp_std))
-full_fut_scaled <- as.data.frame(cbind(full_fut, full_fut_std))
-mll_fut_scaled <- as.data.frame(cbind(mll_fut, mll_fut_std))
-
-# write all of this information out to csv for any future analysis
-write.csv(full_sea_scaled, paste0("data/EnvDat/full_seascapeEnv_", Sys.Date(), ".csv"))
-write.csv(mll_sea_scaled, paste0("data/EnvDat/mll_seascapeEnv_", Sys.Date(), ".csv"))
-write.csv(full_exp_scaled, paste0("data/EnvDat/full_expEnv_", Sys.Date(), ".csv"))
-write.csv(mll_exp_scaled, paste0("data/EnvDat/mll_expEnv_", Sys.Date(), ".csv"))
-write.csv(full_fut_scaled, paste0("data/EnvDat/full_futEnv_", Sys.Date(), ".csv"))
-write.csv(mll_fut_scaled, paste0("data/EnvDat/mll_futEnv_", Sys.Date(), ".csv"))
-```
 
 ### Formatting for LEA
 

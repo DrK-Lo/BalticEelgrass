@@ -136,7 +136,7 @@ tempdf_sum <- data.frame(temp_mean = apply(tempdf[,-1],1,mean),
 # put together df
 site_abbrev <- rownames(saldf_sum)
 copernicus_df <- cbind(site_abbrev, saldf_sum, tempdf_sum)
-write.csv(copernicus_df, paste0("data/EnvDat/complete_expSites_copernicus", Sys.Date(), ".csv"))
+write.csv(copernicus_df, paste0("data/EnvDat/complete_expSites_copernicus_", Sys.Date(), ".csv"))
 
 # expand to long format df to calculate monthly/annual trends
 sal_expanded <- saldf %>% 
