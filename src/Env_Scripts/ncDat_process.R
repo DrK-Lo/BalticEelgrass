@@ -1,13 +1,15 @@
 ## For working with netcdf data
 
+# libraries
 library(dplyr)
 library(tidyr)
 library(ncdf4)
 library(raster)
 library(terra)
 
-# experimental site data
+# data
 exp_pops <- read.csv("data/experiment/eelgrass_exp_sites.csv")
+popsdf <- read.csv("data/experiment/poptrts_df.csv")
 
 # set up objects
 sal_complete <- matrix(nrow = 8)
@@ -202,17 +204,37 @@ overall_trends <- copernicus_expanded %>% group_by(site_name,month,year) %>%
             .groups = "drop")
 overall_trends
 
+# colors for plotting
+popsdf$site_name <- popsdf$poptrt
+copernicus_plotting <- merge(copernicus_expanded, popsdf, by = c("site_name"))
+
 # plot the data by group
-ggplot(copernicus_expanded, 
-       aes(x = date, y = sal, fill = site_name, col = site_name)) +
+ggplot(copernicus_plotting, 
+       aes(x = date, y = sal, 
+           fill = fct_reorder(site_name, order), 
+           col = fct_reorder(site_name, order))) +
   geom_smooth() +
+  scale_fill_manual(name = "Site",
+                    values = popsdf$cols,
+                    labels = popsdf$poptrt) +
+  scale_color_manual(name = "Site",
+                     values = popsdf$cols,
+                     labels = popsdf$poptrt) +
   labs(title = "Salinity at Experimental Sites 2011-2021",
        x = "Date", y = "Salinity", color = "Site", fill = "Site") +
   theme_bw()
 
-ggplot(copernicus_expanded, 
-       aes(x = date, y = temp, fill = site_name, col = site_name)) +
+ggplot(copernicus_plotting, 
+       aes(x = date, y = temp, 
+           fill = fct_reorder(site_name, order), 
+           col = fct_reorder(site_name, order))) +
   geom_smooth() +
+  scale_fill_manual(name = "Site",
+                    values = popsdf$cols,
+                    labels = popsdf$poptrt) +
+  scale_color_manual(name = "Site",
+                     values = popsdf$cols,
+                     labels = popsdf$poptrt) +
   labs(title = "Temperature at Experimental Sites 2011-2021",
        x = "Date", y = "Temperature", color = "Site", fill = "Site") +
   theme_bw()
