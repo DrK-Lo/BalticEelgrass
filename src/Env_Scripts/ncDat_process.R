@@ -238,3 +238,6 @@ ggplot(copernicus_plotting,
   labs(title = "Temperature at Experimental Sites 2011-2021",
        x = "Date", y = "Temperature", color = "Site", fill = "Site") +
   theme_bw()
+
+# keep the df for comparison to treatment data later
+write.csv(copernicus_plotting, "data/EnvDat/copernicus_plotting_data.csv", row.names = F)
