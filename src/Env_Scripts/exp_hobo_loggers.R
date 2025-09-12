@@ -110,6 +110,7 @@ all_tanks_trim <- all_tanks[-(108035:108044),]
 # re-summarize by tank
 tank_temps <- all_tanks_trim %>% group_by(tank) %>%
   summarise(mean_temp = mean(temp),
+            median_temp = mean(temp),
             min_temp = min(temp),
             max_temp = max(temp),
             sd_temp = sd(temp))
@@ -121,6 +122,7 @@ all_tanks_trim$trt <- ifelse(all_tanks_trim$tank %in% control, "ctrl", "heat")
 # summarize by trt
 trt_temps <- all_tanks_trim %>% group_by(trt) %>%
   summarise(mean_temp = mean(temp),
+            median_temp = median(temp),
             min_temp = min(temp),
             max_temp = max(temp),
             sd_temp = sd(temp))
@@ -150,7 +152,13 @@ colnames(exp_df) <- c("bagnum","tank","pop","genet","trt")
 exp_df$ind <- paste0(exp_df$pop,"_",exp_df$genet)
 
 # now format environmental data by treatment
-trt_env_dat <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"), max_temp = c(trt_temps[trt_temps$trt == "ctrl",]$max_temp, trt_temps[trt_temps$trt == "ctrl",]$max_temp, trt_temps[trt_temps$trt == "heat",]$max_temp, trt_temps[trt_temps$trt == "heat",]$max_temp), avg_temp = c(trt_temps[trt_temps$trt == "ctrl",]$mean_temp, trt_temps[trt_temps$trt == "ctrl",]$mean_temp, trt_temps[trt_temps$trt == "heat",]$mean_temp, trt_temps[trt_temps$trt == "heat",]$mean_temp), min_sal = c(21, 7, 16, 5), avg_sal = c(21, 7, 16, 5))
+trt_env_dat <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"), 
+                          max_temp = c(trt_temps[trt_temps$trt == "ctrl",]$max_temp, trt_temps[trt_temps$trt == "ctrl",]$max_temp, trt_temps[trt_temps$trt == "heat",]$max_temp, trt_temps[trt_temps$trt == "heat",]$max_temp), 
+                          avg_temp = c(trt_temps[trt_temps$trt == "ctrl",]$mean_temp, trt_temps[trt_temps$trt == "ctrl",]$mean_temp, trt_temps[trt_temps$trt == "heat",]$mean_temp, trt_temps[trt_temps$trt == "heat",]$mean_temp), 
+                          med_temp = c(trt_temps[trt_temps$trt == "ctrl",]$median_temp, trt_temps[trt_temps$trt == "ctrl",]$median_temp, trt_temps[trt_temps$trt == "heat",]$median_temp, trt_temps[trt_temps$trt == "heat",]$median_temp), 
+                          min_sal = c(21, 7, 16, 5), 
+                          avg_sal = c(21, 7, 16, 5),
+                          med_sal = c(21, 7, 16, 5))
 
 # and combine
 exp_ind_env <- merge(exp_df, trt_env_dat, by = c("trt"))
