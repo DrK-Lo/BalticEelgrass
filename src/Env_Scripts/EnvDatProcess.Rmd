@@ -333,16 +333,6 @@ colnames(popsdf1) <- c("pops1","order1")
 colnames(popsdf2) <- c("pops2","order2")
 euc_dists_long_mg <- merge(popsdf1[,c("pops1","order1")], euc_dists_long, by = "pops1")
 euc_dists_long_mg2 <- merge(popsdf2[,c("pops2","order2")], euc_dists_long_mg, by = "pops2")
-
-# pop info
-order_pops <- c("VAT","VIK","HOG","BAR","KUR","KAL","HOR","BJO","TempControl-21psu","TempControl-7psu","TempWarm-16psu","TempWarm-5psu")
-
-# order pops_in_exp & set explicit colors
-pops_in_df <- data.frame(poptrt = order_pops, order = 1:12, cols = c("#155d27","#25a244","#4ad66d","#b7efc5","#caf0f8","#90e0ef","#0096c7","#023e8a","#FFA203","#FE691E","deeppink","deeppink4"), coast = c(rep("West",4), rep("East",4), rep("trt",4)))
-
-# keep this order df for other purposes
-write.csv(pops_in_df, "data/experiment/poptrts_df.csv", row.names = F)
-
 euc_dist_trtpop <- ggplot(euc_dists_long_mg2, aes(x = fct_reorder(pops1, order1), 
                               y = fct_reorder(pops2, order2), 
                               fill = distances))+
@@ -372,7 +362,9 @@ Also plot treatment data against experimental site of origin data
 order_pops <- c("VAT","VIK","HOG","BAR","KUR","KAL","HOR","BJO","TempControl-21psu","TempControl-7psu","TempWarm-16psu","TempWarm-5psu")
 
 # order pops_in_exp & set explicit colors
-pops_in_df <- data.frame(poptrt = order_pops, order = 1:12, cols = c("#155d27","#25a244","#4ad66d","#b7efc5","#caf0f8","#90e0ef","#0096c7","#023e8a","#FFA203","deeppink","#FE691E","deeppink4"), coast = c(rep("West",4), rep("East",4), rep("trt",4)))
+pops_in_df <- data.frame(poptrt = order_pops, order = 1:12, cols = c("#155d27","#25a244","#4ad66d","#b7efc5","#caf0f8","#90e0ef","#0096c7","#023e8a","#FFA203","#FE691E","deeppink","deeppink4"), coast = c(rep("West",4), rep("East",4), rep("trt",4)))
+
+pops_in_df1 <- data.frame(poptrt = order_pops, order = 1:12, cols = c("#002800","#155d27","#25a244","#6ede8a","#90e0ef","#00b4d8","#0077b6","#03045e","#FFA203","#FE691E","deeppink","deeppink4"), coast = c(rep("West",4), rep("East",4), rep("trt",4)))
 
 # keep this order df for other purposes
 write.csv(pops_in_df, "data/experiment/poptrts_df.csv", row.names = F)
@@ -384,21 +376,41 @@ copernicus_plot$date <- as.Date(copernicus_plot$date)
 copernicus_plot$temp_adjust <- copernicus_plot$temp + 4
 copernicus_plot$sal_adjust <- ifelse(copernicus_plot$coast == "West", copernicus_plot$sal - 5, copernicus_plot$sal)
 
-ggplot(copernicus_plot, 
-       aes(x = date, y = temp_adjust, 
-           fill = fct_reorder(site_name, order), 
-           col = fct_reorder(site_name, order))) +
-  geom_smooth() +
+ggplot(copernicus_plot, aes(x = date, y = temp_adjust, 
+                            fill = fct_reorder(site_name, order), 
+                            col = fct_reorder(site_name, order))) +
+  geom_line()+
+#  geom_line(na.rm = T, aes(group = time_block)) +
+  facet_grid(~ year, scales = "free_x") +
   scale_fill_manual(name = "Site",
-                    values = pops_in_df$cols,
-                    labels = pops_in_df$poptrt) +
+                    values = pops_in_df1$cols,
+                    labels = pops_in_df1$poptrt) +
   scale_color_manual(name = "Site",
-                     values = pops_in_df$cols,
-                     labels = pops_in_df$poptrt) +
-  geom_hline(yintercept = 20.07134, col = "#FFA202") +
-  geom_hline(yintercept = 25.80038, col = "#FF1393") +
+                     values = pops_in_df1$cols,
+                     labels = pops_in_df1$poptrt) +
+  geom_hline(yintercept = 20.07134, col = "#FFA202", linewidth = 1) +
+  geom_hline(yintercept = 25.80038, col = "#FF1393", linewidth = 1) +
   labs(title = "Temperature at Experimental Sites 2011-2021",
        x = "Date", y = "Temperature (ºC)", color = "Site", fill = "Site") +
+  theme_bw()
+
+ggplot(copernicus_plot, aes(x = date, y = sal, 
+                            fill = fct_reorder(site_name, order), 
+                            col = fct_reorder(site_name, order))) +
+  geom_line()+
+#  geom_line(na.rm = T, aes(group = time_block)) +
+  facet_grid(~ year, scales = "free_x") +
+  scale_fill_manual(name = "Site",
+                    values = pops_in_df1$cols,
+                    labels = pops_in_df1$poptrt) +
+  scale_color_manual(name = "Site",
+                     values = pops_in_df1$cols,
+                     labels = pops_in_df1$poptrt) +
+  geom_hline(yintercept = 20.07134, col = "#FFA202", linewidth = 1) +
+  geom_hline(yintercept = 25.80038, col = "#FF1393", linewidth = 1) +
+  labs(title = "Salinity at Experimental Sites 2011-2021",
+       x = "Date", y = "Salinity (PSU)", color = "Site", fill = "Site") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
   theme_bw()
 
 ggplot(copernicus_plot, 
@@ -407,17 +419,84 @@ ggplot(copernicus_plot,
            col = fct_reorder(site_name, order))) +
   geom_smooth() +
   scale_fill_manual(name = "Site",
-                    values = pops_in_df$cols,
-                    labels = pops_in_df$poptrt) +
+                    values = pops_in_df1$cols,
+                    labels = pops_in_df1$poptrt) +
   scale_color_manual(name = "Site",
-                     values = pops_in_df$cols,
-                     labels = pops_in_df$poptrt) +
-  geom_hline(yintercept = 21, col = "#FFA202") +
-  geom_hline(yintercept = 7, col = "#FF1393") +
-  geom_hline(yintercept = 16, col = "#FE691F") +
-  geom_hline(yintercept = 5, col = "#8B0A50") +
+                     values = pops_in_df1$cols,
+                     labels = pops_in_df1$poptrt) +
+  geom_hline(yintercept = 21, col = "#FFA202", linewidth = 1) +
+  geom_hline(yintercept = 7, col = "#FF1393", linewidth = 1) +
+  geom_hline(yintercept = 16, col = "#FE691F", linewidth = 1) +
+  geom_hline(yintercept = 5, col = "#8B0A50", linewidth = 1) +
   labs(title = "Salinity at Experimental Sites 2011-2021",
        x = "Date", y = "Salinity (PSU)", color = "Site", fill = "Site") +
   theme_bw()
+```
 
+
+I also want violin plots, which require putting together the different raw datasets for both treatment and site of origin 
+
+```{r}
+# read in raw temperature data from tanks
+tanks_dat <- read.csv("data/EnvDat/all_tanks_logger_dat.csv")[,-1]
+copernicus_plotting
+
+# expand out the date time info from tanks
+tanks_dat$date <- str_split_fixed(tanks_dat$datetime, " ", 2)[,1]
+tanks_dat$date <- as.Date(tanks_dat$date)
+tanks_dat$time <- str_split_fixed(tanks_dat$datetime, " ", 2)[,2]
+tanks_dat$poptrt <- tanks_dat$trt
+
+# look at just these data
+ggplot(tanks_dat) +
+  geom_violin(aes(x = trt, y = temp, fill = trt)) +
+#  geom_boxplot(aes(x = trt, y = temp, fill = trt), width = 0.1) +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA202","#FF1393"),
+                    labels = c("Control", "Heated")) +
+  theme_bw()
+
+# now put it with the other sites temp data
+pops_in_df2 <- data.frame(poptrt = c("VAT","VIK","HOG","BAR","KUR","KAL","HOR","BJO","ctrl","heat"), order = 1:10, cols = c("#10451d","#155d27","#25a244","#6ede8a","#90e0ef","#00b4d8","#0077b6","#03045e","#FFA203","#FF1393"), coast = c(rep("West",4), rep("East",4), rep("trt", 2)))
+
+temps_all <- rbind(tanks_dat[,c("date","poptrt","temp")], 
+                   copernicus_plotting[,c("date","poptrt","temp")])
+
+temps_plotting <- merge(temps_all, pops_in_df2, by = c("poptrt"))
+
+# plot
+ggplot(temps_plotting) +
+  geom_violin(aes(x = as.factor(fct_reorder(poptrt, order)), y = temp, fill = fct_reorder(poptrt, order))) +
+#  geom_boxplot(aes(x = trt, y = temp, fill = trt), width = 0.1) +
+  scale_fill_manual(name = "Site",
+                    values = pops_in_df2$cols,
+                    labels = pops_in_df2$poptrt) +
+    labs(title = "Temperature at Experimental Sites 2011-2021",
+       x = "Date", y = "Temperature (ºC)", color = "Site", fill = "Site") +
+  theme_bw()
+
+# for salinity, we don't have any time series data so we add a few rows (with minor variability so that it actually plots, single values cause ggplot to fail)
+sal_all <- rbind(copernicus_plotting[,c("date","poptrt","sal")], data.frame(date = rep(Sys.Date(), 40), poptrt = c(rep("TempControl-21psu", 10), rep("TempControl-7psu", 10), rep("TempWarm-16psu", 10), rep("TempWarm-5psu", 10)), sal = c(rnorm(n = 10, mean = 21, sd = 0.0001), rnorm(n = 10, mean = 7, sd = 0.0001), rnorm(n = 10, mean = 16, sd = 0.0001), rnorm(n = 10, mean = 5, sd = 0.0001))))
+sal_plotting <- merge(sal_all, pops_in_df, by = c("poptrt"))
+
+# plot
+ggplot(sal_plotting) +
+  geom_violin(aes(x = as.factor(fct_reorder(poptrt, order)), y = (sal), fill = fct_reorder(poptrt, order))) +
+  scale_fill_manual(name = "Site",
+                    values = pops_in_df$cols,
+                    labels = pops_in_df$poptrt) +
+  labs(title = "Temperature at Experimental Sites 2011-2021",
+       x = "Site", y = "Salinity (PSU)", color = "Site", fill = "Site") +
+  theme_bw()
+
+# plot just sites
+ggplot(copernicus_plotting) +
+  geom_violin(aes(x = as.factor(fct_reorder(poptrt, order)), y = as.numeric(sal), fill = fct_reorder(poptrt, order))) +
+#  geom_boxplot(aes(x = fct_reorder(poptrt, order), y = sal, fill = fct_reorder(poptrt, order)), width = 0.1) +
+  scale_fill_manual(name = "Site",
+                    values = pops_in_df2$cols,
+                    labels = pops_in_df2$poptrt) +
+  labs(title = "Salinity at Experimental Sites 2011-2021",
+       x = "Date", y = "Salinity (PSU)", color = "Site", fill = "Site") +
+  theme_bw()
 ```

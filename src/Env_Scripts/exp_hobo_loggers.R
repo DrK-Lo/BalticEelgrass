@@ -119,6 +119,9 @@ tank_temps <- all_tanks_trim %>% group_by(tank) %>%
 control <- c("A1","A2","C1","C2","C3","C4")
 all_tanks_trim$trt <- ifelse(all_tanks_trim$tank %in% control, "ctrl", "heat")
 
+# keep this raw data
+write.csv(all_tanks_trim, "data/EnvDat/all_tanks_logger_dat.csv")
+
 # summarize by trt
 trt_temps <- all_tanks_trim %>% group_by(trt) %>%
   summarise(mean_temp = mean(temp),
