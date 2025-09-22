@@ -22,8 +22,8 @@ I need to first pre-process data to combine pop/trt/mort/growth data into a sing
 
 ```{r}
 # read in data
-setup <- read.csv("experiment/GOEEL-eelgrass-Sweden-exp - Setup.csv")
-takedown <- read.csv("experiment/GO_eelgrass_mesocosm_takedown_data.csv")
+setup <- read.csv("data/experiment/GOEEL-eelgrass-Sweden-exp - Setup.csv")
+takedown <- read.csv("data/experiment/GO_eelgrass_mesocosm_takedown_data.csv")
 head(setup)
 head(takedown)
 
@@ -66,7 +66,7 @@ which(duplicated(setup_rm3$DNA_label)) # nope
 # back to our full dataset
 full_dat # looks good, but still need treatment information
 full_dat$trt <- paste0(full_dat$temp_full, "_", full_dat$sal_full)
-write.csv(full_dat, "experiment/eelgrass_mesocosm_start_end_complete.csv")
+write.csv(full_dat, "data/experiment/eelgrass_mesocosm_start_end_complete.csv")
 ```
 
 
