@@ -24,6 +24,7 @@ library(performance)
 
 # data
 fit <- read.csv("data/experiment/eelgrass_mesocosm_start_end_complete.csv")[,-1]
+env <- read.csv("data/EnvDat/indiv_trt_env_dat_2025-10-02.csv")[,-1]
 ```
 
 # Fitness Modeling
@@ -49,9 +50,12 @@ fit_trim$pop <- as.factor(fit_trim$pop)
 fit_trim$tank_ID <- as.factor(fit_trim$tank_ID)
 fit_trim$trt <- as.factor(fit_trim$trt)
 
+# combine with the exp env dat
+fit_trim_env <- merge(fit_trim, env[,c("DNA_label", "mean_sal", "median_sal", "min_sal", "max_sal", "sd_sal", "mean_temp", "median_temp", "min_temp", "max_temp", "sd_temp", "x_coord", "y_coord", "position")], by = c("DNA_label"))
+
 # length and weight growth
 # for the growth analyses, we want a df with no flowering individuals and no dead individuals
-fit_growth <- fit_trim[is.na(fit_trim$Length_flower1),]
+fit_growth <- fit_trim_env[is.na(fit_trim$Length_flower1),]
 fit_growth <- fit_growth[fit_growth$isAlive == 1,]
 
 # length
@@ -74,7 +78,8 @@ I will start by modeling differences in survival. To do so, I will use a binomia
 
 ```{r}
 # analysis of fixed effects
-anova(lm(isAlive ~ pop + trt, data = fit_trim)) # both significant
+anova(lm(isAlive ~ pop + trt, data = fit_trim_env)) # both significant
+anova(lm(isAlive ~ pop + median_sal + median_temp + x_coord + y_coord, data = fit_trim_env)) # pop, med sal, med temp all signif
 
 # now try building a model
 mod1 <- glmer(isAlive ~ pop * trt + (1 | tank_ID), 
