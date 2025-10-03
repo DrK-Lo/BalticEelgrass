@@ -52,10 +52,14 @@ C4a <- as.data.frame(read_excel("data/EnvDat/HOBOloggers_GOeelgrass2024/C4a.xlsx
 C4b <- as.data.frame(read_excel("data/EnvDat/HOBOloggers_GOeelgrass2024/C4b.xlsx"))[,-1]
 C4c <- as.data.frame(read_excel("data/EnvDat/HOBOloggers_GOeelgrass2024/C4c.xlsx"))[,-1]
 gas <- as.data.frame(read_excel("data/EnvDat/HOBOloggers_GOeelgrass2024/gas2024.xlsx"))[,-1]
+
+# also salinity data
+bags <- read.csv("data/EnvDat/GOEEL-eelgrass-Sweden-exp - Bags.csv")
+daily_checks <- read.csv("data/EnvDat/GOEEL-eelgrass-Sweden-exp - DailyChecks.csv")
 ########
 
-## data pre-cleaning
-####################
+## temp data pre-cleaning
+#########################
 # change colnames to be more usable
 colnames(gas) <- colnames(A1a) <- colnames(A1b) <- colnames(A1c) <- colnames(A2a) <- 
   colnames(A2b) <- colnames(A2c) <- colnames(A3a) <- colnames(A3b) <- colnames(A3c) <- 
@@ -86,7 +90,7 @@ for (logger in log_names) {
   assign(paste0(logger, "_trim"), 
          get(logger) %>% 
            filter(between(datetime, start, end)) %>% # filter times
-           mutate(tank = tank, logger = logger)) # add metadata columns
+           mutate(tank_ID = tank, logger = logger)) # add metadata columns
 }
 
 
@@ -95,9 +99,12 @@ all_tanks <- rbind(A1a_trim,A1b_trim,A1c_trim,A2a_trim,A2b_trim,A2c_trim,A3a_tri
                    B2b_trim,B2c_trim,B3a_trim,B3b_trim,B3c_trim,B4a_trim,B4b_trim,B4c_trim,
                    C1a_trim,C1b_trim,C1c_trim,C2a_trim,C2b_trim,C2c_trim,C3a_trim,C3b_trim,
                    C3c_trim,C4a_trim,C4b_trim,C4c_trim)
+#########################
 
+## analyze temp trends
+######################
 # summarize by tank
-tank_temps <- all_tanks %>% group_by(tank) %>%
+tank_temps <- all_tanks %>% group_by(tank_ID) %>%
   summarise(mean_temp = mean(temp),
             min_temp = min(temp),
             max_temp = max(temp),
@@ -108,7 +115,7 @@ tank_temps <- all_tanks %>% group_by(tank) %>%
 all_tanks_trim <- all_tanks[-(108035:108044),]
 
 # re-summarize by tank
-tank_temps <- all_tanks_trim %>% group_by(tank) %>%
+tank_temps <- all_tanks_trim %>% group_by(tank_ID) %>%
   summarise(mean_temp = mean(temp),
             median_temp = mean(temp),
             min_temp = min(temp),
@@ -154,14 +161,11 @@ exp_df <- as.data.frame(str_split_fixed(exp_labels, "_", 5))
 colnames(exp_df) <- c("bagnum","tank","pop","genet","trt")
 exp_df$ind <- paste0(exp_df$pop,"_",exp_df$genet)
 
-# now format environmental data by treatment
-trt_env_dat <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"), 
+# now format temp data by treatment
+trt_temp_dat <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"), 
                           max_temp = c(trt_temps[trt_temps$trt == "ctrl",]$max_temp, trt_temps[trt_temps$trt == "ctrl",]$max_temp, trt_temps[trt_temps$trt == "heat",]$max_temp, trt_temps[trt_temps$trt == "heat",]$max_temp), 
                           avg_temp = c(trt_temps[trt_temps$trt == "ctrl",]$mean_temp, trt_temps[trt_temps$trt == "ctrl",]$mean_temp, trt_temps[trt_temps$trt == "heat",]$mean_temp, trt_temps[trt_temps$trt == "heat",]$mean_temp), 
-                          med_temp = c(trt_temps[trt_temps$trt == "ctrl",]$median_temp, trt_temps[trt_temps$trt == "ctrl",]$median_temp, trt_temps[trt_temps$trt == "heat",]$median_temp, trt_temps[trt_temps$trt == "heat",]$median_temp), 
-                          min_sal = c(21, 7, 16, 5), 
-                          avg_sal = c(21, 7, 16, 5),
-                          med_sal = c(21, 7, 16, 5))
+                          med_temp = c(trt_temps[trt_temps$trt == "ctrl",]$median_temp, trt_temps[trt_temps$trt == "ctrl",]$median_temp, trt_temps[trt_temps$trt == "heat",]$median_temp, trt_temps[trt_temps$trt == "heat",]$median_temp))
 
 # and combine
 exp_ind_env <- merge(exp_df, trt_env_dat, by = c("trt"))
@@ -175,7 +179,50 @@ trt <- unique(levels(as.factor(exp_env_ord$trt)))
 pop_trt_df <- expand.grid(pops, trt)
 colnames(pop_trt_df) <- c("pop","trt")
 pop_trt_env <- merge(pop_trt_df, trt_env_dat, by = c("trt"))
+######################
+
+## salinity
+###########
+# sal summary stats
+bag_sals <- daily_checks %>% group_by(bagKey) %>%
+  summarise(mean_sal = mean(dailySalinity),
+            median_sal = median(dailySalinity),
+            min_sal = min(dailySalinity),
+            max_sal = max(dailySalinity),
+            sd_sal = sd(dailySalinity)) %>%
+  as.data.frame()
+
+# merge
+bag_sals_df <- merge(bags, bag_sals, by = c("bagKey"))
+###########
+
+## complete exp env dat
+#######################
+# combine exp env data
+exp_env_df <- merge(bag_sals_df, tank_temps, by = c("tank_ID"))
+
+# get the xy position for each bag in 384 cell grid as well
+# x goes 1-24, y goes 1-16
+# try using rep and seq to make this work
+rep(c(rep(1,4), rep(2,4), rep(3,4), rep(4,4)), 4)
+
+coords_bags <- data.frame(x_coord = c(rep(c(rep(1,4), rep(2,4), rep(3,4), rep(4,4), 
+                                            rep(5,4), rep(6,4), rep(7,4), rep(8,4)), 
+                                          4),
+                                      rep(c(rep(9,4), rep(10,4), rep(11,4), rep(12,4), 
+                                            rep(13,4), rep(14,4), rep(15,4), rep(16,4)), 
+                                          4),
+                                      rep(c(rep(17,4), rep(18,4), rep(19,4), rep(20,4), 
+                                            rep(21,4), rep(22,4), rep(23,4), rep(24,4)), 
+                                          4)),
+                          y_coord = rep(c(rep(1:4, 8), rep(5:8, 8), rep(9:12, 8), rep(13:16, 8)), 3),
+                          bagnum_num = 1:384)
+coords_bags$position <- paste0(coords_bags$x_coord, "_", coords_bags$y_coord)
+
+# merge coords
+exp_env_full_df <- merge(exp_env_df, coords_bags, by = c("bagnum_num"))
 
 # save both the indiv and pop level env dfs
-write.csv(exp_env_ord, paste0("data/EnvDat/indiv_trt_env_dat_", Sys.Date(), ".csv"), row.names = F)
+write.csv(exp_env_full_df, paste0("data/EnvDat/indiv_trt_env_dat_", Sys.Date(), ".csv"), row.names = F)
 write.csv(pop_trt_env, paste0("data/EnvDat/pop_trt_env_dat_", Sys.Date(), ".csv"), row.names = F)
+#######################
