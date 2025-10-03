@@ -70,7 +70,7 @@ fit_growth$above_below_weight_ratio <- fit_growth$above_ground_weight / fit_grow
 
 ## Fitness Difference Modeling
 
-Here I will compare differences among groups. I will use tank, treatment, (???coast), and population as explanatory factors in my analysis.
+Here I will compare differences among groups. I will use tank, treatment, and population as explanatory factors in my analysis.
 
 ### Survival Modeling
 
@@ -79,27 +79,26 @@ I will start by modeling differences in survival. To do so, I will use a binomia
 ```{r}
 # analysis of fixed effects
 anova(lm(isAlive ~ pop + trt, data = fit_trim_env)) # both significant
-anova(lm(isAlive ~ pop + median_sal + median_temp + x_coord + y_coord, data = fit_trim_env)) # pop, med sal, med temp all signif
 
 # now try building a model
-mod1 <- glmer(isAlive ~ pop * trt + (1 | tank_ID), 
+surv_glmm <- glmer(isAlive ~ pop * trt + (1 | tank_ID), # may need to add more components of treatment after tank ID
                family = binomial(link = "logit"),
-               data = fit_trim)
-plot(mod1)
-Anova(mod1, type = "III")
-drop1(mod1) # keep all
-summary(mod1)
+               data = fit_trim_env)
+plot(surv_glmm)
+Anova(surv_glmm, type = "III")
+drop1(surv_glmm) # keep all
+summary(surv_glmm)
 
 # significance testing with tukey
-mod1.1 <- glmer(isAlive ~ pop_trt + (1 | tank_ID), # getting boundary (singular) fit: see help('isSingular')
+surv_glmm.1 <- glmer(isAlive ~ pop_trt + (1 | tank_ID), # getting boundary (singular) fit: see help('isSingular')
                family = binomial(link = "logit"),
                data = fit_trim)
-mod1.2 <- glm(isAlive ~ pop_trt,
-               family = binomial,
-               data = fit_trim)
+surv_glm_poptrt <- glm(isAlive ~ pop_trt,
+                       family = binomial,
+                       data = fit_trim_env)
 
-tuk_surv <- TukeyHSD(aov(mod1.2), conf.level = 0.95)
-cld_surv <- multcompLetters4(aov(mod1.2), tuk_surv)
+tuk_surv <- TukeyHSD(aov(surv_glm_poptrt), conf.level = 0.95)
+cld_surv <- multcompLetters4(aov(surv_glm_poptrt), tuk_surv)
 
 # multcomp letters to get letters
 letters_surv_df <- data.frame(letters = as.data.frame.list(cld_surv$pop_trt), popsite = names((cld_surv$pop_trt)$Letters))
@@ -108,6 +107,41 @@ colnames(letters_surv_df_red) <- c("letters","popsite")
 rownames(letters_surv_df_red) <- NULL
 ```
 
+Rather than using treatment directly, I will try using salinity and temperature to represent temperature. Additionally, because tank_ID is confounded with temperature, I will try using x/y coordinates as a fixed effect and avoid having random effects altogether. If I do this, I can use a GLM. 
+
+```{r}
+# anova
+anova(lm(isAlive ~ pop + median_sal + median_temp + x_coord + y_coord, data = fit_trim_env)) # pop, sal, temp all significant
+
+# try a glm
+surv_glm <- glm(isAlive ~ pop + median_sal + median_temp + board_ID, # use board ID instead of position
+                family = binomial(link = "logit"),
+                data = fit_trim_env)
+
+# check dispersion & multicollinearity
+check_overdispersion(surv_glm) # looks good
+vif(surv_glm) # suggests no collinearity, everything is around 1
+
+# inspect model
+summary(surv_glm)
+plot(surv_glm)
+Anova(surv_glm, type = "III") # pop, sal, temp all signif
+
+# model selection
+step(surv_glm)
+
+# final model removes xy coords
+surv_glm.1 <- glm(isAlive ~ pop + median_sal + median_temp, 
+                  family = binomial(link = "logit"),
+                  data = fit_trim_env)
+
+# double check this model
+check_overdispersion(surv_glm.1) # looks good
+vif(surv_glm.1) # suggests no collinearity, everything is around 1
+summary(surv_glm.1)
+plot(surv_glm.1)
+Anova(surv_glm.1, type = "III") # pop, sal, temp all signif
+```
 
 ### Growth Modeling
 
@@ -139,6 +173,39 @@ cld_len <- multcompLetters4(aov(mod2.2), tuk_len)
 # try a linear model
 mod2.3 <- lm(length_growth ~ pop * trt, data = fit_growth)
 mod2.4 <- lm(length_growth ~ pop_trt, data = fit_growth)
+```
 
+I will also try this one without random factors, using a basic linear model. 
+
+```{r}
+# growth models
+lm_len <- lm(length_growth ~ pop + median_sal + median_temp + x_coord + y_coord, data = fit_growth)
+lm_weight <- lm(weight_growth ~ pop + median_sal + median_temp + x_coord + y_coord, data = fit_growth)
+
+# anova of these models
+anova(lm_len) # pop, sal, temp all significant
+anova(lm_weight) # temp significant
+
+# check multicollinearity
+vif(lm_len) # suggests no collinearity
+vif(lm_weight) # suggests no collinearity
+
+# inspect models
+# length
+summary(lm_len)
+plot(lm_len)
+Anova(lm_len, type = "III") # intercept, pop, sal, temp all signif
+
+# weight
+summary(lm_weight)
+plot(lm_weight)
+Anova(lm_weight, type = "III") # intercept and temp signif
+
+# model selection
+# length
+step(lm_len) # keeps pop, median sal, median temp
+
+# weight
+step(lm_weight) # keeps just median temp
 ```
 

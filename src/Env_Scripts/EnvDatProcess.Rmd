@@ -439,7 +439,13 @@ I also want violin plots, which require putting together the different raw datas
 ```{r}
 # read in raw temperature data from tanks
 tanks_dat <- read.csv("data/EnvDat/all_tanks_logger_dat.csv")[,-1]
-copernicus_plotting
+
+# salinity data also
+bags <- read.csv("data/EnvDat/GOEEL-eelgrass-Sweden-exp - Bags.csv")
+daily_checks <- read.csv("data/EnvDat/GOEEL-eelgrass-Sweden-exp - DailyChecks.csv")
+
+# put together the salinity data so we can look at trends by tank/treatment
+sal_dat <- merge(bags, daily_checks, by = c("bagKey"))
 
 # expand out the date time info from tanks
 tanks_dat$date <- str_split_fixed(tanks_dat$datetime, " ", 2)[,1]
