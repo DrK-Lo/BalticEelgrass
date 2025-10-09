@@ -48,7 +48,7 @@ library(raster) # for nc data
 seascape_dat <- read.csv("data/EnvDat/summary_env_data_meadows_GEA.csv") # seascape env data
 exp_dat <- read.csv("data/EnvDat/complete_expSites_copernicus_2025-08-25.csv")[,-1]
 exp_dat_cop <- read_excel("data/EnvDat/Camille_env_data_experiment.xlsx")
-trt_dat <- read.csv("data/EnvDat/pop_trt_env_dat_2025-09-10.csv")
+trt_dat <- read.csv("data/EnvDat/pop_trt_env_dat_2025-09-12.csv")
 indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx") # seascape individuals data
 eelgrass_vcf_MLL <- read.vcfR("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")# read in vcf eelgrass mll
 ```
@@ -197,7 +197,7 @@ table(indiv_list_full$Pop) # between 4 and 20 individuals in each pop - most 17+
 # also put together an mll dataset
 mll_split <- stringr::str_split_fixed(colnames(eelgrass_vcf_MLL@gt), "-", 3)
 mll_inds <- mll_split[-1,3]
-indiv_list_mll <- indiv_list_full[indiv_list_full$Indv_no %in% MLL_inds,]
+indiv_list_mll <- indiv_list_full[indiv_list_full$Indv_no %in% mll_inds,]
 
 # now put this together with the environmental dataset
 head(sea_scaled)
@@ -214,7 +214,7 @@ sea_scaled$sal_8.5 <- as.numeric(fut_sea$sal_8.5)
 
 # I can put it together using "Pop"
 full_sea_scaled <- merge(indiv_list_full, sea_scaled, by = c("Pop"))
-mll_sea_scaled <- merge(indiv_list_MLL, sea_scaled, by = c("Pop"))
+mll_sea_scaled <- merge(indiv_list_mll, sea_scaled, by = c("Pop"))
 
 # output for rda
 write.csv(full_sea_scaled, paste0("data/EnvDat/sea_scaled_envdat_full_", Sys.Date(), ".csv"), row.names = F)
@@ -242,52 +242,7 @@ write.env(mat4, paste0("data/EnvDat/trtEnv_", Sys.Date(), ".env"))
 
 ### Formatting for RDA & GF
 
-RDA needs information in the exact format I already had it in, so no need to do any further processing - just know that I will use the csv for RDA. When I go to run RDA, I will likely also want to correct for population structure by including PCs from a PCA, but this will come when the analysis is actually run (since that requires genetic information).
-
-GF requires environmental data in the same format as RDA, just a regular table format. 
-The authors suggest using PCNMs to integrate spatial variation, rather than just latitude and longitude, but I don't have real coordinates for my experimental treatments so I am limited in my ability to integrate PCNMs. I have code to do this below, but have blocked it out for now. 
-
-```{r}
-# # isolate coordinates
-# coord_fullsea <- full_sea[,c("long", "lat")]
-# coord_mllsea <- mll_sea[,c("long", "lat")]
-# coord_exp <- full_exp[,c("long","lat")]
-# 
-# # generate PCNMs (note that there is no PCNM for the treatments, so may be unable to use this)
-# pcnm_fullsea <- pcnm(dist(coord_fullsea))
-# pcnm_mllsea <- pcnm(dist(coord_mllsea))
-# pcnm_mllexp <- pcnm(dist(coord_mllexp))
-# 
-# 
-# # keep half of positive PCNMs as suggest by authors (determine which authors, I am using following tutorial https://github.com/pgugger/LandscapeGenomics/blob/master/2018_China/Exercise3.md)
-# keep_full_sea <- round(length(which(pcnm_fullsea$value < 0))/2)
-# keep_mll_sea <- round(length(which(pcnm_mllsea$value < 0))/2)
-# keep_full_exp <- round(length(which(pcnm_fullexp$value < 0))/2)
-# keep_mll_exp <- round(length(which(pcnm_mllexp$value < 0))/2)
-# pcnm_keep_full_sea <- scores(pcnm_fullsea)[,1:keep_full_sea]
-# pcnm_keep_mll_sea <- scores(pcnm_mllsea)[,1:keep_mll_sea]
-# pcnm_keep_full_exp <- scores(pcnm_fullexp)[,1:keep_full_exp]
-# pcnm_keep_full_exp <- scores(pcnm_mllsea)[,1:keep_mll_exp]
-# 
-# # create file output that contains just climate and pcnm spatial variables, i.e. no lat long
-# write.csv(cbind(pcnm_keep_full_sea, curr_full_scaled[,9:12]), "EnvDat/current_full_env_gf.csv")
-# write.csv(cbind(pcnm_keep_mll_sea, curr_mll_scaled[,9:12]), "EnvDat/current_mll_env_gf.csv")
-# write.csv(cbind(pcnm_keep_full_exp, fut_full_scaled[,9:10]), "EnvDat/fut_full_env_gf.csv")
-# write.csv(cbind(pcnm_keep_full_exp, fut_mll_scaled[,9:10]), "EnvDat/fut_mll_env_gf.csv")
-# 
-# # also make a version of this dataset at the population level - note mll vs full doesn't matter here, as everything is at the population level
-# curr_pop <- cbind(pcnm_keep_full, curr_full_scaled)
-# fut_pop <- cbind(pcnm_keep_full, fut_full_scaled)
-# curr_pop_rm <- curr_pop[!duplicated(curr_pop$Pop),]
-# fut_pop_rm <- fut_pop[!duplicated(fut_pop$Pop),]
-# 
-# # save these
-# curr_pop_save <- curr_pop_rm[,c("pcnm_keep_full","temp_scaled","max_temp_scaled","sal_scaled","min_sal_scaled")]
-# fut_pop_save <- fut_pop_rm[,c("pcnm_keep_full","temp_scaled8.5","sal_scaled8.5")] # this will pose a problem with the variables not lining up across datasets
-# write.csv(curr_pop_save,"EnvDat/curr_pop_env_gf.csv")
-# write.csv(fut_pop_save,"EnvDat/fut_pop_env_gf.csv")
-```
-
+RDA needs information in the exact format I already had it in, so no need to do any further processing - just know that I will use the csv for RDA. When I go to run RDA, I will likely also want to correct for population structure by including PCs from a PCA, but this will come when the analysis is actually run (since that requires genetic information). GF requires environmental data in the same format as RDA, just a regular table format. 
 
 ### Environmental Distance
 
@@ -440,13 +395,6 @@ I also want violin plots, which require putting together the different raw datas
 # read in raw temperature data from tanks
 tanks_dat <- read.csv("data/EnvDat/all_tanks_logger_dat.csv")[,-1]
 
-# salinity data also
-bags <- read.csv("data/EnvDat/GOEEL-eelgrass-Sweden-exp - Bags.csv")
-daily_checks <- read.csv("data/EnvDat/GOEEL-eelgrass-Sweden-exp - DailyChecks.csv")
-
-# put together the salinity data so we can look at trends by tank/treatment
-sal_dat <- merge(bags, daily_checks, by = c("bagKey"))
-
 # expand out the date time info from tanks
 tanks_dat$date <- str_split_fixed(tanks_dat$datetime, " ", 2)[,1]
 tanks_dat$date <- as.Date(tanks_dat$date)
@@ -481,9 +429,20 @@ ggplot(temps_plotting) +
        x = "Date", y = "Temperature (ºC)", color = "Site", fill = "Site") +
   theme_bw()
 
-# for salinity, we don't have any time series data so we add a few rows (with minor variability so that it actually plots, single values cause ggplot to fail)
-sal_all <- rbind(copernicus_plotting[,c("date","poptrt","sal")], data.frame(date = rep(Sys.Date(), 40), poptrt = c(rep("TempControl-21psu", 10), rep("TempControl-7psu", 10), rep("TempWarm-16psu", 10), rep("TempWarm-5psu", 10)), sal = c(rnorm(n = 10, mean = 21, sd = 0.0001), rnorm(n = 10, mean = 7, sd = 0.0001), rnorm(n = 10, mean = 16, sd = 0.0001), rnorm(n = 10, mean = 5, sd = 0.0001))))
-sal_plotting <- merge(sal_all, pops_in_df, by = c("poptrt"))
+# we use daily checks data for salinity
+bags <- read.csv("data/EnvDat/GOEEL-eelgrass-Sweden-exp - Bags.csv")
+daily_checks <- read.csv("data/EnvDat/GOEEL-eelgrass-Sweden-exp - DailyChecks.csv")
+
+# put together the salinity data so we can look at trends by tank/treatment
+sal_dat <- merge(bags, daily_checks, by = c("bagKey"))
+
+# expand out the date time info from daily checks
+sal_dat$date <- str_split_fixed(sal_dat$dailyTimestamp, " ", 2)[,1]
+sal_dat$date <- as.Date(sal_dat$date)
+sal_dat$time <- str_split_fixed(sal_dat$dailyTimestamp, " ", 2)[,2]
+sal_dat$poptrt <- paste0(sal_dat$PopID, "_", sal_dat$trt)
+
+# 
 
 # plot
 ggplot(sal_plotting) +
@@ -496,7 +455,7 @@ ggplot(sal_plotting) +
   theme_bw()
 
 # plot just sites
-ggplot(copernicus_plotting) +
+ggplot(copernicus_plot) +
   geom_violin(aes(x = as.factor(fct_reorder(poptrt, order)), y = as.numeric(sal), fill = fct_reorder(poptrt, order))) +
 #  geom_boxplot(aes(x = fct_reorder(poptrt, order), y = sal, fill = fct_reorder(poptrt, order)), width = 0.1) +
   scale_fill_manual(name = "Site",

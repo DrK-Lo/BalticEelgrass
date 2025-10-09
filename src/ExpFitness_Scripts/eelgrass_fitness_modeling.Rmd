@@ -12,8 +12,8 @@ knitr::opts_knit$set(root.dir = "~/Eelgrass/BalticEelgrass")
 
 ```{r}
 # libraries
-library(dplyr)
 library(tidyr)
+library(dplyr)
 library(ggplot2)
 library(stringr)
 library(lme4)
@@ -114,7 +114,7 @@ Rather than using treatment directly, I will try using salinity and temperature 
 anova(lm(isAlive ~ pop + median_sal + median_temp + x_coord + y_coord, data = fit_trim_env)) # pop, sal, temp all significant
 
 # try a glm
-surv_glm <- glm(isAlive ~ pop + median_sal + median_temp + board_ID, # use board ID instead of position
+surv_glm <- glm(isAlive ~ pop + median_sal + median_temp, # use board ID instead of position
                 family = binomial(link = "logit"),
                 data = fit_trim_env)
 
