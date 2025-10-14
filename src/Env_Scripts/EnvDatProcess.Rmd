@@ -361,8 +361,10 @@ ggplot(copernicus_plot, aes(x = date, y = sal,
   scale_color_manual(name = "Site",
                      values = pops_in_df1$cols,
                      labels = pops_in_df1$poptrt) +
-  geom_hline(yintercept = 20.07134, col = "#FFA202", linewidth = 1) +
-  geom_hline(yintercept = 25.80038, col = "#FF1393", linewidth = 1) +
+  geom_hline(yintercept = 21, col = "#FFA202", linewidth = 1) +
+  geom_hline(yintercept = 7, col = "#FF1393", linewidth = 1) +
+  geom_hline(yintercept = 16, col = "#FE691F", linewidth = 1) +
+  geom_hline(yintercept = 5, col = "#8B0A50", linewidth = 1) +
   labs(title = "Salinity at Experimental Sites 2011-2021",
        x = "Date", y = "Salinity (PSU)", color = "Site", fill = "Site") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
@@ -410,11 +412,27 @@ ggplot(tanks_dat) +
                     labels = c("Control", "Heated")) +
   theme_bw()
 
+# also plot by tank
+tank_cols <- data.frame(tank_ID = levels(as.factor(tanks_dat$tank_ID)), col = c("#03045e","#023e8a","#590d22","#800f2f","#c9184a","#ff4d6d","#ff758f","#ffb3c1","#0077b6","#00b4d8","#48cae4","#ade8f4"))
+tanks_plotting <- merge(tank_cols, tanks_dat, by = c("tank_ID"))
+
+ggplot(tanks_plotting, aes(x = datetime, y = temp, 
+                            col = tank_ID)) +
+  scale_color_manual(values = tank_cols$col)+
+  geom_line()+
+  labs(title = "Temperature in Mesocosm Tanks", 
+       x = "Date", y = "Temperature (ºC)")+
+  theme(axis.ticks.x = element_blank()) +
+  theme_classic()
+
 # now put it with the other sites temp data
 pops_in_df2 <- data.frame(poptrt = c("VAT","VIK","HOG","BAR","KUR","KAL","HOR","BJO","ctrl","heat"), order = 1:10, cols = c("#10451d","#155d27","#25a244","#6ede8a","#90e0ef","#00b4d8","#0077b6","#03045e","#FFA203","#FF1393"), coast = c(rep("West",4), rep("East",4), rep("trt", 2)))
 
+cop_temps <- copernicus_plot[,c("date","poptrt","temp_adjust")]
+colnames(cop_temps) <- c("date","poptrt","temp")
+
 temps_all <- rbind(tanks_dat[,c("date","poptrt","temp")], 
-                   copernicus_plotting[,c("date","poptrt","temp")])
+                   cop_temps)
 
 temps_plotting <- merge(temps_all, pops_in_df2, by = c("poptrt"))
 
@@ -433,24 +451,63 @@ ggplot(temps_plotting) +
 bags <- read.csv("data/EnvDat/GOEEL-eelgrass-Sweden-exp - Bags.csv")
 daily_checks <- read.csv("data/EnvDat/GOEEL-eelgrass-Sweden-exp - DailyChecks.csv")
 
+# check data
+summary(daily_checks)
+
+# there are some massive outliers, remove these
+daily_checks_clean <- daily_checks %>%
+  filter(dailyTemp < 40 & dailySalinity <30)
+
 # put together the salinity data so we can look at trends by tank/treatment
-sal_dat <- merge(bags, daily_checks, by = c("bagKey"))
+sal_dat <- merge(bags, daily_checks_clean, by = c("bagKey"))
 
 # expand out the date time info from daily checks
+library(lubridate)
 sal_dat$date <- str_split_fixed(sal_dat$dailyTimestamp, " ", 2)[,1]
-sal_dat$date <- as.Date(sal_dat$date)
+sal_dat$date <- mdy(sal_dat$date)
 sal_dat$time <- str_split_fixed(sal_dat$dailyTimestamp, " ", 2)[,2]
-sal_dat$poptrt <- paste0(sal_dat$PopID, "_", sal_dat$trt)
+sal_dat$poptrt <- sal_dat$trt
 
-# 
+# plot just these data
+ggplot(sal_dat) +
+  geom_violin(aes(x = as.factor(trt), y = dailySalinity, fill = trt)) +
+  scale_fill_manual(name = "Site",
+                    values = pops_in_df[9:12,]$cols,
+                    labels = pops_in_df[9:12,]$poptrt) +
+  labs(title = "Temperature in Mesocosm Treatments",
+       x = "Site", y = "Salinity (PSU)", color = "Treatment", fill = "Treatment") +
+  theme_bw()
+
+# it looks like some bag ids got mixed up between current W and future E
+sal_dat_trim <- sal_dat[!(sal_dat$trt == "TempControl-21psu" & sal_dat$dailySalinity < 18),]
+sal_dat_clean <- sal_dat_trim[!(sal_dat_trim$trt == "TempWarm-5psu" & sal_dat_trim$dailySalinity > 8),]
+
+# plot again
+ggplot(sal_dat_clean) +
+  geom_violin(aes(x = as.factor(trt), y = dailySalinity, fill = trt)) +
+  scale_fill_manual(name = "Site",
+                    values = pops_in_df[9:12,]$cols,
+                    labels = pops_in_df[9:12,]$poptrt) +
+  labs(title = "Temperature in Mesocosm Treatments",
+       x = "Site", y = "Salinity (PSU)", color = "Treatment", fill = "Treatment") +
+  theme_bw()
+
+# df for all salinity now
+cop_sals <- copernicus_plot[,c("date","poptrt","sal_adjust")]
+colnames(cop_sals) <- c("date","poptrt","dailySalinity")
+
+sal_all <- rbind(sal_dat_clean[,c("date","poptrt","dailySalinity")], 
+                   cop_sals)
+
+sal_plotting <- merge(sal_all, pops_in_df1, by = c("poptrt"))
 
 # plot
 ggplot(sal_plotting) +
-  geom_violin(aes(x = as.factor(fct_reorder(poptrt, order)), y = (sal), fill = fct_reorder(poptrt, order))) +
+  geom_violin(aes(x = as.factor(fct_reorder(poptrt, order)), y = (dailySalinity), fill = fct_reorder(poptrt, order))) +
   scale_fill_manual(name = "Site",
                     values = pops_in_df$cols,
                     labels = pops_in_df$poptrt) +
-  labs(title = "Temperature at Experimental Sites 2011-2021",
+  labs(title = "Salinity at Experimental Sites 2011-2021",
        x = "Site", y = "Salinity (PSU)", color = "Site", fill = "Site") +
   theme_bw()
 

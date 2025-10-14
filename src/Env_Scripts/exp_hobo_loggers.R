@@ -183,8 +183,30 @@ pop_trt_env <- merge(pop_trt_df, trt_env_dat, by = c("trt"))
 
 ## salinity
 ###########
+# check data
+summary(daily_checks)
+
+# there are some massive outliers, remove these
+daily_checks_clean <- daily_checks %>%
+  filter(dailyTemp < 40 & dailySalinity <30)
+summary(daily_checks_clean)
+
+# put together the salinity data so we can look at trends by tank/treatment
+sal_dat <- merge(bags, daily_checks_clean, by = c("bagKey"))
+
+# expand out the date time info from daily checks
+library(lubridate)
+sal_dat$date <- str_split_fixed(sal_dat$dailyTimestamp, " ", 2)[,1]
+sal_dat$date <- mdy(sal_dat$date)
+sal_dat$time <- str_split_fixed(sal_dat$dailyTimestamp, " ", 2)[,2]
+sal_dat$poptrt <- sal_dat$trt
+
+# it looks like some bag ids got mixed up between current W and future E
+sal_dat_trim <- sal_dat[!(sal_dat$trt == "TempControl-21psu" & sal_dat$dailySalinity < 18),]
+sal_dat_clean <- sal_dat_trim[!(sal_dat_trim$trt == "TempWarm-5psu" & sal_dat_trim$dailySalinity > 8),]
+
 # sal summary stats
-bag_sals <- daily_checks %>% group_by(bagKey) %>%
+bag_sals <- sal_dat_clean %>% group_by(bagKey) %>%
   summarise(mean_sal = mean(dailySalinity),
             median_sal = median(dailySalinity),
             min_sal = min(dailySalinity),
