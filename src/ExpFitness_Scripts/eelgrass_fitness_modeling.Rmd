@@ -12,15 +12,15 @@ knitr::opts_knit$set(root.dir = "~/Eelgrass/BalticEelgrass")
 
 ```{r}
 # libraries
-library(tidyr)
-library(dplyr)
-library(ggplot2)
+library(tidyverse)
+library(psych)
 library(stringr)
 library(lme4)
 library(lmerTest)
 library(multcompView)
 library(car)
 library(performance)
+library(corrplot)
 
 # data
 fit <- read.csv("data/experiment/eelgrass_mesocosm_start_end_complete.csv")[,-1]
@@ -61,11 +61,31 @@ fit_growth <- fit_growth[fit_growth$isAlive == 1,]
 # length
 fit_growth$length_growth <- rowSums(fit_growth[,c("Growth_leaf1","Growth_leaf2","Growth_leaf3","Growth_leaf4","Growth_leaf5","Growth_leaf6","Growth_leaf7","Length_new_leaf1","Length_new_leaf2","Length_new_leaf3","Length_new_leaf4","Length_new_leaf5","Length_new_leaf6","Length_new_shoot1_leaf1","Length_new_shoot1_leaf2","Length_new_shoot1_leaf3","Length_new_shoot1_leaf4","Length_new_shoot1_leaf5","Length_new_shoot1_leaf6","Length_new_shoot2_leaf1","Length_new_shoot2_leaf2","Length_new_shoot2_leaf3","Length_new_shoot2_leaf4","Length_new_shoot2_leaf5")], na.rm = T)
 
+# percent length growth
+fit_growth$length_std_change <- fit_growth$length_growth / fit_growth$length_longest_leaf_start
+
 # weight
-fit_growth$weight_growth <- fit_growth$total_weight - fit_growth$weight_start
+fit_growth$weight_change <- fit_growth$total_weight - fit_growth$weight_start
+
+# percent weight change
+fit_growth$weight_std_change <- fit_growth$weight_change / fit_growth$weight_start
 
 # ratio of above vs below ground weight
 fit_growth$above_below_weight_ratio <- fit_growth$above_ground_weight / fit_growth$below_ground_weight
+
+
+# correlations between fitness metrics
+# survival
+fit_surv_cordf <- fit_trim[,c("IsBlackLesions_start","isAlive","nbr_leaves_start","weight_start","length_longest_leaf_start")]
+pairs.panels(fit_surv_cordf)
+fit_surv_cors <- cor(fit_surv_cordf)
+corrplot(fit_surv_cors, method = "circle")
+
+# growth
+fit_growth_cordf <- fit_growth[,c("IsBlackLesions_start","nbr_leaves_start","nbr_leaves_end","length_longest_leaf_start","length_growth","length_std_change","weight_change","weight_std_change","weight_start","total_weight","above_ground_weight","below_ground_weight","above_below_weight_ratio")]
+pairs.panels(fit_growth_cordf)
+fit_growth_cors <- cor(fit_growth_cordf, use = "complete.obs")
+corrplot(fit_growth_cors, method = "circle")
 ```
 
 ## Fitness Difference Modeling
@@ -180,7 +200,7 @@ I will also try this one without random factors, using a basic linear model.
 ```{r}
 # growth models
 lm_len <- lm(length_growth ~ pop + median_sal + median_temp + x_coord + y_coord, data = fit_growth)
-lm_weight <- lm(weight_growth ~ pop + median_sal + median_temp + x_coord + y_coord, data = fit_growth)
+lm_weight <- lm(weight_change ~ pop + median_sal + median_temp + x_coord + y_coord, data = fit_growth)
 
 # anova of these models
 anova(lm_len) # pop, sal, temp all significant
