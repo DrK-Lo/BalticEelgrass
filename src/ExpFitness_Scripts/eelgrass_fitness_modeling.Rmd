@@ -65,7 +65,7 @@ fit_trim_env <- merge(fit_trim_ord, env[,c("DNA_label", "mean_sal", "median_sal"
 
 # length and weight growth
 # for the growth analyses, we want a df with no flowering individuals and no dead individuals
-fit_growth <- fit_trim_env[is.na(fit_trim$Length_flower1),]
+fit_growth <- fit_trim_env[is.na(fit_trim_env$Length_flower1),]
 fit_growth <- fit_growth[fit_growth$isAlive == 1,]
 
 # length
@@ -314,37 +314,65 @@ boxplot(residuals ~ block, data = resid_growweightstd, main = "Residuals of Weig
 boxplot(residuals ~ tank_ID, data = resid_growweightstd, main = "Residuals of Weight Change (std) LMM by Tank") # some tank variance in mean, more in variance of residuals themselves
 ```
 
+
+I will now look at this same data using salinity/temp in the place of treatment. Again, I will only do this for standardized data.
+
+```{r weight modeling sal/temp}
+# analysis of fixed effects
+anova(lm(weight_std_change ~ pop + median_sal + median_temp, data = fit_growth)) # pop and temp signif, not sal
+
+# now try building a model
+growweight_saltemp_lmm <- lmer(weight_std_change ~ pop * median_sal * median_temp + (1 | tank_ID), data = fit_growth)
+plot(growweight_saltemp_lmm)
+Anova(growweight_saltemp_lmm, type = "III") # nothing is significant
+drop1(growweight_saltemp_lmm) # don't need to drop anything if nothing matters anyways
+summary(growweight_saltemp_lmm)
+
+# additive model
+growweight_saltemp_lmm.1 <- lmer(weight_std_change ~ pop + median_sal + median_temp + (1 | tank_ID), data = fit_growth) # boundary (singular) fit: see help('isSingular')
+plot(growweight_saltemp_lmm.1)
+Anova(growweight_saltemp_lmm.1, type = "III") # median sal not significant
+drop1(growweight_saltemp_lmm.1) # keep everything
+summary(growweight_saltemp_lmm.1)
+
+# residuals
+resid_saltemp_lmm.1_growweight <- data.frame(residuals = residuals(growweight_saltemp_lmm.1), block = fit_growth$block, tank_ID = fit_growth$tank_ID)
+boxplot(residuals ~ block, data = resid_saltemp_lmm.1_growlen, main = "Residuals of Weight Change LMM by Block") # here we do seem to have more variance in the data by block
+boxplot(residuals ~ tank_ID, data = resid_saltemp_lmm.1_growlen, main = "Residuals of Weight Change LMM by Tank") # more variance by tank too, but nothing significantly different
+```
+
+
 I will also try these growth models without random factors, using a basic linear model. Note that a linear model is inappropriate for survival analyses because the response data is binary.
 
 ```{r growth models lm}
-# growth models
-lm_len <- lm(length_growth ~ pop + median_sal + median_temp + x_coord + y_coord, data = fit_growth)
-lm_weight <- lm(weight_change ~ pop + median_sal + median_temp + x_coord + y_coord, data = fit_growth)
-
-# anova of these models
-anova(lm_len) # pop, sal, temp all significant
-anova(lm_weight) # temp significant
-
-# check multicollinearity
-vif(lm_len) # suggests no collinearity
-vif(lm_weight) # suggests no collinearity
-
-# inspect models
-# length
-summary(lm_len)
-plot(lm_len)
-Anova(lm_len, type = "III") # intercept, pop, sal, temp all signif
-
-# weight
-summary(lm_weight)
-plot(lm_weight)
-Anova(lm_weight, type = "III") # intercept and temp signif
-
-# model selection
-# length
-step(lm_len) # keeps pop, median sal, median temp
-
-# weight
-step(lm_weight) # keeps just median temp
+# # growth models
+# lm_len <- lm(length_growth ~ pop + median_sal + median_temp + block, data = fit_growth)
+# lm_weight <- lm(weight_change ~ pop + median_sal + median_temp + block, data = fit_growth)
+# 
+# # anova of these models
+# anova(lm_len) # pop, sal, temp all significant
+# anova(lm_weight) # temp significant
+# 
+# # check multicollinearity
+# vif(lm_len) # suggests no collinearity
+# vif(lm_weight) # suggests no collinearity
+# 
+# # inspect models
+# # length
+# summary(lm_len)
+# plot(lm_len)
+# Anova(lm_len, type = "III") # intercept, pop, sal, temp all signif
+# 
+# # weight
+# summary(lm_weight)
+# plot(lm_weight)
+# Anova(lm_weight, type = "III") # intercept and temp signif
+# 
+# # model selection
+# # length
+# step(lm_len) # keeps pop, median sal, median temp
+# 
+# # weight
+# step(lm_weight) # keeps just median temp
 ```
 
