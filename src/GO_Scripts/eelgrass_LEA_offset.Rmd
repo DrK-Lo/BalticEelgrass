@@ -1,0 +1,59 @@
+---
+title: "eelgrass_LEA_offset"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+# Offset Modeling with LEA
+
+This script is for offset calculation using LEA, specifically for the project "VR_Zostera_genomic_offset." It includes training of the models using seascape genomic data, as well as calculation of genomic offset for experimental populations in each mesocosm treatment. 
+
+## Setup
+
+```{r setup, include = F}
+# markdown options
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/BalticEelgrass/")
+
+# libraries
+library(BiocManager) # needed to download specific packages
+library(readxl) # reading xlsx files
+library(vcfR) # reading vcf files
+library(LEA) # landscape genomics
+library(psych) # environmental data cleaning
+library(vegan) # environmental data cleaning
+library(tidyr) # data cleaning
+library(dplyr) # data cleaning
+library(stringr) # data cleaning
+library(sdmpredictors) # for downloading environmental data - NOT LOADING IN CLUSTER
+library(qvalue) # for calculating qvalues
+library(ggplot2) # plotting
+library(s2) # mapping
+library(rnaturalearth) # mapping - NOT LOADING IN CLUSTER
+library(rnaturalearthdata) # mapping
+library(maps) # mapping
+library(ggspatial) # mapping - NOT LOADING IN CLUSTER
+
+# read in data
+# indiv/site dat
+sites <- read.csv("data/seascape_data/sampling_sites_coordinates_Baltic_Sea.csv")
+indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx")
+gen_div <- read_excel("data/seascape_data/Gen_div_table.xlsx")
+
+# gen dat
+eelgrass_vcf_MLL <- read.vcfR(
+  "data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")
+eelgrass_vcf_full <- read.vcfR(
+  "data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.vcf")
+eelgrass_lfmm_MLL <- read.lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.lfmm")
+eelgrass_geno_MLL <- read.geno("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.geno")
+eelgrass_lfmm_full <- read.lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.lfmm")
+eelgrass_geno_full <- read.geno("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.geno")
+eelgrass_lfmm_full_rm <- read.lfmm("data/seascape_data/eel_full_rm.lfmm")
+
+# env dat
+
+
+```
+
