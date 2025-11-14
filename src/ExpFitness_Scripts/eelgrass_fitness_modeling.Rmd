@@ -266,7 +266,12 @@ summary(growlen_std_lm.1)
 resid_len <- data.frame(residuals = residuals(growlen_std_lm.1), tank_ID = fit_growth$tank_ID)
 boxplot(residuals ~ tank_ID, data = resid_len, main = "Residuals of Length LM by Tank") # some variation, very slight, try an lmm
 
-# 
+# lmm
+growlen_std_lmm <- lmer(log(length_std_change) ~ pop * trt + (1|tank_ID), data = fit_growth)
+plot(growlen_std_lmm)
+Anova(growlen_std_lmm, type = "III") # all significant
+step(growlen_std_lmm) # keep all
+summary(growlen_std_lmm)
 ```
 
 I will look at separating out salinity and temperature for these models as well. I will only do this for the standardized data.
@@ -387,7 +392,7 @@ summary(weight_saltemp_lm.1)
 
 # check for random effects
 resid_weight_saltemp <- data.frame(residuals = residuals(weight_saltemp_lm.1), tank_ID = fit_growth$tank_ID)
-boxplot(residuals ~ tank_ID, data = resid_weight_saltemp, main = "Residuals of Weight GLM by Tank") # some randomness, try an lmm
+boxplot(residuals ~ tank_ID, data = resid_weight_saltemp, main = "Residuals of Weight LM by Tank") # some randomness, try an lmm
 
 # with random effect
 growweight_saltemp_lmm <- lmer(weight_std_change ~ pop + median_sal + median_temp + pop:median_sal + pop:median_temp + (1|tank_ID), data = fit_growth)
@@ -413,5 +418,32 @@ vif(growweight_saltemp_lmm.1) # suggests no collinearity, everything is around 1
 Now I have my beautiful models! I'll write relevant results out for future reference:
 
 ```{r}
+sink(paste0("results/eelgrass_fitness_models_",Sys.Date(),".txt"))
 
+"Survival Model Pop/trt\n"
+summary(surv_glm)
+Anova(surv_glm, type = "III")
+
+"Survival Model Env\n"
+summary(surv_glmm_env.2)
+Anova(surv_glmm_env.2, type = "III")
+
+
+"Length Model Pop/trt\n"
+summary(growlen_std_lm.1)
+anova(growlen_std_lm.1)
+
+"Length Model Env\n"
+summary(len_saltemp_lm.1)
+anova(len_saltemp_lm.1)
+
+"Weight Model Pop/trt\n"
+summary(growweightstd_lm.1)
+anova(growweightstd_lm.1)
+
+"Weight Model Env\n"
+summary(weight_saltemp_lm.1)
+anova(weight_saltemp_lm.1)
+
+sink()
 ```

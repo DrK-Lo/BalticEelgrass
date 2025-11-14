@@ -1,0 +1,275 @@
+[1] "Survival Model Pop/trt\n"
+
+Call:
+glm(formula = isAlive ~ pop * trt, family = binomial(link = "logit"), 
+    data = fit_trim_env)
+
+Coefficients:
+                             Estimate Std. Error z value Pr(>|z|)
+(Intercept)                 1.957e+01  3.104e+03   0.006    0.995
+popBJO                      2.851e-07  4.390e+03   0.000    1.000
+popHOG                     -1.726e+01  3.104e+03  -0.006    0.996
+popHOR                     -1.717e+01  3.104e+03  -0.006    0.996
+popKAL                      1.799e-07  4.390e+03   0.000    1.000
+popKUR                      1.918e-07  4.390e+03   0.000    1.000
+popVAT                     -1.717e+01  3.104e+03  -0.006    0.996
+popVIK                      1.934e-07  4.390e+03   0.000    1.000
+trtTempControl_7psu        -1.957e+01  3.104e+03  -0.006    0.995
+trtTempWarm_16psu          -1.923e+01  3.104e+03  -0.006    0.995
+trtTempWarm_5psu           -2.196e+01  3.104e+03  -0.007    0.994
+popBJO:trtTempControl_7psu -2.851e-07  4.390e+03   0.000    1.000
+popHOG:trtTempControl_7psu  1.726e+01  3.104e+03   0.006    0.996
+popHOR:trtTempControl_7psu  1.717e+01  3.104e+03   0.006    0.996
+popKAL:trtTempControl_7psu  6.931e-01  4.390e+03   0.000    1.000
+popKUR:trtTempControl_7psu -6.931e-01  4.390e+03   0.000    1.000
+popVAT:trtTempControl_7psu  1.477e+01  3.104e+03   0.005    0.996
+popVIK:trtTempControl_7psu  1.099e+00  4.390e+03   0.000    1.000
+popBJO:trtTempWarm_16psu   -6.729e-01  4.390e+03   0.000    1.000
+popHOG:trtTempWarm_16psu    1.762e+01  3.104e+03   0.006    0.995
+popHOR:trtTempWarm_16psu    1.752e+01  3.104e+03   0.006    0.995
+popKAL:trtTempWarm_16psu    7.621e-01  4.390e+03   0.000    1.000
+popKUR:trtTempWarm_16psu   -6.729e-01  4.390e+03   0.000    1.000
+popVAT:trtTempWarm_16psu    1.585e+01  3.104e+03   0.005    0.996
+popVIK:trtTempWarm_16psu    1.923e+01  5.377e+03   0.004    0.997
+popBJO:trtTempWarm_5psu    -1.717e+01  5.377e+03  -0.003    0.997
+popHOG:trtTempWarm_5psu     1.726e+01  3.104e+03   0.006    0.996
+popHOR:trtTempWarm_5psu    -1.860e-07  4.390e+03   0.000    1.000
+popKAL:trtTempWarm_5psu     7.885e-01  4.390e+03   0.000    1.000
+popKUR:trtTempWarm_5psu    -1.717e+01  5.377e+03  -0.003    0.997
+popVAT:trtTempWarm_5psu    -1.860e-07  4.390e+03   0.000    1.000
+popVIK:trtTempWarm_5psu    -1.717e+01  5.377e+03  -0.003    0.997
+
+(Dispersion parameter for binomial family taken to be 1)
+
+    Null deviance: 528.89  on 381  degrees of freedom
+Residual deviance: 268.37  on 350  degrees of freedom
+AIC: 332.37
+
+Number of Fisher Scoring iterations: 18
+
+Analysis of Deviance Table (Type III tests)
+
+Response: isAlive
+        LR Chisq Df Pr(>Chisq)    
+pop       6.1657  7     0.5205    
+trt      26.3882  3  7.909e-06 ***
+pop:trt  18.5088 21     0.6166    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+[1] "Survival Model Env\n"
+Generalized linear mixed model fit by maximum likelihood (Laplace Approximation) [
+glmerMod]
+ Family: binomial  ( logit )
+Formula: isAlive ~ pop + median_sal + median_temp + (1 | tank_ID)
+   Data: fit_trim_env
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+    310.9     354.3    -144.4     288.9       371 
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-9.1392 -0.3892  0.0619  0.4474  4.3926 
+
+Random effects:
+ Groups  Name        Variance Std.Dev.
+ tank_ID (Intercept) 0        0       
+Number of obs: 382, groups:  tank_ID, 12
+
+Fixed effects:
+             Estimate Std. Error z value Pr(>|z|)    
+(Intercept)  5.841140   1.314282   4.444 8.82e-06 ***
+popBJO      -0.462520   0.556703  -0.831  0.40608    
+popHOG      -0.006235   0.555027  -0.011  0.99104    
+popHOR      -0.149827   0.554269  -0.270  0.78692    
+popKAL       0.816855   0.575117   1.420  0.15551    
+popKUR      -0.764350   0.564377  -1.354  0.17563    
+popVAT      -1.911335   0.644578  -2.965  0.00302 ** 
+popVIK       1.141777   0.590200   1.935  0.05304 .  
+median_sal   0.314807   0.036540   8.615  < 2e-16 ***
+median_temp -0.402947   0.062884  -6.408 1.48e-10 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Correlation of Fixed Effects:
+            (Intr) popBJO popHOG popHOR popKAL popKUR popVAT popVIK mdn_sl
+popBJO      -0.219                                                        
+popHOG      -0.210  0.498                                                 
+popHOR      -0.214  0.499  0.500                                          
+popKAL      -0.165  0.478  0.482  0.482                                   
+popKUR      -0.221  0.492  0.491  0.492  0.470                            
+popVAT      -0.263  0.435  0.430  0.433  0.400  0.432                     
+popVIK      -0.128  0.464  0.470  0.469  0.464  0.455  0.381              
+median_sal   0.336 -0.035  0.000 -0.011  0.084 -0.054 -0.176  0.127       
+median_temp -0.921  0.017 -0.001  0.006 -0.058  0.027  0.123 -0.100 -0.586
+optimizer (Nelder_Mead) convergence code: 0 (OK)
+boundary (singular) fit: see help('isSingular')
+
+Analysis of Deviance Table (Type III Wald chisquare tests)
+
+Response: isAlive
+             Chisq Df Pr(>Chisq)    
+(Intercept) 19.752  1  8.815e-06 ***
+pop         27.052  7  0.0003262 ***
+median_sal  74.225  1  < 2.2e-16 ***
+median_temp 41.060  1  1.476e-10 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+[1] "Length Model Pop/trt\n"
+
+Call:
+lm(formula = log(length_std_change) ~ pop + trt, data = fit_growth)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-1.96567 -0.30686  0.06958  0.29319  1.49651 
+
+Coefficients:
+                    Estimate Std. Error t value Pr(>|t|)    
+(Intercept)          0.80187    0.10046   7.982 1.42e-13 ***
+popBJO               0.11624    0.13643   0.852   0.3953    
+popHOG              -0.00697    0.13318  -0.052   0.9583    
+popHOR               0.10394    0.13347   0.779   0.4371    
+popKAL               0.16478    0.12660   1.302   0.1947    
+popKUR               0.58347    0.13988   4.171 4.64e-05 ***
+popVAT              -0.04152    0.15548  -0.267   0.7897    
+popVIK              -0.04170    0.12602  -0.331   0.7411    
+trtTempControl_7psu -0.12858    0.08709  -1.476   0.1415    
+trtTempWarm_16psu   -0.45729    0.08152  -5.609 7.22e-08 ***
+trtTempWarm_5psu    -0.81929    0.24719  -3.314   0.0011 ** 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4752 on 187 degrees of freedom
+Multiple R-squared:  0.2792,	Adjusted R-squared:  0.2407 
+F-statistic: 7.244 on 10 and 187 DF,  p-value: 1.219e-09
+
+Analysis of Variance Table
+
+Response: log(length_std_change)
+           Df Sum Sq Mean Sq F value    Pr(>F)    
+pop         7  7.581 1.08301  4.7964 5.509e-05 ***
+trt         3  8.775 2.92504 12.9544 1.002e-07 ***
+Residuals 187 42.224 0.22579                      
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+[1] "Length Model Env\n"
+
+Call:
+lm(formula = log(length_std_change) ~ pop + median_sal + median_temp + 
+    pop:median_sal, data = fit_growth)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-1.80387 -0.29467  0.07287  0.29058  1.64838 
+
+Coefficients:
+                   Estimate Std. Error t value Pr(>|t|)    
+(Intercept)        1.780193   0.389824   4.567 9.14e-06 ***
+popBJO             0.544905   0.388751   1.402   0.1627    
+popHOG             0.673703   0.370526   1.818   0.0707 .  
+popHOR             0.323288   0.386533   0.836   0.4040    
+popKAL             0.618614   0.341319   1.812   0.0716 .  
+popKUR             1.017052   0.431001   2.360   0.0194 *  
+popVAT            -1.487266   0.666252  -2.232   0.0268 *  
+popVIK            -0.169767   0.354961  -0.478   0.6330    
+median_sal         0.025101   0.015298   1.641   0.1026    
+median_temp       -0.071654   0.012721  -5.633 6.68e-08 ***
+popBJO:median_sal -0.025956   0.022503  -1.153   0.2503    
+popHOG:median_sal -0.043193   0.021978  -1.965   0.0509 .  
+popHOR:median_sal -0.013049   0.022583  -0.578   0.5641    
+popKAL:median_sal -0.029541   0.020427  -1.446   0.1499    
+popKUR:median_sal -0.025547   0.024343  -1.049   0.2954    
+popVAT:median_sal  0.072668   0.034684   2.095   0.0375 *  
+popVIK:median_sal  0.009242   0.021102   0.438   0.6619    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4643 on 181 degrees of freedom
+Multiple R-squared:  0.3339,	Adjusted R-squared:  0.275 
+F-statistic:  5.67 on 16 and 181 DF,  p-value: 7.809e-10
+
+Analysis of Variance Table
+
+Response: log(length_std_change)
+                Df Sum Sq Mean Sq F value    Pr(>F)    
+pop              7  7.581  1.0830  5.0234 3.183e-05 ***
+median_sal       1  1.069  1.0685  4.9561   0.02723 *  
+median_temp      1  7.284  7.2840 33.7856 2.727e-08 ***
+pop:median_sal   7  3.624  0.5177  2.4012   0.02258 *  
+Residuals      181 39.022  0.2156                      
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+[1] "Weight Model Pop/trt\n"
+
+Call:
+lm(formula = weight_std_change ~ pop + trt, data = fit_growth)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.88093 -0.15711 -0.01818  0.15446  1.09576 
+
+Coefficients:
+                     Estimate Std. Error t value Pr(>|t|)    
+(Intercept)          0.071264   0.064535   1.104   0.2709    
+popBJO              -0.022150   0.087638  -0.253   0.8007    
+popHOG              -0.110124   0.085552  -1.287   0.1996    
+popHOR              -0.043197   0.085737  -0.504   0.6150    
+popKAL              -0.024865   0.081326  -0.306   0.7601    
+popKUR               0.149814   0.089857   1.667   0.0971 .  
+popVAT              -0.102068   0.099875  -1.022   0.3081    
+popVIK              -0.181206   0.080950  -2.238   0.0264 *  
+trtTempControl_7psu -0.009126   0.055946  -0.163   0.8706    
+trtTempWarm_16psu   -0.260643   0.052368  -4.977 1.46e-06 ***
+trtTempWarm_5psu    -0.321822   0.158791  -2.027   0.0441 *  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.3052 on 187 degrees of freedom
+Multiple R-squared:  0.2139,	Adjusted R-squared:  0.1718 
+F-statistic: 5.087 on 10 and 187 DF,  p-value: 1.475e-06
+
+Analysis of Variance Table
+
+Response: weight_std_change
+           Df  Sum Sq Mean Sq F value    Pr(>F)    
+pop         7  1.9108 0.27297  2.9297  0.006216 ** 
+trt         3  2.8288 0.94295 10.1205 3.283e-06 ***
+Residuals 187 17.4232 0.09317                      
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+[1] "Weight Model Env\n"
+
+Call:
+lm(formula = weight_std_change ~ pop + median_temp, data = fit_growth)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.88629 -0.15694 -0.01506  0.15658  1.08672 
+
+Coefficients:
+             Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  0.980185   0.189499   5.173 5.86e-07 ***
+popBJO      -0.020650   0.087058  -0.237   0.8128    
+popHOG      -0.109406   0.085123  -1.285   0.2003    
+popHOR      -0.039904   0.085086  -0.469   0.6396    
+popKAL      -0.026103   0.080810  -0.323   0.7470    
+popKUR       0.153969   0.089169   1.727   0.0859 .  
+popVAT      -0.096841   0.098604  -0.982   0.3273    
+popVIK      -0.179339   0.080216  -2.236   0.0265 *  
+median_temp -0.045524   0.008242  -5.523 1.09e-07 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.3037 on 189 degrees of freedom
+Multiple R-squared:  0.2132,	Adjusted R-squared:  0.1799 
+F-statistic: 6.402 on 8 and 189 DF,  p-value: 2.354e-07
+
+Analysis of Variance Table
+
+Response: weight_std_change
+             Df  Sum Sq Mean Sq F value   Pr(>F)    
+pop           7  1.9108 0.27297  2.9586  0.00577 ** 
+median_temp   1  2.8145 2.81452 30.5056 1.09e-07 ***
+Residuals   189 17.4376 0.09226                     
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
