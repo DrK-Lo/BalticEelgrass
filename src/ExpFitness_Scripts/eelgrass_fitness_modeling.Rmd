@@ -34,7 +34,7 @@ This script is to compare fitness across populations/treatments in the GO eelgra
 
 ## Setup
 
-I need first to put together my data so that I have all the fitness and growth metrics possible.
+I need first to put together my data so that I have all the fitness and growth metrics possible. Note that all salinity stats are summarized through the experimental period at the individual bag level, while temperature stats are summarized through the experimental period at the tank level.
 
 ```{r data pre-process}
 # data cleaning to just relevant columns
@@ -45,6 +45,27 @@ fit_trim$isAlive <- ifelse(fit_trim$isAlive == TRUE, 1, 0)
 
 # pop_trt factor for later significance testing
 fit_trim$pop_trt <- as.factor(paste0(fit_trim$pop, "_", fit_trim$trt))
+
+# length and weight growth
+# for the growth analyses, we want a df with no flowering individuals and no dead individuals
+fit_growth <- fit_trim_env[is.na(fit_trim_env$Length_flower1),]
+fit_growth <- fit_growth[fit_growth$isAlive == 1,]
+
+# standardized growth variables
+# length
+fit_growth$length_growth <- rowSums(fit_growth[,c("Growth_leaf1", "Growth_leaf2", "Growth_leaf3", "Growth_leaf4", "Growth_leaf5", "Growth_leaf6", "Growth_leaf7", "Length_new_leaf1", "Length_new_leaf2", "Length_new_leaf3", "Length_new_leaf4", "Length_new_leaf5", "Length_new_leaf6", "Length_new_shoot1_leaf1", "Length_new_shoot1_leaf2", "Length_new_shoot1_leaf3", "Length_new_shoot1_leaf4", "Length_new_shoot1_leaf5", "Length_new_shoot1_leaf6", "Length_new_shoot2_leaf1", "Length_new_shoot2_leaf2", "Length_new_shoot2_leaf3", "Length_new_shoot2_leaf4", "Length_new_shoot2_leaf5")], na.rm = T)
+
+# percent length growth
+fit_growth$length_std_change <- fit_growth$length_growth / fit_growth$length_longest_leaf_start
+
+# weight
+fit_growth$weight_change <- fit_growth$total_weight - fit_growth$weight_start
+
+# percent weight change
+fit_growth$weight_std_change <- fit_growth$weight_change / fit_growth$weight_start
+
+# ratio of above vs below ground weight
+fit_growth$above_below_weight_ratio <- fit_growth$above_ground_weight / fit_growth$below_ground_weight
 
 # add treatment block to both data frames for testing potential random effects
 # block changes every 8 IDs - note though that salinity was independently controlled in each bag, so block may not actually appropriate descriptor of design
@@ -62,30 +83,6 @@ fit_trim_ord$block <- as.factor(fit_trim_ord$block)
 
 # combine with the exp env dat
 fit_trim_env <- merge(fit_trim_ord, env[,c("DNA_label", "mean_sal", "median_sal", "min_sal", "max_sal", "sd_sal", "mean_temp", "median_temp", "min_temp", "max_temp", "sd_temp", "x_coord", "y_coord", "position")], by = c("DNA_label"))
-
-# also add in the actual bag level salinity
-
-
-# length and weight growth
-# for the growth analyses, we want a df with no flowering individuals and no dead individuals
-fit_growth <- fit_trim_env[is.na(fit_trim_env$Length_flower1),]
-fit_growth <- fit_growth[fit_growth$isAlive == 1,]
-
-# length
-fit_growth$length_growth <- rowSums(fit_growth[,c("Growth_leaf1", "Growth_leaf2", "Growth_leaf3", "Growth_leaf4", "Growth_leaf5", "Growth_leaf6", "Growth_leaf7", "Length_new_leaf1", "Length_new_leaf2", "Length_new_leaf3", "Length_new_leaf4", "Length_new_leaf5", "Length_new_leaf6", "Length_new_shoot1_leaf1", "Length_new_shoot1_leaf2", "Length_new_shoot1_leaf3", "Length_new_shoot1_leaf4", "Length_new_shoot1_leaf5", "Length_new_shoot1_leaf6", "Length_new_shoot2_leaf1", "Length_new_shoot2_leaf2", "Length_new_shoot2_leaf3", "Length_new_shoot2_leaf4", "Length_new_shoot2_leaf5")], na.rm = T)
-
-# percent length growth
-fit_growth$length_std_change <- fit_growth$length_growth / fit_growth$length_longest_leaf_start
-
-# weight
-fit_growth$weight_change <- fit_growth$total_weight - fit_growth$weight_start
-
-# percent weight change
-fit_growth$weight_std_change <- fit_growth$weight_change / fit_growth$weight_start
-
-# ratio of above vs below ground weight
-fit_growth$above_below_weight_ratio <- fit_growth$above_ground_weight / fit_growth$below_ground_weight
-
 
 # correlations between fitness metrics
 # survival
@@ -245,130 +242,176 @@ Notes on this dataset: The dataset used in this modeling approach excludes indiv
 
 I will start by building models for length change (standardized) using treatment, then environmental variables, to explain differences in length change. 
 
-```{r length modeling standardized}
-# analysis of fixed effects
+```{r length modeling, standardized}
+# quick check
 anova(lm(length_std_change ~ pop + trt, data = fit_growth)) # both significant
+hist(fit_growth$length_std_change) # left skewed, try log transformation
+hist(log(fit_growth$length_std_change)) # yay it's normally distributed now
 
-# build a model
-growlenstd_lmm <- lmer(length_std_change ~ pop * trt + (1 | tank_ID), data = fit_growth)
-plot(growlenstd_lmm)
-Anova(growlenstd_lmm, type = "III") # all signif except trt * pop
-drop1(growlenstd_lmm) # drop interaction
-summary(growlenstd_lmm)
+# start with lm since data is relatively normally distributed and not incorporating random effects yet
+growlen_std_lm <- lm(log(length_std_change) ~ pop * trt, data = fit_growth)
+plot(growlen_std_lm) # qq plot has some outliers deviating significantly from 1-1 line
+anova(lm(length_std_change ~ pop * trt, data = fit_growth)) # both significant, interaction isn't
+step(growlen_std_lm) # drop interaction
+summary(growlen_std_lm)
 
-growlenstd_lmm.1 <- lmer(length_std_change ~ pop + trt + (1 | tank_ID), data = fit_growth)
-plot(growlenstd_lmm.1)
-Anova(growlenstd_lmm.1, type = "III") # all signif
-drop1(growlenstd_lmm.1) # keep all
-summary(growlenstd_lmm.1)
+# without interaction
+growlen_std_lm.1 <- lm(log(length_std_change) ~ pop + trt, data = fit_growth)
+plot(growlen_std_lm.1) # qq plot has some outliers deviating significantly from 1-1 line, but not as bad as before
+anova(growlen_std_lm.1) # both significant
+step(growlen_std_lm.1) # final model
+summary(growlen_std_lm.1)
 
-# look for random effects in residuals
-resid_growlenstd <- data.frame(residuals = residuals(growlenstd_lmm.1), tank_ID = fit_growth$tank_ID)
-boxplot(residuals ~ tank_ID, data = resid_growlenstd, main = "Residuals of Length Growth LMM by Tank") # more variance by tank too, but nothing significantly different
+# check for random effects
+resid_len <- data.frame(residuals = residuals(growlen_std_lm.1), tank_ID = fit_growth$tank_ID)
+boxplot(residuals ~ tank_ID, data = resid_len, main = "Residuals of Length LM by Tank") # some variation, very slight, try an lmm
 
-# check dispersion & multicollinearity
-check_overdispersion(growlenstd_lmm.1) # looks good
-vif(growlenstd_lmm.1) # suggests no collinearity, everything is around 1
+# 
 ```
 
 I will look at separating out salinity and temperature for these models as well. I will only do this for the standardized data.
 
-```{r length modeling sal/temp}
-# analysis of fixed effects
+```{r length modeling sal/temp, standardized}
+# quick check
 anova(lm(length_std_change ~ pop + median_sal + median_temp, data = fit_growth)) # pop and temp signif, not sal
 
-# glm without random effects, but with interactions
-len_saltemp_lmm <- lmer(length_std_change ~ pop + median_sal + median_temp + pop:median_sal + pop:median_temp, data = fit_growth)
+# we know we have skew, so log transform
+len_saltemp_lm <- lm(log(length_std_change) ~ pop + median_sal + median_temp + pop:median_sal + pop:median_temp, data = fit_growth) # what family?
+plot(len_saltemp_lm)
+anova(len_saltemp_lm) # all signif except pop:median_temp interaction
+step(len_saltemp_lm) # remove pop temp interaction
+summary(len_saltemp_lm)
 
-# now try building an additive model
-growlen_saltemp_lmm.1 <- lmer(length_growth ~ pop + median_sal + median_temp + (1 | tank_ID), data = fit_growth) # boundary (singular) fit: see help('isSingular')
-plot(growlen_saltemp_lmm.1)
-Anova(growlen_saltemp_lmm.1, type = "III") # all significant
-drop1(growlen_saltemp_lmm.1) # keep everything
-summary(growlen_saltemp_lmm.1)
+# without interaction
+len_saltemp_lm.1 <- lm(log(length_std_change) ~ pop + median_sal + median_temp + pop:median_sal, data = fit_growth) # what family?
+plot(len_saltemp_lm.1)
+anova(len_saltemp_lm.1) # all signif
+step(len_saltemp_lm.1) # final model
+summary(len_saltemp_lm.1)
 
-# residuals
-resid_saltemp_lmm.1_growlen <- data.frame(residuals = residuals(growlen_saltemp_lmm.1), tank_ID = fit_growth$tank_ID)
-boxplot(residuals ~ tank_ID, data = resid_saltemp_lmm.1_growlen, main = "Residuals of Length Growth LMM by Tank") # more variance by tank too, but nothing significantly different
+# check residuals for random effects
+resid_len_saltemp <- data.frame(residuals = residuals(len_saltemp_lm.1), tank_ID = fit_growth$tank_ID)
+boxplot(residuals ~ tank_ID, data = resid_len_saltemp, main = "Residuals of Length LM by Tank") # some variation, very slight, try an lmm
+
+# lmm
+len_saltemp_lmm <- lmer(log(length_std_change) ~ pop + median_sal + median_temp + pop:median_sal + pop:median_temp + (1|tank_ID), data = fit_growth)
+plot(len_saltemp_lmm)
+Anova(len_saltemp_lmm, type = "III") # intercept, temp, pop:sal significant
+step(len_saltemp_lmm) # drop temp/pop interaction
+summary(len_saltemp_lmm)
+
+len_saltemp_lmm.1 <- lmer(log(length_std_change) ~ pop + median_sal + median_temp + pop:median_sal + (1|tank_ID), data = fit_growth)
+plot(len_saltemp_lmm.1)
+Anova(len_saltemp_lmm.1, type = "III") # everything signif except sal
+step(len_saltemp_lmm.1) # this is final model
+summary(len_saltemp_lmm.1)
 
 # check dispersion & multicollinearity
-check_overdispersion(growlen_saltemp_lmm.1) # looks good
-vif(growlen_saltemp_lmm.1) # suggests no collinearity, everything is around 1
+check_overdispersion(len_saltemp_lmm.1) # looks good
+vif(len_saltemp_lmm.1) # suggests no collinearity
+
+# # another option would be to do a glm with a gamma family, which is meant for skewed data
+# len_saltemp_glm.1 <- glm(length_std_change ~ pop + median_temp, family = "gamma", data = fit_growth)
+# plot(len_saltemp_glm.1)
+# Anova(len_saltemp_glm.1, type = "III") # all signif
+# step(len_saltemp_glm.1)
+# summary(len_saltemp_glm.1)
+
+# # check dispersion & multicollinearity
+# check_overdispersion(len_saltemp_glm.1) # looks good
+# vif(len_saltemp_glm.1) # suggests no collinearity, everything is around 1
 ```
 
 Now look into weight. I am testing only standardized weight change.
 
-```{r}
-# std weight model
-growweightstd_lmm <- lmer(weight_std_change ~ pop + trt + (1 | tank_ID), data = fit_growth)
+```{r weight modeling, standardized}
+# quick check
+anova(lm(weight_std_change ~ pop + trt, data = fit_growth)) # pop and temp signif, not sal
+
+# check distribution
+hist(fit_growth$weight_std_change) # beautifully normally distributed omg
+
+# linear model to start
+growweightstd_lm <- lm(weight_std_change ~ pop * trt, data = fit_growth)
+plot(growweightstd_lm)
+anova(growweightstd_lm) # pop & trt signif
+step(growweightstd_lm) # remove interaction
+
+growweightstd_lm.1 <- lm(weight_std_change ~ pop + trt, data = fit_growth)
+plot(growweightstd_lm.1)
+anova(growweightstd_lm.1) # everything signif
+step(growweightstd_lm.1) # final model
+summary(growweightstd_lm.1)
+
+# check for random effects
+resid_weight <- data.frame(residuals = residuals(growweightstd_lm.1), tank_ID = fit_growth$tank_ID)
+boxplot(residuals ~ tank_ID, data = resid_weight, main = "Residuals of Weight GLM by Tank") # some randomness, try an lmm
+
+# lmm weight model
+growweightstd_lmm <- lmer(weight_std_change ~ pop * trt + (1|tank_ID), data = fit_growth)
 plot(growweightstd_lmm)
-Anova(growweightstd_lmm, type = "III")
-drop1(growweightstd_lmm)
+Anova(growweightstd_lmm, type = "III") # nothing is significant
+step(growweightstd_lmm) # drop the interaction
 summary(growweightstd_lmm)
 
-# check residuals
-resid_growweightstd <- data.frame(residuals = residuals(growweightstd_lmm), tank_ID = fit_growth$tank_ID)
-boxplot(residuals ~ tank_ID, data = resid_growweightstd, main = "Residuals of Weight Change (std) LMM by Tank") # some tank variance in mean, more in variance of residuals themselves
+# dropping interaction
+growweightstd_lmm.1 <- lmer(weight_std_change ~ pop + trt + (1|tank_ID), data = fit_growth)
+plot(growweightstd_lmm.1)
+Anova(growweightstd_lmm.1, type = "III") # both significant
+step(growweightstd_lmm.1) # final model, although model without random effect has AIC slightly lower (but 144.76 vs 146.75 AIC, so can leave it)
+summary(growweightstd_lmm.1)
 
 # check dispersion & multicollinearity
-check_overdispersion(growweightstd_lmm) # looks good
-vif(growweightstd_lmm) # suggests no collinearity, everything is around 1
+check_overdispersion(growweightstd_lmm.1) # looks good
+vif(growweightstd_lmm.1) # suggests no collinearity, everything is around 1
 ```
 
 I will now look at this same data using salinity/temp in the place of treatment. Again, I will only do this for standardized data.
 
-```{r weight modeling sal/temp}
-# analysis of fixed effects
+```{r weight modeling sal/temp, standardized}
+# quick check
 anova(lm(weight_std_change ~ pop + median_sal + median_temp, data = fit_growth)) # pop and temp signif, not sal
 
-# now try building an additive model
-growweight_saltemp_lmm <- lmer(weight_std_change ~ pop + median_sal + median_temp + (1 | tank_ID), data = fit_growth) # boundary (singular) fit: see help('isSingular')
+# linear model
+weight_saltemp_lm <- lm(weight_std_change ~ pop * median_sal + median_temp, data = fit_growth)
+plot(weight_saltemp_lm) # looks pretty good
+anova(weight_saltemp_lm) # pop and temp signif
+step(weight_saltemp_lm) # just keep pop and temp
+summary(weight_saltemp_lm)
+
+weight_saltemp_lm.1 <- lm(weight_std_change ~ pop + median_temp, data = fit_growth)
+plot(weight_saltemp_lm.1) # looks pretty good
+anova(weight_saltemp_lm.1) # both signif
+step(weight_saltemp_lm.1) # final model
+summary(weight_saltemp_lm.1)
+
+# check for random effects
+resid_weight_saltemp <- data.frame(residuals = residuals(weight_saltemp_lm.1), tank_ID = fit_growth$tank_ID)
+boxplot(residuals ~ tank_ID, data = resid_weight_saltemp, main = "Residuals of Weight GLM by Tank") # some randomness, try an lmm
+
+# with random effect
+growweight_saltemp_lmm <- lmer(weight_std_change ~ pop + median_sal + median_temp + pop:median_sal + pop:median_temp + (1|tank_ID), data = fit_growth)
 plot(growweight_saltemp_lmm)
-Anova(growweight_saltemp_lmm, type = "III") # median sal not significant
-drop1(growweight_saltemp_lmm) # keep everything
+Anova(growweight_saltemp_lmm, type = "III") # median temp not significant
+step(growweight_saltemp_lmm) # keep pop and temp, can keep random effect because AIC close to what i
 summary(growweight_saltemp_lmm)
 
-# residuals
-resid_saltemp_lmm_growweight <- data.frame(residuals = residuals(growweight_saltemp_lmm), tank_ID = fit_growth$tank_ID)
-boxplot(residuals ~ tank_ID, data = resid_saltemp_lmm_growweight, main = "Residuals of Weight Change (std) LMM by Tank") # more variance by tank too, but nothing significantly different
+growweight_saltemp_lmm.1 <- lmer(weight_std_change ~ pop + median_temp + (1|tank_ID), data = fit_growth)
+plot(growweight_saltemp_lmm.1)
+Anova(growweight_saltemp_lmm.1, type = "III") # all significant
+step(growweight_saltemp_lmm.1) # final model, although model without random effect has AIC slightly different (but 140.64 w vs 138.65 wo AIC, so can leave it)
+summary(growweight_saltemp_lmm.1)
 
 # check dispersion & multicollinearity
-check_overdispersion(resid_saltemp_lmm_growweight) # looks good
-vif(resid_saltemp_lmm_growweight) # suggests no collinearity, everything is around 1
+check_overdispersion(growweight_saltemp_lmm.1) # looks good
+vif(growweight_saltemp_lmm.1) # suggests no collinearity, everything is around 1
 ```
 
 
-I will also try these growth models without random factors, using a basic linear model. Note that a linear model is inappropriate for survival analyses because the response data is binary.
+### Modeling Outputs
 
-```{r growth models lm}
-# # growth models
-# lm_len <- lm(length_growth ~ pop + median_sal + median_temp + block, data = fit_growth)
-# lm_weight <- lm(weight_change ~ pop + median_sal + median_temp + block, data = fit_growth)
-# 
-# # anova of these models
-# anova(lm_len) # pop, sal, temp all significant
-# anova(lm_weight) # temp significant
-# 
-# # check multicollinearity
-# vif(lm_len) # suggests no collinearity
-# vif(lm_weight) # suggests no collinearity
-# 
-# # inspect models
-# # length
-# summary(lm_len)
-# plot(lm_len)
-# Anova(lm_len, type = "III") # intercept, pop, sal, temp all signif
-# 
-# # weight
-# summary(lm_weight)
-# plot(lm_weight)
-# Anova(lm_weight, type = "III") # intercept and temp signif
-# 
-# # model selection
-# # length
-# step(lm_len) # keeps pop, median sal, median temp
-# 
-# # weight
-# step(lm_weight) # keeps just median temp
+Now I have my beautiful models! I'll write relevant results out for future reference:
+
+```{r}
+
 ```
-
