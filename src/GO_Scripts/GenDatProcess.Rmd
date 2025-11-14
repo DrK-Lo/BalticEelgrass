@@ -1,0 +1,239 @@
+---
+title: "GenDatProcess"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Genetic Data Processing
+
+This script processes VCF files into the formats needed for downstream GO analysis, specifically for the project "VR_Zostera_genomic_offset." It includes data formatting + conversion to create .geno and .lfmm format files, as well as calculation of population level allele frequencies.  
+
+```{r setup, include=FALSE}
+# markdown options
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/BalticEelgrass/")
+
+# libraries
+library(tidyverse)
+library(vcfR)
+library(LEA)
+library(readxl)
+
+# read in data
+# gen dat
+eelgrass_vcf_MLL <- read.vcfR(
+  "data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")
+eelgrass_vcf_full <- read.vcfR(
+  "data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.vcf")
+
+# indiv/site dat
+sites <- read.csv("data/seascape_data/sampling_sites_coordinates_Baltic_Sea.csv")
+indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx")
+gen_div <- read_excel("data/seascape_data/Gen_div_table.xlsx")
+```
+
+## Data Checks
+
+```{r vcf processing}
+# investigate vcf data - MLL
+dim(eelgrass_vcf_MLL) # 3287 variants, 8 fix cols, 242 genotypes
+fix_MLL <- as.data.frame(eelgrass_vcf_MLL@fix)
+gt_MLL <- as.data.frame(eelgrass_vcf_MLL@gt)
+
+# how many variants pass filtering?
+table(fix_MLL$FILTER) # all pass
+
+# quality summary
+summary(as.numeric(fix_MLL$QUAL))
+
+#investigate vcf data - FULL
+dim(eelgrass_vcf_full) # 4149 variants, 8 fix cols, 696 genotypes
+fix_full <- as.data.frame(eelgrass_vcf_full@fix)
+gt_full <- as.data.frame(eelgrass_vcf_full@gt)
+
+# how many variants pass filtering?
+table(fix_full$FILTER) # all pass
+
+# how many individuals in each population?
+head(indiv_list)
+pops_split <- stringr::str_split_fixed(indiv_list$`Indv #`, "-", 2) # split Indv # to have population in a seperate column
+indiv_list_full <- cbind(indiv_list, pops_split) # add this info back to original file
+colnames(indiv_list_full) <- c("MLL_no","Indv_no","Pop","Pop_no")
+table(indiv_list_full$Pop) # between 4 and 20 individuals in each pop - most 17+ inds
+
+# need indiv data for MLL dataset
+# individuals are stored in column names of vcf - isolate these names
+colnames(eelgrass_vcf_MLL@gt)
+MLL_split <- stringr::str_split_fixed(colnames(eelgrass_vcf_MLL@gt), "-", 3)
+MLL_inds <- MLL_split[-1,3]
+
+# now get subsetted indiv dataframe from indiv list full
+indiv_list_MLL <- indiv_list_full[indiv_list_full$Indv_no %in% MLL_inds,]
+```
+
+## File formatting
+
+```{r lfmm & geno formats}
+# convert vcf files to lfmm file format
+eelgrass_lfmm_MLL <- vcf2lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")
+eelgrass_lfmm_full <- vcf2lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.vcf")
+
+# convert vcf files to lfmm file format
+eelgrass_lfmm_MLL <- vcf2lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")
+eelgrass_lfmm_full <- vcf2lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.vcf")
+
+# read in geno and lfmm files
+eelgrass_lfmm_MLL <- read.lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.lfmm")
+eelgrass_geno_MLL <- read.geno("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.geno")
+eelgrass_lfmm_full <- read.lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.lfmm")
+eelgrass_geno_full <- read.geno("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.geno")
+eelgrass_lfmm_full_rm <- read.lfmm("data/seascape_data/eel_full_rm.lfmm")
+
+# check for missing data
+sum((eelgrass_lfmm_MLL == 9)) # 16894/174269 missing data (~9.7% missing data)
+sum((eelgrass_lfmm_full_rm == 9)) # 51254/615284 missing data (~8.3% missing data)
+
+# impute missing data - this is a super naive imputation method, replace with more robust method using snmf later
+gen_full_imp <- apply(eelgrass_lfmm_full_rm, 2, function(x) replace(x, x == 9, as.numeric(names(which.max(table(x))))))
+sum((gen_full_imp == 9)) 
+
+gen_MLL_imp <- apply(eelgrass_lfmm_MLL, 2, function(x) replace(x, x == 9, as.numeric(names(which.max(table(x))))))
+sum((gen_MLL_imp == 9))
+
+# remove non-variable genomic sites
+gen_full_imp_df <- as.data.frame(gen_full_imp)
+gen_full_imp_trim <- Filter(var, gen_full_imp_df)
+gen_full_imp_mat <- as.matrix(gen_full_imp_trim)
+
+gen_MLL_imp_df <- as.data.frame(gen_MLL_imp)
+gen_MLL_imp_trim <- Filter(var, gen_MLL_imp_df)
+gen_MLL_imp_mat <- as.matrix(gen_MLL_imp_trim)
+
+# re-write lfmm files
+write.lfmm(gen_full_imp_mat, "data/seascape_data/gen_full_rm_imp_mat.lfmm")
+write.lfmm(gen_MLL_imp_mat, "data/seascape_data/gen_MLL_imp_mat.lfmm")
+
+# also re-write geno files
+write.geno(gen_full_imp_mat, "data/seascape_data/gen_full_rm_imp_mat.geno")
+write.geno(gen_MLL_imp_mat, "data/seascape_data/gen_MLL_imp_mat.geno")
+
+# read in lfmm files
+gen_full <- read.lfmm("data/seascape_data/gen_full_rm_imp_mat.lfmm") # has 3264 SNPs after filtering
+gen_MLL <- read.lfmm("data/seascape_data/gen_MLL_imp_mat.lfmm") # has 3036 SNPs after filtering
+```
+
+
+## Allele Frequency Calculation
+
+```{r af prep}
+# convert lfmm data to dataframe
+eel_full_df <- as.data.frame(eelgrass_lfmm_full)
+eel_MLL_df <- as.data.frame(eelgrass_lfmm_MLL)
+
+# rotate df so rows are now columns (we want individuals as columns, alleles as rows)
+eel_full_df <- as.matrix(t(eel_full_df))
+eel_MLL_df <- as.matrix(t(eel_MLL_df))
+
+# replace 9/-9 with NA
+eel_full_df[eel_full_df == 9] <- NA
+eel_MLL_df[eel_MLL_df == 9] <- NA
+# check it worked
+sum((eel_full_df == 9)) # returns NA - good
+sum((eel_MLL_df == 9)) # returns NA - good
+
+# get vector of populations
+pop_vector_full <- indiv_list_full$Pop
+pop_vector_MLL <- indiv_list_MLL$Pop
+
+# add pop data to genomic data
+rownames(eel_full_df) <- pop_vector_full
+rownames(eel_MLL_df) <- pop_vector_MLL
+
+# convert lfmm data to dataframe
+eel_full_df <- as.data.frame(eelgrass_lfmm_full)
+eel_MLL_df <- as.data.frame(eelgrass_lfmm_MLL)
+
+# rotate df so rows are now columns (we want individuals as columns, alleles as rows)
+eel_full_df <- as.matrix(t(eel_full_df))
+eel_MLL_df <- as.matrix(t(eel_MLL_df))
+
+# replace 9/-9 with NA
+eel_full_df[eel_full_df == 9] <- NA
+eel_MLL_df[eel_MLL_df == 9] <- NA
+# check it worked
+sum((eel_full_df == 9)) # returns NA - good
+sum((eel_MLL_df == 9)) # returns NA - good
+
+# get vector of populations
+pop_vector_full <- indiv_list_full$Pop
+pop_vector_MLL <- indiv_list_MLL$Pop
+
+# add pop data to genomic data
+rownames(eel_full_df) <- pop_vector_full
+rownames(eel_MLL_df) <- pop_vector_MLL
+```
+
+
+```{r genetic data positions}
+# quick check of data
+eelgrass_vcf_full
+eelgrass_vcf_MLL
+
+# use vcfR to extract positional information
+full_fix <- as.data.frame(getFIX(eelgrass_vcf_full))
+MLL_fix <- as.data.frame(getFIX(eelgrass_vcf_MLL))
+
+# which SNPs are in both datasets?
+dim(MLL_fix[MLL_fix$POS %in% full_fix$POS,]) # all MLL SNPs are in full
+
+# filter out full SNPs that aren't in MLL dataset
+full_fix_rm <- full_fix[full_fix$POS %in% MLL_fix$POS,]
+
+# are these the same?
+which(full_fix_rm != MLL_fix) # yes
+
+# how will I exclude these SNPs from whole vcf file?
+rm <- which(!(full_fix$POS %in% MLL_fix$POS)) # these are indices of the SNPs to remove
+
+# reduce eel_full_df file to match eel_MLL_df file
+eel_full_df_rm <- eel_full_df[-rm,]
+
+# sanity check
+dim(eel_MLL_df)
+dim(eel_full_df_rm)
+# looks good
+
+# write the trimmed data back to lfmm format
+write.lfmm(t(eel_full_df_rm), "seascape_data/eel_full_rm.lfmm")
+```
+
+
+```{r allele frequency calculation}
+# function to calculate allele frequency @ single locus
+calc_freq <- function(x){
+  a <- sum(x, na.rm=TRUE)
+  b <- (2*length(na.omit(x)))
+  a/b
+}
+
+# function extending this to calculate allele frequencies across whole pop
+calcfreq <- function(a, pop){
+  tapply(a, pop, calc_freq)
+}
+
+# full dataset
+str(eel_full_df_rm)
+freqs_full <- apply(t(eel_full_df_rm), 2, calcfreq, pop_vector_full)
+str(freqs_full)
+colSums(freqs_full[,1:5])
+View(freqs_full[,1:10])
+
+# MLL dataset
+freqs_MLL <- apply(t(eel_MLL_df), 2, calcfreq, pop_vector_MLL)
+str(eel_MLL_df)
+str(freqs_MLL)
+colSums(freqs_MLL[,1:5])
+View(freqs_MLL[,1:10])
+```
+
