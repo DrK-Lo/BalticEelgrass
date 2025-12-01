@@ -163,12 +163,21 @@ exp_df$ind <- paste0(exp_df$pop,"_",exp_df$genet)
 
 # now format temp data by treatment
 trt_temp_dat <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"), 
-                          max_temp = c(trt_temps[trt_temps$trt == "ctrl",]$max_temp, trt_temps[trt_temps$trt == "ctrl",]$max_temp, trt_temps[trt_temps$trt == "heat",]$max_temp, trt_temps[trt_temps$trt == "heat",]$max_temp), 
-                          avg_temp = c(trt_temps[trt_temps$trt == "ctrl",]$mean_temp, trt_temps[trt_temps$trt == "ctrl",]$mean_temp, trt_temps[trt_temps$trt == "heat",]$mean_temp, trt_temps[trt_temps$trt == "heat",]$mean_temp), 
-                          med_temp = c(trt_temps[trt_temps$trt == "ctrl",]$median_temp, trt_temps[trt_temps$trt == "ctrl",]$median_temp, trt_temps[trt_temps$trt == "heat",]$median_temp, trt_temps[trt_temps$trt == "heat",]$median_temp))
+                          max_temp = c(trt_temps[trt_temps$trt == "ctrl",]$max_temp, 
+                                       trt_temps[trt_temps$trt == "ctrl",]$max_temp, 
+                                       trt_temps[trt_temps$trt == "heat",]$max_temp, 
+                                       trt_temps[trt_temps$trt == "heat",]$max_temp), 
+                          avg_temp = c(trt_temps[trt_temps$trt == "ctrl",]$mean_temp, 
+                                       trt_temps[trt_temps$trt == "ctrl",]$mean_temp, 
+                                       trt_temps[trt_temps$trt == "heat",]$mean_temp, 
+                                       trt_temps[trt_temps$trt == "heat",]$mean_temp), 
+                          med_temp = c(trt_temps[trt_temps$trt == "ctrl",]$median_temp, 
+                                       trt_temps[trt_temps$trt == "ctrl",]$median_temp, 
+                                       trt_temps[trt_temps$trt == "heat",]$median_temp, 
+                                       trt_temps[trt_temps$trt == "heat",]$median_temp))
 
 # and combine
-exp_ind_env <- merge(exp_df, trt_env_dat, by = c("trt"))
+exp_ind_env <- merge(exp_df, trt_temp_dat, by = c("trt"))
 
 # order this by bagnum
 exp_env_ord <- exp_ind_env[order(as.numeric(exp_ind_env$bagnum)),]
@@ -178,7 +187,7 @@ pops <- unique(levels(as.factor(exp_env_ord$pop)))
 trt <- unique(levels(as.factor(exp_env_ord$trt)))
 pop_trt_df <- expand.grid(pops, trt)
 colnames(pop_trt_df) <- c("pop","trt")
-pop_trt_env <- merge(pop_trt_df, trt_env_dat, by = c("trt"))
+pop_trt_env <- merge(pop_trt_df, trt_temp_dat, by = c("trt"))
 ######################
 
 ## salinity
@@ -195,7 +204,6 @@ summary(daily_checks_clean)
 sal_dat <- merge(bags, daily_checks_clean, by = c("bagKey"))
 
 # expand out the date time info from daily checks
-library(lubridate)
 sal_dat$date <- str_split_fixed(sal_dat$dailyTimestamp, " ", 2)[,1]
 sal_dat$date <- mdy(sal_dat$date)
 sal_dat$time <- str_split_fixed(sal_dat$dailyTimestamp, " ", 2)[,2]
@@ -216,6 +224,9 @@ bag_sals <- sal_dat_clean %>% group_by(bagKey) %>%
 
 # merge
 bag_sals_df <- merge(bags, bag_sals, by = c("bagKey"))
+
+# order by bagnum
+bag_sals_df_ord <- bag_sals_df[order(bag_sals_df$bagnum_num),]
 ###########
 
 ## complete exp env dat
@@ -244,7 +255,9 @@ coords_bags$position <- paste0(coords_bags$x_coord, "_", coords_bags$y_coord)
 # merge coords
 exp_env_full_df <- merge(exp_env_df, coords_bags, by = c("bagnum_num"))
 
-# save both the indiv and pop level env dfs
+# rename pop column
+colnames(exp_env_full_df)[colnames(exp_env_full_df) == "PopID"] <- "pop"
+
+# save both the indiv env dfs
 write.csv(exp_env_full_df, paste0("data/EnvDat/indiv_trt_env_dat_", Sys.Date(), ".csv"), row.names = F)
-write.csv(pop_trt_env, paste0("data/EnvDat/pop_trt_env_dat_", Sys.Date(), ".csv"), row.names = F)
 #######################
