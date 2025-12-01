@@ -117,7 +117,7 @@ all_tanks_trim <- all_tanks[-(108035:108044),]
 # re-summarize by tank
 tank_temps <- all_tanks_trim %>% group_by(tank_ID) %>%
   summarise(mean_temp = mean(temp),
-            median_temp = mean(temp),
+            median_temp = median(temp),
             min_temp = min(temp),
             max_temp = max(temp),
             sd_temp = sd(temp))

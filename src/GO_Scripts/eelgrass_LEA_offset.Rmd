@@ -17,43 +17,115 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = "~/BalticEelgrass/")
 
 # libraries
+library(LEA) # for offsets
 library(BiocManager) # needed to download specific packages
 library(readxl) # reading xlsx files
-library(vcfR) # reading vcf files
-library(LEA) # landscape genomics
-library(psych) # environmental data cleaning
-library(vegan) # environmental data cleaning
-library(tidyr) # data cleaning
-library(dplyr) # data cleaning
-library(stringr) # data cleaning
-library(sdmpredictors) # for downloading environmental data - NOT LOADING IN CLUSTER
-library(qvalue) # for calculating qvalues
-library(ggplot2) # plotting
+library(ggplot2) # for plotting
+library(vegan) # for env dat processing
+library(dplyr) # for data wrangling
+library(stringr) # for data wrangling
 library(s2) # mapping
-library(rnaturalearth) # mapping - NOT LOADING IN CLUSTER
+library(rnaturalearth) # mapping
 library(rnaturalearthdata) # mapping
 library(maps) # mapping
-library(ggspatial) # mapping - NOT LOADING IN CLUSTER
+library(ggspatial) # mapping
+library(ggrepel) # mapping
+library(terra) # interpolation
+library(stars) # interpolation
+library(gstat) # interpolation
 
 # read in data
-# indiv/site dat
-sites <- read.csv("data/seascape_data/sampling_sites_coordinates_Baltic_Sea.csv")
+## indiv dat
 indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx")
-gen_div <- read_excel("data/seascape_data/Gen_div_table.xlsx")
+sea_pops <- read.csv("data/seascape_data/population_data.csv")[,-1]
+exp_pops <- read.csv("data/experiment/eelgrass_exp_sites.csv")
 
-# gen dat
-eelgrass_vcf_MLL <- read.vcfR(
-  "data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")
-eelgrass_vcf_full <- read.vcfR(
-  "data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.vcf")
+## gen dat
 eelgrass_lfmm_MLL <- read.lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.lfmm")
 eelgrass_geno_MLL <- read.geno("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.geno")
 eelgrass_lfmm_full <- read.lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.lfmm")
 eelgrass_geno_full <- read.geno("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.geno")
 eelgrass_lfmm_full_rm <- read.lfmm("data/seascape_data/eel_full_rm.lfmm")
 
-# env dat
+## env dat
+curr_full_env <- read.env("data/EnvDat/full_seascapeEnv_2025-09-12.env")
+curr_mll_env <- read.env("data/EnvDat/mll_seascapeEnv_2025-09-12.env")
+exp_env <- read.env("data/EnvDat/expEnv_2025-09-12.env")
+trt_env <- read.env("data/EnvDat/trtEnv_2025-09-12.env")
+trt_scaled <- read.csv("data/EnvDat/trt_scaled_envdat_2025-09-12.csv")
+exp_scaled <- read.csv("data/EnvDat/exp_scaled_envdat_2025-09-12.csv")
+sea_scaled <- read.csv("data/EnvDat/sea_scaled_envdat_2025-09-12.csv")
+```
 
+## Data Prep
+
+### Individual Data Prep
+
+I will start by processing the individual data to work with both MLL and full datasets. 
+
+```{r}
+# inspect data
+sea_pops
+indiv_list
+exp_pops
+
+# rename sea pop columns
+colnames(sea_pops) <- c("region","site_name","pop","long","lat")
+
+# rename exp pop columns
+colnames(exp_pops) <- c("site_name", "pop", "long", "lat")
+
+# add metadata to inds
+indiv_list <- as.data.frame(indiv_list)
+colnames(indiv_list) <- c("mll", "ind")
+indiv_list$pop <- str_split_fixed(indiv_list$ind, "-", 2)[,1]
+inds <- merge(sea_pops, indiv_list, by = c("pop"))
+```
+
+### Environmental Data Prep
+
+Environmental Data has been pre-processed using the script "EnvDatProcess.Rmd". This script scales all environmental data together, then splits it into the relevant data sets for seascape, experimental pops, and treatments before outputting the correct formats for each GO method. Here, I just ensure that column names are consistent and that the order of the .env files matches with our other metadata
+
+```{r}
+# inspect data
+# seascape
+curr_full_env
+curr_mll_env
+sea_scaled
+
+# exp sites
+exp_env
+exp_scaled
+
+# trt
+trt_env
+trt_scaled
+
+# colnames for env files
+colnames(curr_full_env) <- colnames(curr_mll_env) <- colnames(exp_env) <- colnames(trt_env) <- c("temp_scaled", "max_temp_scaled", "sal_scaled", "min_sal_scaled")
+
+# now check the order of data
+# exp env
+exp_env == exp_scaled[,9:12] # temperature is correct but salinity isn't, need to check this in env dat process script
+
+# trt env
+trt_env == trt_scaled[,6:9] # salinity is different here as well
+
+# seascape
+curr_mll_env == sea_scaled[,12:15] # these aren't in order at all
+unique(curr_full_env) == sea_scaled[,12:15] # not even close and the dimensions are wrong too
+```
+
+### Genomic Data Prep
+
+Seascape genomic data comes from Steffi Ries and Marlene Jahnke at the University of Gothenburg, who had already processed the genomic dataset to do XX (check what part of bioinformatic pipeline had been done already).
+
+```{r}
 
 ```
+
+
+## Seascape Model Training
+
+Now that I have prepped and cleaned my data, I will use it to train LFMM models later used to predict genomic offset to some other (in this case experimental) climate. Importantly, I do not need to trim or impute my genomic data - this has been done in the script "GenDatProcess.Rmd". I also do not determine ancestry, Steffi has done this and recovered K = 12. 
 
