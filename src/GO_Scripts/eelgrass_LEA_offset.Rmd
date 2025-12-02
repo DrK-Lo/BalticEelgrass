@@ -41,20 +41,21 @@ sea_pops <- read.csv("data/seascape_data/population_data.csv")[,-1]
 exp_pops <- read.csv("data/experiment/eelgrass_exp_sites.csv")
 
 ## gen dat
-eelgrass_lfmm_MLL <- read.lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.lfmm")
-eelgrass_geno_MLL <- read.geno("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.geno")
-eelgrass_lfmm_full <- read.lfmm("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.lfmm")
-eelgrass_geno_full <- read.geno("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.geno")
-eelgrass_lfmm_full_rm <- read.lfmm("data/seascape_data/eel_full_rm.lfmm")
+lfmm_mll <- read.lfmm("data/seascape_data/gen_MLL_imp_mat.lfmm")
+geno_mll <- read.geno("data/seascape_data/gen_MLL_imp_mat.geno")
+lfmm_full <- read.lfmm("data/seascape_data/gen_full_rm_imp_mat.lfmm")
+geno_full <- read.geno("data/seascape_data/gen_full_rm_imp_mat.geno")
+lfmm_full_rm <- read.lfmm("data/seascape_data/eel_full_rm.lfmm") # this one has only snps found in both full and mll
 
 ## env dat
-curr_full_env <- read.env("data/EnvDat/full_seascapeEnv_2025-09-12.env")
-curr_mll_env <- read.env("data/EnvDat/mll_seascapeEnv_2025-09-12.env")
-exp_env <- read.env("data/EnvDat/expEnv_2025-09-12.env")
-trt_env <- read.env("data/EnvDat/trtEnv_2025-09-12.env")
-trt_scaled <- read.csv("data/EnvDat/trt_scaled_envdat_2025-09-12.csv")
-exp_scaled <- read.csv("data/EnvDat/exp_scaled_envdat_2025-09-12.csv")
-sea_scaled <- read.csv("data/EnvDat/sea_scaled_envdat_2025-09-12.csv")
+curr_full_env <- read.env("data/EnvDat/full_seascapeEnv_2025-12-02.env")
+curr_mll_env <- read.env("data/EnvDat/mll_seascapeEnv_2025-12-02.env")
+exp_env <- read.env("data/EnvDat/expEnv_2025-12-02.env")
+trt_env <- read.env("data/EnvDat/trtEnv_2025-12-02.env")
+trt_scaled <- read.csv("data/EnvDat/trt_scaled_envdat_2025-12-02.csv")
+exp_scaled <- read.csv("data/EnvDat/exp_scaled_envdat_2025-12-02.csv")
+sea_scaled_mll <- read.csv("data/EnvDat/sea_scaled_envdat_mll_2025-12-02.csv")
+sea_scaled_full <- read.csv("data/EnvDat/sea_scaled_envdat_full_2025-12-02.csv")
 ```
 
 ## Data Prep
@@ -80,6 +81,9 @@ indiv_list <- as.data.frame(indiv_list)
 colnames(indiv_list) <- c("mll", "ind")
 indiv_list$pop <- str_split_fixed(indiv_list$ind, "-", 2)[,1]
 inds <- merge(sea_pops, indiv_list, by = c("pop"))
+
+# unique mll inds
+inds_mll <- inds[unique(inds$mll),]
 ```
 
 ### Environmental Data Prep
@@ -101,27 +105,37 @@ exp_scaled
 trt_env
 trt_scaled
 
+# rownames for trt
+rownames(trt_env) <- trt_scaled$trt
+
 # colnames for env files
-colnames(curr_full_env) <- colnames(curr_mll_env) <- colnames(exp_env) <- colnames(trt_env) <- c("temp_scaled", "max_temp_scaled", "sal_scaled", "min_sal_scaled")
+colnames(curr_full_env) <- colnames(curr_mll_env) <- colnames(exp_env) <- colnames(trt_env) <- c("median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")
 
 # now check the order of data
-# exp env
-exp_env == exp_scaled[,9:12] # temperature is correct but salinity isn't, need to check this in env dat process script
+exp_env == exp_scaled[,9:12] 
+trt_env == trt_scaled[,6:9]
+curr_mll_env == sea_scaled_mll[,15:18]
+curr_full_env == sea_scaled_full[,15:18]
 
-# trt env
-trt_env == trt_scaled[,6:9] # salinity is different here as well
-
-# seascape
-curr_mll_env == sea_scaled[,12:15] # these aren't in order at all
-unique(curr_full_env) == sea_scaled[,12:15] # not even close and the dimensions are wrong too
+# add pops as rownames
+rownames(exp_env) <- exp_scaled$pop
+rownames(trt_env) <- trt_scaled$pop
+rownames(curr_mll_env) <- sea_scaled_mll$pop
+rownames(curr_full_env) <- sea_scaled_full$pop
 ```
 
 ### Genomic Data Prep
 
-Seascape genomic data comes from Steffi Ries and Marlene Jahnke at the University of Gothenburg, who had already processed the genomic dataset to do XX (check what part of bioinformatic pipeline had been done already).
+Seascape genomic data comes from Steffi Ries and Marlene Jahnke at the University of Gothenburg, who had already processed the genomic dataset (check what part of bioinformatic pipeline had been done already). I further process this data to impute missing genomic data and remove non-variable genomic sites in the script "GenDatProcess.Rmd"
 
 ```{r}
+# inspect
+lfmm_mll[1:10,1:10]
+lfmm_full[1:10,1:10]
 
+# add pops as rownames
+rownames(lfmm_mll) <- inds_mll$pop
+rownames(lfmm_full) <- inds$pop
 ```
 
 
@@ -129,3 +143,110 @@ Seascape genomic data comes from Steffi Ries and Marlene Jahnke at the Universit
 
 Now that I have prepped and cleaned my data, I will use it to train LFMM models later used to predict genomic offset to some other (in this case experimental) climate. Importantly, I do not need to trim or impute my genomic data - this has been done in the script "GenDatProcess.Rmd". I also do not determine ancestry, Steffi has done this and recovered K = 12. 
 
+```{r}
+# fit model
+mod_mll <- lfmm2(input = lfmm_mll,
+                  env = curr_mll_env, 
+                  K = 12, # this was number from Steffi's analysis
+                  effect.sizes = T) 
+mod_full <- lfmm2(input = lfmm_full,
+                      env = curr_full_env,
+                      K = 12,
+                      effect.sizes = T)
+```
+
+## Offset Prediction
+
+Now I predict offset for all of my experimental populations to each treatment.
+
+```{r}
+# get environmental effect sizes
+B_mll <- mod_mll@B
+B_full <- mod_full@B
+
+# put together dataset for exp pop origin with trt (pred from and pred to)
+exp_expanded <- exp_env[rep(seq_len(nrow(exp_env)), each = nrow(trt_env)),]
+trt_expanded <- as.data.frame(rep(as.data.frame(trt_env), 8))
+pop1 <- trt_expanded[,1:4]
+pop2 <- trt_expanded[,5:8]
+pop3 <- trt_expanded[,9:12]
+pop4 <- trt_expanded[,13:16]
+pop5 <- trt_expanded[,17:20]
+pop6 <- trt_expanded[,21:24]
+pop7 <- trt_expanded[,25:28]
+pop8 <- trt_expanded[,29:32]
+colnames(pop1) <- colnames(pop2) <- colnames(pop3) <- colnames(pop4) <- colnames(pop5) <- colnames(pop6) <- colnames(pop7) <- colnames(pop8) <- c("median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")
+trt_expanded <- rbind(pop1, pop2, pop3, pop4, pop5, pop6, pop7, pop8)
+trt_expanded <- as.matrix(trt_expanded)
+trt_expanded_trts <- rep(trt_scaled$trt, 8)
+
+# genetic gaps (offset prediction)
+gg_mll_trts = NULL
+for (i in 1:nrow(exp_expanded)){
+gg_mll_trts[i] = mean(((exp_expanded - trt_expanded)[i,]  %*% t(B_mll))^2, na.rm = TRUE)
+}
+
+gg_full_trts = NULL
+for (i in 1:nrow(exp_expanded)){
+gg_full_trts[i] = mean(((exp_expanded - trt_expanded)[i,]  %*% t(B_full))^2, na.rm = TRUE)
+}
+
+# check corr
+cor(gg_mll_trts, gg_full_trts) # highly correlated, 0.9774147
+
+# associate with metadata
+gap_df <- as.data.frame((rownames(exp_expanded)))
+names(gap_df) <- "pop"
+gap_df$trt <- rep(rownames(trt_env), 8)
+gap_df$gap_mll <- gg_mll_trts
+gap_df$gap_full <- gg_full_trts
+rownames(gap_df) <- NULL
+
+# wide versions
+mll_offsets_wide <- pivot_wider(gap_df,
+                                id_cols = trt,
+                                names_from = pop, 
+                                values_from = gap_mll) %>% 
+  as.data.frame()
+mll_offsets_wide$cc <- "mll"
+
+full_offsets_wide <- pivot_wider(gap_df,
+                                id_cols = trt,
+                                names_from = pop, 
+                                values_from = gap_full) %>% 
+  as.data.frame()
+full_offsets_wide$cc <- "full"
+
+offsets_lea_wide <- rbind(mll_offsets_wide, full_offsets_wide)
+
+# save offsets
+write.csv(gap_df, paste0("LEA_offsets_exptrt_long_",Sys.Date(),".csv"))
+write.csv(offsets_lea_wide, paste0("LEA_offsets_exptrt_wide",Sys.Date(),".csv"))
+```
+
+## Offset Plotting
+
+Now that I have my offsets, I want to arrange them in matrices that I can plot. 
+
+```{r}
+# plot
+ggplot(gap_df, aes(x = pop, y = trt, fill = gap_mll)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "red", high = "green") +
+  theme_classic() +
+  labs(x = "Population", y = "Treatment", fill = "Gap MLL")
+
+# try this using log transformed offsets since magnitude is so variable
+ggplot(gap_df, aes(x = pop, y = trt, fill = log(gap_mll))) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "red", high = "green") +
+  theme_classic() +
+  labs(title = "Genomic Offsets (LEA, MLL)", x = "Population", y = "Treatment", fill = "Log(offset)")
+
+# and the full offsets
+ggplot(gap_df, aes(x = pop, y = trt, fill = log(gap_full))) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "red", high = "green") +
+  theme_classic() +
+  labs(title = "Genomic Offsets (LEA, Full)", x = "Population", y = "Treatment", fill = "Log(offset)")
+```
