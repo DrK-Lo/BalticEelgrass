@@ -350,7 +350,7 @@ summary(growweightstd_lm.1)
 
 # check for random effects
 resid_weight <- data.frame(residuals = residuals(growweightstd_lm.1), tank_ID = fit_growth$tank_ID)
-boxplot(residuals ~ tank_ID, data = resid_weight, main = "Residuals of Weight GLM by Tank") # some randomness, try an lmm
+boxplot(residuals ~ tank_ID, data = resid_weight, main = "Residuals of Weight LM by Tank") # some randomness, try an lmm
 
 # lmm weight model
 growweightstd_lmm <- lmer(weight_std_change ~ pop * trt + (1|tank_ID), data = fit_growth)
