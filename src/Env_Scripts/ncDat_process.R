@@ -5,7 +5,10 @@ library(dplyr)
 library(tidyr)
 library(ncdf4)
 library(raster)
+library(stringr)
 library(terra)
+library(ggplot2)
+library(forcats)
 
 # data
 exp_pops <- read.csv("data/experiment/eelgrass_exp_sites.csv")
