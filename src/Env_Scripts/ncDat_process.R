@@ -127,17 +127,19 @@ write.csv(tempdf,
 saldf_sum <- data.frame(sal_mean = apply(saldf[,-1],1,mean), 
                         sal_min = apply(saldf[,-1],1,min),
                         sal_max = apply(saldf[,-1],1,max),
+                        sal_med = apply(saldf[,-1],1,median),
                         sal_quant01 = apply(saldf[,-1],1,function (x) {quantile(x,0.01)}),
                         sal_quant99 = apply(saldf[,-1],1,function (x) {quantile(x,0.99)})) 
 tempdf_sum <- data.frame(temp_mean = apply(tempdf[,-1],1,mean), 
                         temp_min = apply(tempdf[,-1],1,min),
                         temp_max = apply(tempdf[,-1],1,max),
+                        temp_med = apply(tempdf[,-1],1,median),
                         temp_quant01 = apply(tempdf[,-1],1,function (x) {quantile(x,0.01)}),
                         temp_quant99 = apply(tempdf[,-1],1,function (x) {quantile(x,0.99)})) 
 
 # put together df
-site_abbrev <- rownames(saldf_sum)
-copernicus_df <- cbind(site_abbrev, saldf_sum, tempdf_sum)
+pop <- rownames(saldf_sum)
+copernicus_df <- cbind(pop, saldf_sum, tempdf_sum)
 write.csv(copernicus_df, paste0("data/EnvDat/complete_expSites_copernicus_", Sys.Date(), ".csv"))
 
 # expand to long format df to calculate monthly/annual trends

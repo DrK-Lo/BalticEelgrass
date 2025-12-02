@@ -191,6 +191,9 @@ daily_checks_clean <- daily_checks %>%
   filter(dailyTemp < 40 & dailySalinity <30)
 summary(daily_checks_clean)
 
+# change bag colnames for consistency
+colnames(bags)[colnames(bags) == "PopID"] <- "pop"
+
 # put together the salinity data so we can look at trends by tank/treatment
 sal_dat <- merge(bags, daily_checks_clean, by = c("bagKey"))
 
@@ -216,6 +219,15 @@ bag_sals <- sal_dat_clean %>% group_by(bagKey) %>%
 
 # merge
 bag_sals_df <- merge(bags, bag_sals, by = c("bagKey"))
+
+# and treatment level stats
+trt_sals <- sal_dat_clean %>% group_by(trt) %>%
+  summarise(mean_sal = mean(dailySalinity),
+            median_sal = median(dailySalinity),
+            min_sal = min(dailySalinity),
+            max_sal = max(dailySalinity),
+            sd_sal = sd(dailySalinity)) %>%
+  as.data.frame()
 ###########
 
 ## complete exp env dat
@@ -244,7 +256,17 @@ coords_bags$position <- paste0(coords_bags$x_coord, "_", coords_bags$y_coord)
 # merge coords
 exp_env_full_df <- merge(exp_env_df, coords_bags, by = c("bagnum_num"))
 
+# treatment level
+trt_temps
+trt_sals
+
+# expand the temp data
+alltrt_temps <- data.frame(trt_sals$trt, trt_temps[rep(seq_len(nrow(trt_temps)), each = 2),])
+colnames(alltrt_temps) <- c("trt", "temp_trt", "mean_temp", "median_temp", "min_temp", "max_temp", "sd_temp")
+
+trt_env_full <- merge(alltrt_temps, trt_sals, by = "trt")
+
 # save both the indiv and pop level env dfs
 write.csv(exp_env_full_df, paste0("data/EnvDat/indiv_trt_env_dat_", Sys.Date(), ".csv"), row.names = F)
-write.csv(pop_trt_env, paste0("data/EnvDat/pop_trt_env_dat_", Sys.Date(), ".csv"), row.names = F)
+write.csv(trt_env_full, paste0("data/EnvDat/trt_env_dat_", Sys.Date(), ".csv"), row.names = F)
 #######################
