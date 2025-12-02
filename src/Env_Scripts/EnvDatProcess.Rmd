@@ -228,6 +228,8 @@ sea_scaled$sal_8.5 <- as.numeric(sea_scaled$sal_8.5)
 full_sea_scaled <- merge(indiv_list_full, sea_scaled, by = c("pop"))
 mll_sea_scaled <- merge(indiv_list_mll, sea_scaled, by = c("pop"))
 
+full_sea_scaled[,c("pop","median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")]
+
 # output for rda
 write.csv(full_sea_scaled, paste0("data/EnvDat/sea_scaled_envdat_full_", Sys.Date(), ".csv"), row.names = F)
 write.csv(mll_sea_scaled, paste0("data/EnvDat/sea_scaled_envdat_mll_", Sys.Date(), ".csv"), row.names = F)
