@@ -4,6 +4,7 @@
 
 # ignore large data
 data/largeDat/*
+results/lg_results/*
 
 # Session Data files
 .RData
