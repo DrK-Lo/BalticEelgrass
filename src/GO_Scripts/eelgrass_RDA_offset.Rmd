@@ -734,8 +734,8 @@ full_offsets_w$cc <- "full"
 offsets_rda_wide <- rbind(mll_offsets_w, full_offsets_w)
 
 # save offsets
-write.csv(offsets_rda, paste0("RDA_offsets_exptrt_long_",Sys.Date(),".csv"))
-write.csv(offsets_rda_wide, paste0("RDA_offsets_exptrt_wide",Sys.Date(),".csv"))
+write.csv(offsets_rda, paste0("results/GO_results/RDA_offsets_exptrt_long_",Sys.Date(),".csv"))
+write.csv(offsets_rda_wide, paste0("results/GO_results/RDA_offsets_exptrt_wide",Sys.Date(),".csv"))
 ```
 
 

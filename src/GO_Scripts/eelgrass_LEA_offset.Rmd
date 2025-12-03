@@ -211,8 +211,8 @@ full_offsets_wide$cc <- "full"
 offsets_lea_wide <- rbind(mll_offsets_wide, full_offsets_wide)
 
 # save offsets
-write.csv(gap_df, paste0("LEA_offsets_exptrt_long_",Sys.Date(),".csv"))
-write.csv(offsets_lea_wide, paste0("LEA_offsets_exptrt_wide",Sys.Date(),".csv"))
+write.csv(gap_df, paste0("results/GO_results/LEA_offsets_exptrt_long_",Sys.Date(),".csv"))
+write.csv(offsets_lea_wide, paste0("results/GO_results/LEA_offsets_exptrt_wide",Sys.Date(),".csv"))
 ```
 
 ## Offset Plotting
