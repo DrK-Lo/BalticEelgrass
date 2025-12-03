@@ -48,14 +48,14 @@ geno_full <- read.geno("data/seascape_data/gen_full_rm_imp_mat.geno")
 lfmm_full_rm <- read.lfmm("data/seascape_data/eel_full_rm.lfmm") # this one has only snps found in both full and mll
 
 ## env dat
-curr_full_env <- read.env("data/EnvDat/full_seascapeEnv_2025-12-02.env")
-curr_mll_env <- read.env("data/EnvDat/mll_seascapeEnv_2025-12-02.env")
-exp_env <- read.env("data/EnvDat/expEnv_2025-12-02.env")
-trt_env <- read.env("data/EnvDat/trtEnv_2025-12-02.env")
-trt_scaled <- read.csv("data/EnvDat/trt_scaled_envdat_2025-12-02.csv")
-exp_scaled <- read.csv("data/EnvDat/exp_scaled_envdat_2025-12-02.csv")
-sea_scaled_mll <- read.csv("data/EnvDat/sea_scaled_envdat_mll_2025-12-02.csv")
-sea_scaled_full <- read.csv("data/EnvDat/sea_scaled_envdat_full_2025-12-02.csv")
+curr_full_env <- read.env("data/EnvDat/full_seascapeEnv_2025-12-03.env")
+curr_mll_env <- read.env("data/EnvDat/mll_seascapeEnv_2025-12-03.env")
+exp_env <- read.env("data/EnvDat/expEnv_2025-12-03.env")
+trt_env <- read.env("data/EnvDat/trtEnv_2025-12-03.env")
+trt_scaled <- read.csv("data/EnvDat/trt_scaled_envdat_2025-12-03.csv")
+exp_scaled <- read.csv("data/EnvDat/exp_scaled_envdat_2025-12-03.csv")
+sea_scaled_mll <- read.csv("data/EnvDat/sea_scaled_envdat_mll_2025-12-03.csv")
+sea_scaled_full <- read.csv("data/EnvDat/sea_scaled_envdat_full_2025-12-03.csv")
 ```
 
 ## Data Prep
@@ -82,8 +82,11 @@ colnames(indiv_list) <- c("mll", "ind")
 indiv_list$pop <- str_split_fixed(indiv_list$ind, "-", 2)[,1]
 inds <- merge(sea_pops, indiv_list, by = c("pop"))
 
+# reorder by mll
+inds_ord <- inds[order(inds$mll),]
+
 # unique mll inds
-inds_mll <- inds[unique(inds$mll),]
+inds_mll <- inds_ord[unique(inds_ord$mll),]
 ```
 
 ### Environmental Data Prep
@@ -119,7 +122,6 @@ curr_full_env == sea_scaled_full[,15:18]
 
 # add pops as rownames
 rownames(exp_env) <- exp_scaled$pop
-rownames(trt_env) <- trt_scaled$pop
 rownames(curr_mll_env) <- sea_scaled_mll$pop
 rownames(curr_full_env) <- sea_scaled_full$pop
 ```
@@ -135,7 +137,7 @@ lfmm_full[1:10,1:10]
 
 # add pops as rownames
 rownames(lfmm_mll) <- inds_mll$pop
-rownames(lfmm_full) <- inds$pop
+rownames(lfmm_full) <- inds_ord$pop
 ```
 
 
@@ -204,16 +206,16 @@ rownames(gap_df) <- NULL
 
 # wide versions
 mll_offsets_wide <- pivot_wider(gap_df,
-                                id_cols = trt,
-                                names_from = pop, 
-                                values_from = gap_mll) %>% 
+                                id_cols = "trt",
+                                names_from = "pop", 
+                                values_from = "gap_mll") %>% 
   as.data.frame()
 mll_offsets_wide$cc <- "mll"
 
 full_offsets_wide <- pivot_wider(gap_df,
-                                id_cols = trt,
-                                names_from = pop, 
-                                values_from = gap_full) %>% 
+                                id_cols = "trt",
+                                names_from = "pop", 
+                                values_from = "gap_full") %>% 
   as.data.frame()
 full_offsets_wide$cc <- "full"
 
@@ -230,23 +232,18 @@ Now that I have my offsets, I want to arrange them in matrices that I can plot.
 
 ```{r}
 # plot
-ggplot(gap_df, aes(x = pop, y = trt, fill = gap_mll)) +
-  geom_tile(color = "white") +
-  scale_fill_gradient(low = "red", high = "green") +
-  theme_classic() +
-  labs(x = "Population", y = "Treatment", fill = "Gap MLL")
-
-# try this using log transformed offsets since magnitude is so variable
 ggplot(gap_df, aes(x = pop, y = trt, fill = (gap_mll))) +
   geom_tile(color = "white") +
-  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.03)) +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.07)) +
   theme_classic() +
   labs(title = "Genomic Offsets (LEA, MLL)", x = "Population", y = "Treatment", fill = "Offset")
 
 # and the full offsets
 ggplot(gap_df, aes(x = pop, y = trt, fill = (gap_full))) +
   geom_tile(color = "white") +
-  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.03)) +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.07)) +
   theme_classic() +
   labs(title = "Genomic Offsets (LEA, Full)", x = "Population", y = "Treatment", fill = "Offset")
+
+cor(gap_df$gap_mll, gap_df$gap_full) # 0.997 correlation
 ```
