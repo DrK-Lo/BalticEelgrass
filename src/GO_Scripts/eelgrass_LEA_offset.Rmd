@@ -237,16 +237,16 @@ ggplot(gap_df, aes(x = pop, y = trt, fill = gap_mll)) +
   labs(x = "Population", y = "Treatment", fill = "Gap MLL")
 
 # try this using log transformed offsets since magnitude is so variable
-ggplot(gap_df, aes(x = pop, y = trt, fill = log(gap_mll))) +
+ggplot(gap_df, aes(x = pop, y = trt, fill = (gap_mll))) +
   geom_tile(color = "white") +
-  scale_fill_gradient(low = "red", high = "green") +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.03)) +
   theme_classic() +
-  labs(title = "Genomic Offsets (LEA, MLL)", x = "Population", y = "Treatment", fill = "Log(offset)")
+  labs(title = "Genomic Offsets (LEA, MLL)", x = "Population", y = "Treatment", fill = "Offset")
 
 # and the full offsets
-ggplot(gap_df, aes(x = pop, y = trt, fill = log(gap_full))) +
+ggplot(gap_df, aes(x = pop, y = trt, fill = (gap_full))) +
   geom_tile(color = "white") +
-  scale_fill_gradient(low = "red", high = "green") +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.03)) +
   theme_classic() +
-  labs(title = "Genomic Offsets (LEA, Full)", x = "Population", y = "Treatment", fill = "Log(offset)")
+  labs(title = "Genomic Offsets (LEA, Full)", x = "Population", y = "Treatment", fill = "Offset")
 ```
