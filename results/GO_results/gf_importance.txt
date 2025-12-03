@@ -1,0 +1,8 @@
+ median_sal_scaled     min_sal_scaled    max_temp_scaled median_temp_scaled 
+        0.03732179         0.01706766         0.01494946         0.01188928 
+ median_sal_scaled     min_sal_scaled median_temp_scaled    max_temp_scaled 
+        0.04513374         0.02836386         0.02446048         0.01797063 
+    min_sal_scaled  median_sal_scaled median_temp_scaled    max_temp_scaled 
+        0.03355680         0.03279906         0.03103772         0.02335147 
+median_temp_scaled     min_sal_scaled  median_sal_scaled    max_temp_scaled 
+        0.05725726         0.04734750         0.04715672         0.04257340 
