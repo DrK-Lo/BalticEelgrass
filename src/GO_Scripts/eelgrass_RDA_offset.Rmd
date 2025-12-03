@@ -697,18 +697,7 @@ Now I predict offset for all of my experimental populations to each treatment.
 ```{r}
 # put together dataset for exp pop origin with trt (pred from and pred to)
 exp_expanded <- exp_scaled_red[rep(seq_len(nrow(exp_scaled_red)), each = nrow(trt_scaled_red)),]
-trt_expanded <- as.data.frame(rep(as.data.frame(trt_scaled_red), 8))
-pop1 <- trt_expanded[,1:4]
-pop2 <- trt_expanded[,5:8]
-pop3 <- trt_expanded[,9:12]
-pop4 <- trt_expanded[,13:16]
-pop5 <- trt_expanded[,17:20]
-pop6 <- trt_expanded[,21:24]
-pop7 <- trt_expanded[,25:28]
-pop8 <- trt_expanded[,29:32]
-colnames(pop1) <- colnames(pop2) <- colnames(pop3) <- colnames(pop4) <- colnames(pop5) <- colnames(pop6) <- colnames(pop7) <- colnames(pop8) <- c("median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")
-trt_expanded <- rbind(pop1, pop2, pop3, pop4, pop5, pop6, pop7, pop8)
-trt_expanded <- as.matrix(trt_expanded)
+trt_expanded <- as.matrix(do.call(rbind, replicate(8, trt_scaled_red, simplify = FALSE)))
 trt_expanded_trts <- rep(trt_scaled$trt, 8)
 exp_expanded_pops <- (rep(rownames(exp_scaled_red), 4))[order(rep(rownames(exp_scaled_red), 4))]
 
