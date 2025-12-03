@@ -10,11 +10,11 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = "~/Eelgrass/BalticEelgrass/")
 ```
 
-# Offset Modeling with Gradient Forest
+# Offset Modeling with RDA
 
 This script is for offset calculation using RDAdapt, specifically for the project "VR_Zostera_genomic_offset." It includes training of the models using seascape genomic data, as well as calculation of genomic offset for experimental populations in each mesocosm treatment. 
 
-### Setup & Formatting
+## Setup & Formatting
 
 ```{r Setup, echo = F}
 # packages
