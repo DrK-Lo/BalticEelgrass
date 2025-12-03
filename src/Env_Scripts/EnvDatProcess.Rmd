@@ -89,7 +89,7 @@ Now that I have environmental data for all my sites in a coding-friendly format,
 
 ```{r}
 # start by splitting current and future data
-curr_sea <- seascape_dat[,c("region","site_full","pop","long","lat","temp_curr","max_temp_curr","sal_curr","min_sal_curr")]
+curr_sea <- seascape_dat[,c("region","site_full","pop","long","lat","median_temp","max_temp","median_sal","min_sal")]
 fut_sea <- seascape_dat[,c("region","site_full","pop","long","lat","temp_8.5","sal_8.5")]
 
 # let's also keep a df with the population data only
@@ -230,9 +230,13 @@ mll_sea_scaled <- merge(indiv_list_mll, sea_scaled, by = c("pop"))
 
 full_sea_scaled[,c("pop","median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")]
 
-# output for rda
-write.csv(full_sea_scaled, paste0("data/EnvDat/sea_scaled_envdat_full_", Sys.Date(), ".csv"), row.names = F)
-write.csv(mll_sea_scaled, paste0("data/EnvDat/sea_scaled_envdat_mll_", Sys.Date(), ".csv"), row.names = F)
+# put in order of indiv list
+full_sea_scaled_ord <- full_sea_scaled[order(full_sea_scaled$mll_no),]
+mll_sea_scaled_ord <- mll_sea_scaled[order(mll_sea_scaled$mll_no),]
+
+# output for rda & gf
+write.csv(full_sea_scaled_ord, paste0("data/EnvDat/sea_scaled_envdat_full_", Sys.Date(), ".csv"), row.names = F)
+write.csv(mll_sea_scaled_ord, paste0("data/EnvDat/sea_scaled_envdat_mll_", Sys.Date(), ".csv"), row.names = F)
 ```
 
 
@@ -242,8 +246,8 @@ LEA requires environmental data be formatted as a .env file type.
 
 ```{r}
 # prep as matrix
-mat1 <- as.matrix(full_sea_scaled[,c("median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")])
-mat2 <- as.matrix(mll_sea_scaled[,c("median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")])
+mat1 <- as.matrix(full_sea_scaled_ord[,c("median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")])
+mat2 <- as.matrix(mll_sea_scaled_ord[,c("median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")])
 mat3 <- as.matrix(exp_scaled[,c("median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")])
 mat4 <- as.matrix(trt_scaled[,c("median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")])
 
