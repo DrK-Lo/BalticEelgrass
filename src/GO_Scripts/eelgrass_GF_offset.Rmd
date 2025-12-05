@@ -25,6 +25,7 @@ library(dplyr) # for data wrangling
 library(stringr) # for data wrangling
 library(ggplot2) # for data vis
 library(viridis) # for data vis
+library(forcats) # for data vis
 
 # data
 ## indiv dat
@@ -352,17 +353,21 @@ write.csv(gf_offsets_wide, paste0("results/GO_results/GF_offsets_exptrt_wide",Sy
 Now that I have my offsets, I want to plot them in a grid where populations are columns and treatments are rows 
 
 ```{r}
+# prep for plotting
+exp_pops$order <- 1:8
+gf_offsets_plotting <- merge(exp_pops, gf_offsets, by = "pop")
+
 # plot
 # af offsets
 # mll
-ggplot(gf_offsets, aes(x = pop, y = trt, fill = (offset_gf_af_mll))) +
+ggplot(gf_offsets_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_gf_af_mll))) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.15)) +
   theme_classic() +
   labs(title = "Genomic Offsets (GFaf, MLL)", x = "Population", y = "Treatment", fill = "Offset")
 
 # and the full offsets
-ggplot(gf_offsets, aes(x = pop, y = trt, fill = (offset_gf_af_full))) +
+ggplot(gf_offsets_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_gf_af_full))) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.15)) +
   theme_classic() +
@@ -370,14 +375,14 @@ ggplot(gf_offsets, aes(x = pop, y = trt, fill = (offset_gf_af_full))) +
 
 # geno offsets
 # mll
-ggplot(gf_offsets, aes(x = pop, y = trt, fill = (offset_gf_geno_mll))) +
+ggplot(gf_offsets_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_gf_geno_mll))) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.15)) +
   theme_classic() +
   labs(title = "Genomic Offsets (GFgeno, MLL)", x = "Population", y = "Treatment", fill = "Offset")
 
 # and the full offsets
-ggplot(gf_offsets, aes(x = pop, y = trt, fill = (offset_gf_geno_full))) +
+ggplot(gf_offsets_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_gf_geno_full))) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.15)) +
   theme_classic() +

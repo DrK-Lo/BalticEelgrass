@@ -33,6 +33,7 @@ library(viridis) # for data vis
 library(foreach) # for rdadapt functions
 library(qvalue) # for rdadapt functions
 library(robust) # for rdadapt functions
+library(forcats) # for data vis
 
 # data
 ## indiv dat
@@ -744,15 +745,19 @@ write.csv(offsets_rda_wide, paste0("results/GO_results/RDA_offsets_exptrt_wide",
 Now that I have my offsets, I want to plot them in a grid where populations are columns and treatments are rows 
 
 ```{r}
+# prep for plotting
+exp_pops$order <- 1:8
+offsets_rda_plotting <- merge(exp_pops, offsets_rda, by = "pop")
+
 # plot
-ggplot(offsets_rda, aes(x = pop, y = trt, fill = (offset_mll))) +
+ggplot(offsets_rda_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_mll))) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,4)) +
   theme_classic() +
   labs(title = "Genomic Offsets (RDA, MLL)", x = "Population", y = "Treatment", fill = "Offset")
 
 # and the full offsets
-ggplot(offsets_rda, aes(x = pop, y = trt, fill = (offset_full))) +
+ggplot(offsets_rda_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_full))) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,4)) +
   theme_classic() +

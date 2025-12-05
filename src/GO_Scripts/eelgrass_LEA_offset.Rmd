@@ -33,6 +33,7 @@ library(ggrepel) # mapping
 library(terra) # interpolation
 library(stars) # interpolation
 library(gstat) # interpolation
+library(forcats) # data vis
 
 # read in data
 ## indiv dat
@@ -217,18 +218,22 @@ write.csv(offsets_lea_wide, paste0("results/GO_results/LEA_offsets_exptrt_wide",
 
 ## Offset Plotting
 
-Now that I have my offsets, I want to arrange them in matrices that I can plot. 
+Now that I have my offsets, I want to arrange them nicely by coast and plot. 
 
 ```{r}
+# popsdf
+exp_pops$order <- 1:8
+gap_df_plotting <- merge(gap_df, exp_pops, by = "pop")
+
 # plot
-ggplot(gap_df, aes(x = pop, y = trt, fill = (gap_mll))) +
+ggplot(gap_df_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (gap_mll))) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.07)) +
   theme_classic() +
   labs(title = "Genomic Offsets (LEA, MLL)", x = "Population", y = "Treatment", fill = "Offset")
 
 # and the full offsets
-ggplot(gap_df, aes(x = pop, y = trt, fill = (gap_full))) +
+ggplot(gap_df_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (gap_full))) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.07)) +
   theme_classic() +
