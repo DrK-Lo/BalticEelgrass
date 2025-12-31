@@ -48,7 +48,7 @@ library(raster) # for nc data
 seascape_dat <- read.csv("data/EnvDat/summary_env_data_meadows_GEA.csv") # seascape env data
 exp_dat_cop <- read.csv("data/EnvDat/complete_expSites_copernicus_2025-12-01.csv")[,-1]
 exp_dat <- read_excel("data/EnvDat/Camille_env_data_experiment.xlsx")
-trt_dat <- read.csv("data/EnvDat/trt_env_dat_2025-12-02.csv")
+trt_dat <- read.csv("data/EnvDat/trt_env_dat_2025-12-31.csv")
 indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx") # seascape individuals data
 eelgrass_vcf_MLL <- read.vcfR("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf") # read in vcf eelgrass mll
 ```
@@ -256,6 +256,18 @@ write.env(mat1, paste0("data/EnvDat/full_seascapeEnv_", Sys.Date(), ".env"))
 write.env(mat2, paste0("data/EnvDat/mll_seascapeEnv_", Sys.Date(), ".env"))
 write.env(mat3, paste0("data/EnvDat/expEnv_", Sys.Date(), ".env"))
 write.env(mat4, paste0("data/EnvDat/trtEnv_", Sys.Date(), ".env"))
+
+# and an unscaled version
+mat5 <- as.matrix(full_sea_scaled_ord[,c("median_temp", "max_temp", "median_sal", "min_sal")])
+mat6 <- as.matrix(mll_sea_scaled_ord[,c("median_temp", "max_temp", "median_sal", "min_sal")])
+mat7 <- as.matrix(exp_scaled[,c("median_temp", "max_temp", "median_sal", "min_sal")])
+mat8 <- as.matrix(trt_scaled[,c("median_temp", "max_temp", "median_sal", "min_sal")])
+
+# and convert to env format
+write.env(mat5, paste0("data/EnvDat/full_seascapeEnv_unscaled_", Sys.Date(), ".env"))
+write.env(mat6, paste0("data/EnvDat/mll_seascapeEnv_unscaled_", Sys.Date(), ".env"))
+write.env(mat7, paste0("data/EnvDat/expEnv_unscaled_", Sys.Date(), ".env"))
+write.env(mat8, paste0("data/EnvDat/trtEnv_unscaled_", Sys.Date(), ".env"))
 ```
 
 ### Formatting for RDA & GF
