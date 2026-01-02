@@ -1,0 +1,8 @@
+ median_sal median_temp     min_sal    max_temp 
+ 0.03021943  0.01591053  0.01325664  0.01150257 
+ median_sal     min_sal median_temp    max_temp 
+ 0.04629055  0.02557941  0.02322251  0.01442050 
+ median_sal     min_sal median_temp    max_temp 
+ 0.03329188  0.03266952  0.02973519  0.02242724 
+median_temp  median_sal     min_sal    max_temp 
+ 0.05299178  0.04360023  0.04323654  0.03815543 

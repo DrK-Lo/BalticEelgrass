@@ -681,8 +681,8 @@ fwdsel_full <- ordiR2step(rda(geno_full ~ 1, data = as.data.frame(sea_scaled_ful
                trace = T)
 
 # variables retained?
-(fwdsel_mll$call) # all
-(fwdsel_full$call)  # all
+(fwdsel_mll$call) # gets rid of median temp
+(fwdsel_full$call)  # keep all
 
 # signif testing
 (signif_mll <- anova.cca(rda_mll, parallel=getOption("mc.cores"))) # signif
