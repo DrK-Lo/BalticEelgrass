@@ -100,11 +100,168 @@ grow_pop_trt <- grow_trim %>%
 surv_go <- merge(go_wide, surv, by = c("pop", "trt"))
 grow_go <- merge(go_wide, grow_trim, by = c("pop", "trt"))
 
-# full vs mll
+# full vs mll (plotting)
 surv_go_full <- surv_go[surv_go$cc == "full",]
 surv_go_mll <- surv_go[surv_go$cc == "mll",]
 grow_go_full <- grow_go[grow_go$cc == "full",]
 grow_go_mll <- grow_go[grow_go$cc == "mll",]
+
+# long versions
+surv_go_long <- surv_go %>% pivot_longer(names_to = "method", cols = c("lea_offset", "rda_offset", "gf_offset"), values_to = "offset") %>% as.data.frame()
+surv_go_long$method <- str_split_fixed(surv_go_long$method, "_", 2)[,1]
+grow_go_long <- grow_go %>% pivot_longer(names_to = "method", cols = c("lea_offset", "rda_offset", "gf_offset"), values_to = "offset") %>% as.data.frame()
+grow_go_long$method <- str_split_fixed(grow_go_long$method, "_", 2)[,1]
+
+# correlation/signif testing 
+trts <- levels(as.factor(surv_go$trt))
+pops <- levels(as.factor(surv_go$pop))
+
+## SURVIVAL
+###########
+# function for correlations both common garden/current future offset
+surv_corr <- function(df, method, gen_clone, fit_offset) {
+  # subset data
+  df_subset <- df[df$method == method & df$cc == gen_clone,]
+  
+  if(fit_offset == "cg") {
+    # make df
+    corrs_cg <- data.frame(method = NA, trt = NA, cc = NA, kendall_surv = NA, pval_surv = NA)
+    
+    # common garden
+    for (i in 1:length(trts)){
+      # subset
+      trt_temp <- trts[i]
+      temp <- df_subset[df_subset$trt == trt_temp,]
+    
+      # metadata
+      corrs_cg[i,]$method <- method
+      corrs_cg[i,]$cc <- gen_clone
+      corrs_cg[i,]$trt <- trt_temp  
+      
+      # correlation
+      test <- cor.test(temp$surv, temp$offset, method = "kendall")
+      corrs_cg[i,]$kendall_surv <- test$estimate
+      corrs_cg[i,]$pval_surv <- test$p.value
+    }
+    return(corrs_cg)
+  } else if (fit_offset == "cf") {
+    # make df
+    corrs_cf <- data.frame(method = NA, pop = NA, cc = NA, kendall_surv = NA, pval_surv = NA)
+    
+    # current future
+    for (i in 1:length(pops)){
+      # subset
+      pop_temp <- pops[i]
+      temp <- df_subset[df_subset$pop == pop_temp,]
+    
+      # metadata
+      corrs_cf[i,]$method <- method
+      corrs_cf[i,]$cc <- gen_clone
+      corrs_cf[i,]$pop <- pop_temp  
+      
+      # correlation
+      test <- cor.test(temp$surv, temp$offset, method = "kendall")
+      corrs_cf[i,]$kendall_surv <- test$estimate
+      corrs_cf[i,]$pval_surv <- test$p.value
+    }
+    return(corrs_cf)
+  } else {
+    print("Please choose cg for common garden or cf for current-future")
+  }
+}
+
+surv_corr_cg <- rbind(surv_corr(surv_go_long, "lea", "full", "cg"),
+                      surv_corr(surv_go_long, "rda", "full", "cg"),
+                      surv_corr(surv_go_long, "gf", "full", "cg"),
+                      surv_corr(surv_go_long, "lea", "mll", "cg"),
+                      surv_corr(surv_go_long, "rda", "mll", "cg"),
+                      surv_corr(surv_go_long, "gf", "mll", "cg"))
+
+surv_corr_cf <- rbind(surv_corr(surv_go_long, "lea", "full", "cf"),
+                      surv_corr(surv_go_long, "rda", "full", "cf"),
+                      surv_corr(surv_go_long, "gf", "full", "cf"),
+                      surv_corr(surv_go_long, "lea", "mll", "cf"),
+                      surv_corr(surv_go_long, "rda", "mll", "cf"),
+                      surv_corr(surv_go_long, "gf", "mll", "cf"))
+###########
+
+## GROWTH
+#########
+grow_corr <- function(df, method, gen_clone, fit_offset) {
+  # subset data
+  df_subset <- df[df$method == method & df$cc == gen_clone,]
+  
+  if(fit_offset == "cg") {
+    # make df
+    corrs_cg <- data.frame(method = NA, trt = NA, cc = NA, kendall_len = NA, pval_len = NA, kendall_weigh = NA, pval_weigh = NA)
+    
+    # common garden
+    for (i in 1:length(trts)){
+      # subset
+      trt_temp <- trts[i]
+      temp <- df_subset[df_subset$trt == trt_temp,]
+    
+      # metadata
+      corrs_cg[i,]$method <- method
+      corrs_cg[i,]$cc <- gen_clone
+      corrs_cg[i,]$trt <- trt_temp  
+      
+      # correlation
+      test_len <- cor.test(temp$length_std_change, temp$offset, method = "kendall")
+      corrs_cg[i,]$kendall_len <- test_len$estimate
+      corrs_cg[i,]$pval_len <- test_len$p.value
+      
+      test_weigh <- cor.test(temp$weight_std_change, temp$offset, method = "kendall")
+      corrs_cg[i,]$kendall_weigh <- test_weigh$estimate
+      corrs_cg[i,]$pval_weigh <- test_weigh$p.value
+    }
+    return(corrs_cg)
+    
+  } else if (fit_offset == "cf") {
+    # make df
+    corrs_cf <- data.frame(method = NA, pop = NA, cc = NA, kendall_len = NA, pval_len = NA, kendall_weigh = NA, pval_weigh = NA)
+    
+    # current future
+    for (i in 1:length(pops)){
+      # subset
+      pop_temp <- pops[i]
+      temp <- df_subset[df_subset$pop == pop_temp,]
+    
+      # metadata
+      corrs_cf[i,]$method <- method
+      corrs_cf[i,]$cc <- gen_clone
+      corrs_cf[i,]$pop <- pop_temp  
+      
+      # correlation
+      test_len <- cor.test(temp$length_std_change, temp$offset, method = "kendall")
+      corrs_cf[i,]$kendall_len <- test_len$estimate
+      corrs_cf[i,]$pval_len <- test_len$p.value
+      
+      test_weigh <- cor.test(temp$weight_std_change, temp$offset, method = "kendall")
+      corrs_cf[i,]$kendall_weigh <- test_weigh$estimate
+      corrs_cf[i,]$pval_weigh <- test_weigh$p.value
+    }
+    return(corrs_cf)
+    
+  } else {
+    print("Please choose cg for common garden or cf for current-future")
+  }
+}
+
+grow_corr_cg <- rbind(grow_corr(grow_go_long, "lea", "full", "cg"),
+                      grow_corr(grow_go_long, "rda", "full", "cg"),
+                      grow_corr(grow_go_long, "gf", "full", "cg"),
+                      grow_corr(grow_go_long, "lea", "mll", "cg"),
+                      grow_corr(grow_go_long, "rda", "mll", "cg"),
+                      grow_corr(grow_go_long, "gf", "mll", "cg"))
+
+grow_corr_cf <- rbind(grow_corr(grow_go_long, "lea", "full", "cf"),
+                      grow_corr(grow_go_long, "rda", "full", "cf"),
+                      grow_corr(grow_go_long, "gf", "full", "cf"),
+                      grow_corr(grow_go_long, "lea", "mll", "cf"),
+                      grow_corr(grow_go_long, "rda", "mll", "cf"),
+                      grow_corr(grow_go_long, "gf", "mll", "cf"))
+#########
 ```
 
 ### Plotting
@@ -224,7 +381,7 @@ surv_go_full %>% ggplot(aes(x = rda_offset, y = surv, fill = pop)) +
   theme_minimal()
 surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = pop)) +
   geom_point(shape = 21, size = 4) + 
-  geom_smooth(method = "lm", col = "black", se = F) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): Survival", 
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
