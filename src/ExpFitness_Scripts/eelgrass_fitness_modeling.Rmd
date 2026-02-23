@@ -25,7 +25,7 @@ library(corrplot)
 
 # data
 fit <- read.csv("data/experiment/eelgrass_mesocosm_start_end_complete.csv")[,-1]
-env <- read.csv("data/EnvDat/indiv_trt_env_dat_2025-10-02.csv")[,-1]
+env <- read.csv("data/EnvDat/indiv_trt_env_dat_2025-12-31.csv")[,-1]
 ```
 
 # Fitness Modeling
@@ -66,6 +66,9 @@ fit_growth$weight_std_change <- fit_growth$weight_change / fit_growth$weight_sta
 
 # ratio of above vs below ground weight
 fit_growth$above_below_weight_ratio <- fit_growth$above_ground_weight / fit_growth$below_ground_weight
+
+# write out for later analysis
+write.csv(fit_growth, "data/experiment/fit_growth_dat.csv")
 
 # add treatment block to both data frames for testing potential random effects
 # block changes every 8 IDs - note though that salinity was independently controlled in each bag, so block may not actually appropriate descriptor of design
