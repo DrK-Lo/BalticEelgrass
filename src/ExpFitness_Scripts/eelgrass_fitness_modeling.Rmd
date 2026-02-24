@@ -26,6 +26,8 @@ library(corrplot)
 # data
 fit <- read.csv("data/experiment/eelgrass_mesocosm_start_end_complete.csv")[,-1]
 env <- read.csv("data/EnvDat/indiv_trt_env_dat_2025-12-31.csv")[,-1]
+fit_trim <- read.csv("data/experiment/expfit_trim.csv")
+fit_growth <- read.csv("data/experiment/expfit_grow_trim.csv")
 ```
 
 # Fitness Modeling
@@ -37,39 +39,6 @@ This script is to compare fitness across populations/treatments in the GO eelgra
 I need first to put together my data so that I have all the fitness and growth metrics possible. Note that all salinity stats are summarized through the experimental period at the individual bag level, while temperature stats are summarized through the experimental period at the tank level.
 
 ```{r data pre-process}
-# data cleaning to just relevant columns
-fit_trim <- fit[,c("DNA_label", "new_label", "pop", "genet", "bagnum", "tank_ID", "sal_full", "temp_full", "trt", "nbr_leaves_start", "sideShoot", "nbr_sideShootLeaves_start", "length_longest_leaf_start", "weight_start", "IsBlackLesions_start", "nbr_leaves_end", "nbr_new_leaves", "width_leaf", "Growth_leaf1", "Growth_leaf2", "Growth_leaf3", "Growth_leaf4", "Growth_leaf5", "Growth_leaf6", "Growth_leaf7", "Length_new_leaf1", "Length_new_leaf2", "Length_new_leaf3", "Length_new_leaf4", "Length_new_leaf5", "Length_new_leaf6", "Nbr_new_shoots", "Nbr_leaves_new_shoot1", "Length_new_shoot1_leaf1", "Length_new_shoot1_leaf2", "Length_new_shoot1_leaf3", "Length_new_shoot1_leaf4", "Length_new_shoot1_leaf5", "Length_new_shoot1_leaf6", "Nbr_leaves_new_shoot2", "Length_new_shoot2_leaf1", "Length_new_shoot2_leaf2", "Length_new_shoot2_leaf3", "Length_new_shoot2_leaf4", "Length_new_shoot2_leaf5", "below_ground_weight", "above_ground_weight", "weight_new_shoot1", "weight_new_shoot2", "total_weight", "lesions.", "isAlive", "Length_flower1", "Length_bract1")]
-
-# binary survival column
-fit_trim$isAlive <- ifelse(fit_trim$isAlive == TRUE, 1, 0)
-
-# pop_trt factor for later significance testing
-fit_trim$pop_trt <- as.factor(paste0(fit_trim$pop, "_", fit_trim$trt))
-
-# length and weight growth
-# for the growth analyses, we want a df with no flowering individuals and no dead individuals
-fit_growth <- fit_trim_env[is.na(fit_trim_env$Length_flower1),]
-fit_growth <- fit_growth[fit_growth$isAlive == 1,]
-
-# standardized growth variables
-# length
-fit_growth$length_growth <- rowSums(fit_growth[,c("Growth_leaf1", "Growth_leaf2", "Growth_leaf3", "Growth_leaf4", "Growth_leaf5", "Growth_leaf6", "Growth_leaf7", "Length_new_leaf1", "Length_new_leaf2", "Length_new_leaf3", "Length_new_leaf4", "Length_new_leaf5", "Length_new_leaf6", "Length_new_shoot1_leaf1", "Length_new_shoot1_leaf2", "Length_new_shoot1_leaf3", "Length_new_shoot1_leaf4", "Length_new_shoot1_leaf5", "Length_new_shoot1_leaf6", "Length_new_shoot2_leaf1", "Length_new_shoot2_leaf2", "Length_new_shoot2_leaf3", "Length_new_shoot2_leaf4", "Length_new_shoot2_leaf5")], na.rm = T)
-
-# percent length growth
-fit_growth$length_std_change <- fit_growth$length_growth / fit_growth$length_longest_leaf_start
-
-# weight
-fit_growth$weight_change <- fit_growth$total_weight - fit_growth$weight_start
-
-# percent weight change
-fit_growth$weight_std_change <- fit_growth$weight_change / fit_growth$weight_start
-
-# ratio of above vs below ground weight
-fit_growth$above_below_weight_ratio <- fit_growth$above_ground_weight / fit_growth$below_ground_weight
-
-# write out for later analysis
-write.csv(fit_growth, "data/experiment/fit_growth_dat.csv")
-
 # add treatment block to both data frames for testing potential random effects
 # block changes every 8 IDs - note though that salinity was independently controlled in each bag, so block may not actually appropriate descriptor of design
 # note two plants were removed
@@ -472,4 +441,7 @@ summary(weight_saltemp_lm.1)
 anova(weight_saltemp_lm.1)
 
 sink()
+
+# write out other fitness for later analysis
+write.csv(fit_growth, "data/experiment/fit_growth_dat.csv")
 ```

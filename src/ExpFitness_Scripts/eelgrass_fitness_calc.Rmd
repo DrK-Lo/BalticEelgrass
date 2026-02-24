@@ -1,0 +1,71 @@
+---
+title: "eelgrass_fitness_calc"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Documents/Github/BalticEelgrass")
+
+# setwd
+setwd("/Users/camillerumberger/Documents/GitHub/BalticEelgrass")
+
+# libraries
+library(tidyverse)
+library(psych)
+library(stringr)
+library(lme4)
+library(lmerTest)
+library(multcompView)
+library(car)
+library(performance)
+library(corrplot)
+
+# data
+fit <- read.csv("data/experiment/eelgrass_mesocosm_start_end_complete.csv")[,-1]
+```
+
+# Fitness Calculation
+
+This script is to calculate survival and growth in the mesocosm experiments. 
+
+## Data processing
+
+```{r data pre-process}
+# data cleaning to just relevant columns
+fit_trim <- fit[,c("DNA_label", "new_label", "pop", "genet", "bagnum", "tank_ID", "sal_full", "temp_full", "trt", "nbr_leaves_start", "sideShoot", "nbr_sideShootLeaves_start", "length_longest_leaf_start", "weight_start", "IsBlackLesions_start", "nbr_leaves_end", "nbr_new_leaves", "width_leaf", "Growth_leaf1", "Growth_leaf2", "Growth_leaf3", "Growth_leaf4", "Growth_leaf5", "Growth_leaf6", "Growth_leaf7", "Length_new_leaf1", "Length_new_leaf2", "Length_new_leaf3", "Length_new_leaf4", "Length_new_leaf5", "Length_new_leaf6", "Nbr_new_shoots", "Nbr_leaves_new_shoot1", "Length_new_shoot1_leaf1", "Length_new_shoot1_leaf2", "Length_new_shoot1_leaf3", "Length_new_shoot1_leaf4", "Length_new_shoot1_leaf5", "Length_new_shoot1_leaf6", "Nbr_leaves_new_shoot2", "Length_new_shoot2_leaf1", "Length_new_shoot2_leaf2", "Length_new_shoot2_leaf3", "Length_new_shoot2_leaf4", "Length_new_shoot2_leaf5", "below_ground_weight", "above_ground_weight", "weight_new_shoot1", "weight_new_shoot2", "total_weight", "lesions.", "isAlive", "Length_flower1", "Length_bract1")]
+
+# binary survival column
+fit_trim$isAlive <- ifelse(fit_trim$isAlive == TRUE, 1, 0)
+
+# pop_trt factor for later significance testing
+fit_trim$pop_trt <- as.factor(paste0(fit_trim$pop, "_", fit_trim$trt))
+
+# length and weight growth
+# for the growth analyses, we want a df with no flowering individuals and no dead individuals
+fit_growth <- fit_trim_env[is.na(fit_trim_env$Length_flower1),]
+fit_growth <- fit_growth[fit_growth$isAlive == 1,]
+
+# standardized growth variables
+# length
+fit_growth$length_growth <- rowSums(fit_growth[,c("Growth_leaf1", "Growth_leaf2", "Growth_leaf3", "Growth_leaf4", "Growth_leaf5", "Growth_leaf6", "Growth_leaf7", "Length_new_leaf1", "Length_new_leaf2", "Length_new_leaf3", "Length_new_leaf4", "Length_new_leaf5", "Length_new_leaf6", "Length_new_shoot1_leaf1", "Length_new_shoot1_leaf2", "Length_new_shoot1_leaf3", "Length_new_shoot1_leaf4", "Length_new_shoot1_leaf5", "Length_new_shoot1_leaf6", "Length_new_shoot2_leaf1", "Length_new_shoot2_leaf2", "Length_new_shoot2_leaf3", "Length_new_shoot2_leaf4", "Length_new_shoot2_leaf5")], na.rm = T)
+
+# percent length growth
+fit_growth$length_std_change <- fit_growth$length_growth / fit_growth$length_longest_leaf_start
+
+# weight
+fit_growth$weight_change <- fit_growth$total_weight - fit_growth$weight_start
+
+# percent weight change
+fit_growth$weight_std_change <- fit_growth$weight_change / fit_growth$weight_start
+
+# ratio of above vs below ground weight
+fit_growth$above_below_weight_ratio <- fit_growth$above_ground_weight / fit_growth$below_ground_weight
+
+# save outputs
+write.csv(fit_trim, "data/experiment/expfit_trim.csv", row.names = F)
+write.csv(fit_growth, "data/experiment/expfit_grow_trim.csv", row.names = F)
+```
+
