@@ -10,9 +10,11 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = "~/Eelgrass/BalticEelgrass/")
 
 # packages
+library(car)
 library(tidyverse)
 library(dplyr)
 library(ggplot2)
+library(stringr)
 
 # data
 # exp fit
@@ -77,10 +79,22 @@ go_long <- go_wide %>% pivot_longer(
 head(surv)
 dim(surv)
 surv$trt <- gsub("_", "-", surv$trt)
+fit_full$isAlive <- ifelse(fit_full$isAlive == TRUE, 1, 0)
+
+# surv only fitness, all plants
+surv_all <- fit_full[,c("pop", "trt", "tank_ID", "isAlive")]
+surv_all$trt <- gsub("_", "-", surv_all$trt)
+  
+# also a format with survival in each tank/pop/trt
+surv_tanks <- fit_full %>% 
+  dplyr::select(pop, trt, tank_ID, isAlive) %>%
+  group_by(pop, tank_ID, trt) %>%
+  summarize(surv = mean(isAlive),
+            surv_se = sd(isAlive)/length(isAlive))
 
 # growth
 head(grow)
-grow_trim <- grow[,c("trt", "pop","pop_trt", "length_growth", "length_std_change", "weight_change", "weight_std_change", "above_below_weight_ratio")]
+grow_trim <- grow[,c("trt", "pop", "pop_trt", "tank_ID", "length_growth", "length_std_change", "weight_change", "weight_std_change", "above_below_weight_ratio")]
 grow_trim$trt <- gsub("_","-",grow_trim$trt)
 
 # some pop/trt level data
@@ -95,14 +109,31 @@ grow_pop_trt <- grow_trim %>%
 
 ### GO v Fitness
 
+#### Data Merge
+
 ```{r}
 # combine fitness and offset data
 surv_go <- merge(go_wide, surv, by = c("pop", "trt"))
 grow_go <- merge(go_wide, grow_trim, by = c("pop", "trt"))
+surv_all_go <- merge(go_long, surv_all, by = c("pop", "trt"))
+
+# add surv col to surv_all_go from isAlive for consistency in corr analysis
+surv_all_go$surv <- surv_all_go$isAlive
+
+# recode method
+surv_all_go$method <- str_split_fixed(surv_all_go$method, "_", 2)[,1]
+
+# numeric tank coding
+tanks_df <- data.frame(tank_ID = levels(as.factor(surv_all_go$tank_ID)),
+                       tank_num = 1:length(levels(as.factor(surv_all_go$tank_ID))))
+surv_all_go <- merge(surv_all_go, tanks_df, by = "tank_ID")
+surv_all_go$tank_num <- as.numeric(surv_all_go$tank_num)
 
 # full vs mll (plotting)
 surv_go_full <- surv_go[surv_go$cc == "full",]
 surv_go_mll <- surv_go[surv_go$cc == "mll",]
+surv_all_go_full <- surv_all_go[surv_all_go$cc == "full",]
+surv_all_go_mll <- surv_all_go[surv_all_go$cc == "mll",]
 grow_go_full <- grow_go[grow_go$cc == "full",]
 grow_go_mll <- grow_go[grow_go$cc == "mll",]
 
@@ -111,11 +142,16 @@ surv_go_long <- surv_go %>% pivot_longer(names_to = "method", cols = c("lea_offs
 surv_go_long$method <- str_split_fixed(surv_go_long$method, "_", 2)[,1]
 grow_go_long <- grow_go %>% pivot_longer(names_to = "method", cols = c("lea_offset", "rda_offset", "gf_offset"), values_to = "offset") %>% as.data.frame()
 grow_go_long$method <- str_split_fixed(grow_go_long$method, "_", 2)[,1]
+# surv all is already long format
 
-# correlation/signif testing 
+# for correlation/signif testing 
 trts <- levels(as.factor(surv_go$trt))
 pops <- levels(as.factor(surv_go$pop))
+```
 
+#### Correlations
+
+```{r}
 ## SURVIVAL
 ###########
 # function for correlations both common garden/current future offset
@@ -177,12 +213,26 @@ surv_corr_cg <- rbind(surv_corr(surv_go_long, "lea", "full", "cg"),
                       surv_corr(surv_go_long, "rda", "mll", "cg"),
                       surv_corr(surv_go_long, "gf", "mll", "cg"))
 
+surv_corr_all_cf <- rbind(surv_corr(surv_all_go, "lea", "full", "cg"),
+                      surv_corr(surv_all_go, "rda", "full", "cg"),
+                      surv_corr(surv_all_go, "gf", "full", "cg"),
+                      surv_corr(surv_all_go, "lea", "mll", "cg"),
+                      surv_corr(surv_all_go, "rda", "mll", "cg"),
+                      surv_corr(surv_all_go, "gf", "mll", "cg"))
+
 surv_corr_cf <- rbind(surv_corr(surv_go_long, "lea", "full", "cf"),
                       surv_corr(surv_go_long, "rda", "full", "cf"),
                       surv_corr(surv_go_long, "gf", "full", "cf"),
                       surv_corr(surv_go_long, "lea", "mll", "cf"),
                       surv_corr(surv_go_long, "rda", "mll", "cf"),
                       surv_corr(surv_go_long, "gf", "mll", "cf"))
+
+surv_corr_all_cf <- rbind(surv_corr(surv_all_go, "lea", "full", "cf"),
+                      surv_corr(surv_all_go, "rda", "full", "cf"),
+                      surv_corr(surv_all_go, "gf", "full", "cf"),
+                      surv_corr(surv_all_go, "lea", "mll", "cf"),
+                      surv_corr(surv_all_go, "rda", "mll", "cf"),
+                      surv_corr(surv_all_go, "gf", "mll", "cf"))
 ###########
 
 ## GROWTH
@@ -264,6 +314,189 @@ grow_corr_cf <- rbind(grow_corr(grow_go_long, "lea", "full", "cf"),
 #########
 ```
 
+#### Modeling
+
+```{r}
+# survival
+##########
+# quick checks + fixes
+hist(surv_all_go$surv) # we will use binary outcomes first
+
+## lea
+# model full (no cc)
+surv_mod_lea_full <- glm(isAlive ~ offset,
+               family = binomial(link = "logit"),
+               data = surv_all_go_full[surv_all_go_full$method == "lea",])
+summary(surv_mod_lea_full) 
+#plot(surv_mod_lea_full) # these look pretty bad
+Anova(surv_mod_lea_full) # signif
+
+# model mll (cc)
+surv_mod_lea_mll <- glm(isAlive ~ offset,
+               family = binomial(link = "logit"),
+               data = surv_all_go_mll[surv_all_go_mll$method == "lea",])
+summary(surv_mod_lea_mll) 
+#plot(surv_mod_lea_mll) # these look pretty bad
+Anova(surv_mod_lea_mll) # signif
+
+# now the tank level pop/trt
+surv_mod_lea_poptrt_full <- glm(surv ~ lea_offset,
+               family = binomial(link = "logit"),
+               data = surv_go)
+summary(surv_mod_lea_poptrt_full) 
+#plot(surv_mod_lea_full)
+Anova(surv_mod_lea_poptrt_full) # signif
+
+## rda
+# model full (no cc)
+surv_mod_rda_full <- glm(isAlive ~ offset,
+               family = binomial(link = "logit"),
+               data = surv_all_go_full[surv_all_go_full$method == "rda",])
+summary(surv_mod_rda_full) 
+#plot(surv_mod_rda_full) # these look pretty bad
+Anova(surv_mod_rda_full) # signif
+
+# model mll (cc)
+surv_mod_rda_mll <- glm(isAlive ~ offset,
+               family = binomial(link = "logit"),
+               data = surv_all_go_mll[surv_all_go_mll$method == "rda",])
+summary(surv_mod_rda_mll) 
+#plot(surv_mod_rda_mll) # these look pretty bad
+Anova(surv_mod_rda_mll) # signif
+
+# now the tank level pop/trt
+surv_mod_rda_poptrt_full <- glm(surv ~ rda_offset,
+               family = binomial(link = "logit"),
+               data = surv_go)
+summary(surv_mod_rda_poptrt_full) 
+#plot(surv_mod_rda_full)
+Anova(surv_mod_rda_poptrt_full) # signif
+
+## gf
+# model full (no cc)
+surv_mod_gf_full <- glm(isAlive ~ offset,
+               family = binomial(link = "logit"),
+               data = surv_all_go_full[surv_all_go_full$method == "gf",])
+summary(surv_mod_gf_full) 
+#plot(surv_mod_gf_full) # these look pretty bad
+Anova(surv_mod_gf_full) # signif
+
+# model mll (cc)
+surv_mod_gf_mll <- glm(isAlive ~ offset,
+               family = binomial(link = "logit"),
+               data = surv_all_go_mll[surv_all_go_mll$method == "gf",])
+summary(surv_mod_gf_mll) 
+#plot(surv_mod_gf_mll) # these look pretty bad
+Anova(surv_mod_gf_mll) # signif
+
+# now the tank level pop/trt
+surv_mod_gf_poptrt_full <- glm(surv ~ gf_offset,
+               family = binomial(link = "logit"),
+               data = surv_go_full)
+summary(surv_mod_gf_poptrt_full) 
+#plot(surv_mod_gf_poptrt_full) # better than binary model
+Anova(surv_mod_gf_poptrt_full) # signif
+
+surv_mod_gf_poptrt_mll <- glm(surv ~ gf_offset,
+               family = binomial(link = "logit"),
+               data = surv_go_mll)
+summary(surv_mod_gf_poptrt_mll) 
+#plot(surv_mod_gf_poptrt_mll)
+Anova(surv_mod_gf_poptrt_mll) # signif
+##########
+
+# length
+########
+# quick checks + fixes
+hist(grow_go$length_std_change) 
+hist(log(grow_go$length_std_change)) # log-normal distribution
+
+## lea
+# model full (no cc)
+len_mod_lea_full <- lm(length_std_change ~ log(lea_offset), data = grow_go_full)
+summary(len_mod_lea_full) 
+#plot(len_mod_lea_full) # diverges pretty significantly on right tail
+Anova(len_mod_lea_full) # signif
+
+# model mll (cc)
+len_mod_lea_mll <- lm(length_std_change ~ log(lea_offset), data = grow_go_mll)
+summary(len_mod_lea_mll) 
+#plot(len_mod_lea_mll) # diverges pretty significantly on right tail
+Anova(len_mod_lea_mll) # signif
+
+## rda
+# model full (no cc)
+len_mod_rda_full <- lm(length_std_change ~ log(rda_offset), data = grow_go_full)
+summary(len_mod_rda_full) 
+#plot(len_mod_rda_full) # diverges pretty significantly on right tail
+Anova(len_mod_rda_full) # signif
+
+# model mll (cc)
+len_mod_rda_mll <- lm(length_std_change ~ log(rda_offset), data = grow_go_mll)
+summary(len_mod_rda_mll) 
+#plot(len_mod_rda_mll) # diverges pretty significantly on right tail
+Anova(len_mod_rda_mll) # signif
+
+## gf
+# model full (no cc)
+len_mod_gf_full <- lm(length_std_change ~ log(gf_offset), data = grow_go_full)
+summary(len_mod_gf_full) 
+#plot(len_mod_gf_full) # diverges pretty significantly on right tail
+Anova(len_mod_gf_full) # signif
+
+# model mll (cc)
+len_mod_gf_mll <- lm(length_std_change ~ log(gf_offset), data = grow_go_mll)
+summary(len_mod_gf_mll) 
+#plot(len_mod_gf_mll) # diverges pretty significantly on right tail
+Anova(len_mod_gf_mll) # signif
+########
+
+# weight
+########
+# quick checks + fixes
+hist(grow_go$weight_std_change) # normal distribution :D
+
+## lea
+# model full (no cc)
+weigh_mod_lea_full <- lm(weight_std_change ~ lea_offset, data = grow_go_full)
+summary(weigh_mod_lea_full) 
+#plot(weigh_mod_lea_full) # diverges pretty significantly on right tail
+Anova(weigh_mod_lea_full) # signif
+
+# model mll (cc)
+weigh_mod_lea_mll <- lm(weight_std_change ~ lea_offset, data = grow_go_mll)
+summary(weigh_mod_lea_mll) 
+#plot(weigh_mod_lea_mll) # diverges pretty significantly on right tail
+Anova(weigh_mod_lea_mll) # signif
+
+## rda
+# model full (no cc)
+weigh_mod_rda_full <- lm(weight_std_change ~ (rda_offset), data = grow_go_full)
+summary(weigh_mod_rda_full) 
+#plot(weigh_mod_rda_full) # diverges pretty significantly on right tail
+Anova(weigh_mod_rda_full) # signif
+
+# model mll (cc)
+weigh_mod_rda_mll <- lm(weight_std_change ~ (rda_offset), data = grow_go_mll)
+summary(weigh_mod_rda_mll) 
+#plot(weigh_mod_rda_mll) # diverges pretty significantly on right tail
+Anova(weigh_mod_rda_mll) # signif
+
+## gf
+# model full (no cc)
+weigh_mod_gf_full <- lm(weight_std_change ~ (gf_offset), data = grow_go_full)
+summary(weigh_mod_gf_full) 
+#plot(weigh_mod_gf_full) # diverges pretty significantly on right tail
+Anova(weigh_mod_gf_full) # signif
+
+# model mll (cc)
+weigh_mod_gf_mll <- lm(weight_std_change ~ (gf_offset), data = grow_go_mll)
+summary(weigh_mod_gf_mll) 
+#plot(weigh_mod_gf_mll) # diverges pretty significantly on right tail
+Anova(weigh_mod_gf_mll) # signif
+########
+```
+
 ### Plotting
 
 #### Survival
@@ -271,6 +504,7 @@ grow_corr_cf <- rbind(grow_corr(grow_go_long, "lea", "full", "cf"),
 ```{r}
 ## lea
 ######
+# means by pop/treatment
 # common garden: LEA
 surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = trt)) +
   geom_point(shape = 21, size = 4) + 
@@ -308,12 +542,12 @@ surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = pop)) +
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): Survival", 
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
                     labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
                     labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
   theme_minimal()
 surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = pop)) +
@@ -322,12 +556,81 @@ surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = pop)) +
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): Survival", 
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
                     labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme_minimal()
+
+# binary outcome, full data
+# common garden: LEA
+surv_all_go_full %>% 
+  filter(method == "lea") %>%
+  ggplot(aes(x = offset, y = surv, fill = trt)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): \nBinary Survival",
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme_minimal()
+surv_all_go_mll %>% 
+  filter(method == "lea") %>%
+  ggplot(aes(x = offset, y = surv, fill = trt)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival",
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme_minimal()
+
+# current future: LEA
+surv_all_go_full %>%
+  filter(method == "lea") %>%
+  ggplot(aes(x = offset, y = surv, fill = pop)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): \nBinary Survival", 
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme_minimal()
+surv_all_go_mll %>% 
+  filter(method == "lea") %>%
+  ggplot(aes(x = offset, y = surv, fill = pop)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival", 
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
                     labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
   theme_minimal()
 ######
@@ -335,7 +638,8 @@ surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = pop)) +
 ## rda
 ######
 # common garden: RDA
-surv_go_full %>% ggplot(aes(x = rda_offset, y = surv, fill = trt)) +
+surv_go_full %>% 
+  ggplot(aes(x = rda_offset, y = surv, fill = trt)) +
   geom_point(shape = 21, size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
   labs(title = "Common Garden Fitness vs Genomic Offset (RDA, Full): Survival",
@@ -371,12 +675,12 @@ surv_go_full %>% ggplot(aes(x = rda_offset, y = surv, fill = pop)) +
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): Survival", 
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
                     labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
                     labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
   theme_minimal()
 surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = pop)) +
@@ -385,18 +689,88 @@ surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = pop)) +
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): Survival", 
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
                     labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme_minimal()
+
+# binary
+# common garden: RDA
+surv_all_go_full %>% 
+  filter(method == "rda") %>% 
+  ggplot(aes(x = offset, y = surv, fill = trt)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (RDA, Full): \nBinary Survival",
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme_minimal()
+surv_all_go_mll %>% 
+  filter(method == "rda") %>% 
+  ggplot(aes(x = offset, y = surv, fill = trt)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (RDA, MLL): \nBinary Survival",
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme_minimal()
+
+# current future: RDA
+surv_all_go_full %>% 
+  filter(method == "rda") %>% 
+  ggplot(aes(x = offset, y = surv, fill = pop)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): \nBinary Survival", 
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme_minimal()
+surv_all_go_mll %>% 
+  filter(method == "rda") %>% 
+  ggplot(aes(x = offset, y = surv, fill = pop)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): \nBinary Survival", 
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
                     labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
   theme_minimal()
 ######
 
 ## gf
 ######
+# proportions
 # common garden: GF
 surv_go_full %>% ggplot(aes(x = gf_offset, y = surv, fill = trt)) +
   geom_point(shape = 21, size = 4) + 
@@ -434,12 +808,12 @@ surv_go_full %>% ggplot(aes(x = gf_offset, y = surv, fill = pop)) +
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): Survival", 
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
                     labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
                     labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
   theme_minimal()
 surv_go_mll %>% ggplot(aes(x = gf_offset, y = surv, fill = pop)) +
@@ -448,12 +822,81 @@ surv_go_mll %>% ggplot(aes(x = gf_offset, y = surv, fill = pop)) +
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): Survival", 
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
                     labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#caf0f8","#90e0ef","#0096c7","#023e8a"),
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme_minimal()
+
+# binary
+# common garden: GF
+surv_all_go_full %>% 
+  filter(method == "gf") %>% 
+  ggplot(aes(x = offset, y = surv, fill = trt)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): \nBinary Survival",
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme_minimal()
+surv_all_go_mll %>% 
+  filter(method == "gf") %>% 
+  ggplot(aes(x = offset, y = surv, fill = trt)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): \nBinary Survival",
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme_minimal()
+
+# current future: GF
+surv_all_go_full %>% 
+  filter(method == "gf") %>% 
+  ggplot(aes(x = offset, y = surv, fill = pop)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): \nBinary Survival", 
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme_minimal()
+surv_all_go_mll %>% 
+  filter(method == "gf") %>% 
+  ggplot(aes(x = offset, y = surv, fill = pop)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): \nBinary Survival", 
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
                     labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
   theme_minimal()
 ######
@@ -653,3 +1096,197 @@ grow_go_mll %>% ggplot(aes(x = gf_offset, y = length_std_change, fill = pop)) +
   theme_minimal()
 ######
 ```
+
+#### Weight
+
+```{r}
+## lea
+######
+# common garden: LEA
+grow_go_full %>% ggplot(aes(x = lea_offset, y = weight_std_change, fill = trt)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): Weight",
+       x = "LEA offset", y = "Weight") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = lea_offset, y = weight_std_change, fill = trt)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): Weight",
+       x = "LEA offset", y = "Weight") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme_minimal()
+
+# current future: LEA
+grow_go_full %>% ggplot(aes(x = lea_offset, y = weight_std_change, fill = pop)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): Weight", 
+       x = "LEA offset", y = "Weight") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = lea_offset, y = weight_std_change, fill = pop)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): Weight", 
+       x = "LEA offset", y = "Weight") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme_minimal()
+######
+
+## rda
+######
+# common garden: RDA
+grow_go_full %>% ggplot(aes(x = rda_offset, y = weight_std_change, fill = trt)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (RDA, Full): Weight",
+       x = "RDA offset", y = "Weight") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = rda_offset, y = weight_std_change, fill = trt)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (RDA, MLL): Weight",
+       x = "RDA offset", y = "Weight") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme_minimal()
+
+# current future: RDA
+grow_go_full %>% ggplot(aes(x = rda_offset, y = weight_std_change, fill = pop)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): Weight", 
+       x = "RDA offset", y = "Weight") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = rda_offset, y = weight_std_change, fill = pop)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): Weight", 
+       x = "RDA offset", y = "Weight") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme_minimal()
+######
+
+## gf
+######
+# common garden: GF
+grow_go_full %>% ggplot(aes(x = gf_offset, y = weight_std_change, fill = trt)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): Weight",
+       x = "GF offset", y = "Weight") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = gf_offset, y = weight_std_change, fill = trt)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): Weight",
+       x = "GF offset", y = "Weight") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme_minimal()
+
+# current future: GF
+grow_go_full %>% ggplot(aes(x = gf_offset, y = weight_std_change, fill = pop)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): Weight", 
+       x = "GF offset", y = "Weight") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = gf_offset, y = weight_std_change, fill = pop)) +
+  geom_point(shape = 21, size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): Weight", 
+       x = "GF offset", y = "Weight") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme_minimal()
+######
+```
+

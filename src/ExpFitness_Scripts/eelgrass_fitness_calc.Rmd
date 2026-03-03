@@ -14,17 +14,13 @@ setwd("/Users/camillerumberger/Documents/GitHub/BalticEelgrass")
 
 # libraries
 library(tidyverse)
-library(psych)
 library(stringr)
-library(lme4)
-library(lmerTest)
-library(multcompView)
-library(car)
-library(performance)
-library(corrplot)
+library(ggplot2)
+library(viridis)
 
 # data
 fit <- read.csv("data/experiment/eelgrass_mesocosm_start_end_complete.csv")[,-1]
+exp_pops <- read.csv("data/experiment/eelgrass_exp_sites.csv")
 ```
 
 # Fitness Calculation
@@ -52,20 +48,192 @@ fit_growth <- fit_growth[fit_growth$isAlive == 1,]
 # length
 fit_growth$length_growth <- rowSums(fit_growth[,c("Growth_leaf1", "Growth_leaf2", "Growth_leaf3", "Growth_leaf4", "Growth_leaf5", "Growth_leaf6", "Growth_leaf7", "Length_new_leaf1", "Length_new_leaf2", "Length_new_leaf3", "Length_new_leaf4", "Length_new_leaf5", "Length_new_leaf6", "Length_new_shoot1_leaf1", "Length_new_shoot1_leaf2", "Length_new_shoot1_leaf3", "Length_new_shoot1_leaf4", "Length_new_shoot1_leaf5", "Length_new_shoot1_leaf6", "Length_new_shoot2_leaf1", "Length_new_shoot2_leaf2", "Length_new_shoot2_leaf3", "Length_new_shoot2_leaf4", "Length_new_shoot2_leaf5")], na.rm = T)
 
-# percent length growth
+# standardized length growth
 fit_growth$length_std_change <- fit_growth$length_growth / fit_growth$length_longest_leaf_start
 
 # weight
 fit_growth$weight_change <- fit_growth$total_weight - fit_growth$weight_start
 
-# percent weight change
+# standardized weight change
 fit_growth$weight_std_change <- fit_growth$weight_change / fit_growth$weight_start
 
 # ratio of above vs below ground weight
 fit_growth$above_below_weight_ratio <- fit_growth$above_ground_weight / fit_growth$below_ground_weight
 
 # save outputs
-write.csv(fit_trim, "data/experiment/expfit_trim.csv", row.names = F)
-write.csv(fit_growth, "data/experiment/expfit_grow_trim.csv", row.names = F)
+#write.csv(fit_trim, "data/experiment/expfit_trim.csv", row.names = F)
+#write.csv(fit_growth, "data/experiment/expfit_grow_trim.csv", row.names = F)
 ```
+
+## Fitness Metrics
+
+I will calculate pop/trt level survival, length change, and weight change.
+
+```{r}
+# just survival info
+fit_surv <- fit_trim[,c("new_label","bagnum","tank_ID","pop","trt","pop_trt","isAlive")]
+
+# calculate survival
+surv <- fit_surv %>% 
+  group_by(pop, trt) %>% 
+  summarize(surv_mean = mean(isAlive), 
+            surv_sd = sd(isAlive))
+
+# calculate growth
+grow <- fit_growth %>% 
+  group_by(pop, trt) %>% 
+  summarize(len_mean = mean(length_std_change, na.rm = T), 
+            len_sd = sd(length_std_change, na.rm = T), 
+            weigh_mean = mean(weight_std_change, na.rm = T), 
+            weigh_sd = sd(weight_std_change, na.rm = T))
+
+# put it together
+expfit <- merge(surv, grow, by = c("pop", "trt"), all = T)
+
+# add pop info
+exp_pops$order <- 1:8
+exp_pops$pop <- exp_pops$site_abbrev
+expfit_mg <- merge(exp_pops, expfit, by = "pop")
+```
+
+## Plotting
+
+Plotting averages
+
+```{r}
+# survival
+ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, fill = surv_mean)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "viridis", direction = 1, limits = c(0,1), na.value = "white") +
+  theme_classic() +
+  labs(title = "Survival in Mesocosm Treatments", x = "Population", y = "Treatment", fill = "Survival")
+
+# length
+ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, fill = len_mean)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "viridis", direction = 1, limits = c(0,5), na.value = "white") +
+  theme_classic() +
+  labs(title = "Length Change in Mesocosm Treatments", x = "Population", y = "Treatment", fill = "∆Length")
+
+# weight
+ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, fill = weigh_mean)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "viridis", direction = 1, limits = c(-0.7,0.4), na.value = "white") +
+  theme_classic() +
+  labs(title = "Weight Change in Mesocosm Treatments", x = "Population", y = "Treatment", fill = "∆Weight")
+```
+
+Plotting common garden vs current future comparisons
+
+```{r}
+## survival
+###########
+trt_order <- c("TempControl_21psu", "TempWarm_16psu", "TempControl_7psu", "TempWarm_5psu")
+
+# pop x trt
+ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = surv_mean, fill = trt)) +
+  theme_classic() +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#5bc0be","#a5be00","#003459","#245501"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme(plot.title = element_text(size = 24), 
+        plot.subtitle = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "right") +
+  xlab("Population") + 
+  ylab("Survival") +
+  ggtitle("Survival by Population & Treatment", subtitle = "Current-Future Comparison")
+
+# pop x trt
+ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = surv_mean, fill = pop)) +
+  theme_classic() +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme(plot.title = element_text(size = 24), 
+        plot.subtitle = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "right") +
+  xlab("Population") + 
+  ylab("Survival") +
+  ggtitle("Survival by Treatment & Population", subtitle = "Common Garden Comparison")
+###########
+
+## length
+#########
+trt_order <- c("TempControl_21psu", "TempWarm_16psu", "TempControl_7psu", "TempWarm_5psu")
+
+# pop x trt
+ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = len_mean, fill = trt)) +
+  theme_classic() +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme(plot.title = element_text(size = 24), 
+        plot.subtitle = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "right") +
+  xlab("Population") + 
+  ylab("∆Length (cm)") +
+  ggtitle("Length Change by Population & Treatment", subtitle = "Current-Future Comparison")
+
+# pop x trt
+ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = len_mean, fill = pop)) +
+  theme_classic() +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme(plot.title = element_text(size = 24), 
+        plot.subtitle = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "right") +
+  xlab("Population") + 
+  ylab("∆Length (cm)") +
+  ggtitle("Length Change by Treatment & Population", subtitle = "Common Garden Comparison")
+#########
+
+## weight chg
+#############
+# pop x trt
+ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = weigh_mean, fill = trt)) +
+  theme_classic() +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  theme(plot.title = element_text(size = 24), 
+        plot.subtitle = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "right") +
+  xlab("Population") + 
+  ylab("∆Weight (g)") +
+  ggtitle("Weight Change by Population & Treatment", subtitle = "Current-Future Comparison")
+
+# pop x trt
+ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = weigh_mean, fill = pop)) +
+  theme_classic() +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  scale_fill_manual(name = "Population",
+                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  theme(plot.title = element_text(size = 24), 
+        plot.subtitle = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "right") +
+  xlab("Population") + 
+  ylab("∆Weight (g)") +
+  ggtitle("Weight Change by Treatment & Population", subtitle = "Common Garden Comparison")
+#############
+```
+
 
