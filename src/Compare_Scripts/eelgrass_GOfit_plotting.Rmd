@@ -1,0 +1,1121 @@
+---
+title: "Eelgrass GO Fitness Comparison Plotting"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Genomic-Offset Fitness-Offset Plotting
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Documents/GitHub/BalticEelgrass")
+
+# packages
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(forcats)
+
+# data
+# exp fit
+surv_go <- read.csv("results/GO_compare/survival_offset_avgs.csv")
+surv_all_go <- read.csv("results/GO_compare/survival_offset_binary.csv")
+grow_go <- read.csv("results/GO_compare/grow_offset.csv")
+surv_corrs_cf <- read.csv("results/GO_compare/surv_corrs_cf.csv")
+surv_corrs_cg <- read.csv("results/GO_compare/surv_corrs_cg.csv")
+grow_corrs_cf <- read.csv("results/GO_compare/grow_corr_cf.csv")
+grow_corrs_cg <- read.csv("results/GO_compare/grow_corr_cg.csv")
+```
+
+## Data Cleaning & Setup
+
+```{r}
+# quick checks
+
+# add pop coast and trt coast to all dfs for plotting
+pop_coast <- data.frame(pop = c("VIK","VAT","HOG","BAR",
+                                "KUR","KAL","HOR","BJO"),
+                        pop_ord = 1:8,
+                        pop_coast = c("West", "West", "West", "West", 
+                                      "East", "East", "East", "East"),
+                        pop_coast_ord = c(1,1,1,1,2,2,2,2))
+trt_coast <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", 
+                                "TempWarm-16psu", "TempWarm-5psu"),
+                        trt_ord = 1:4,
+                        trt_coast = c("West", "East", "West", "East"),
+                        trt_coast_ord = c(1,2,1,2))
+surv_go1 <- merge(surv_go, pop_coast, by = "pop")
+surv_go2 <- merge(surv_go1, trt_coast, by = "trt")
+surv_all_go1 <- merge(surv_all_go, pop_coast, by = "pop")
+surv_all_go2 <- merge(surv_all_go1, trt_coast, by = "trt")
+grow_go1 <- merge(grow_go, pop_coast, by = "pop")
+grow_go2 <- merge(grow_go1, trt_coast, by = "trt")
+
+# add significance of correlations
+
+
+# full vs mll (plotting)
+surv_go_full <- surv_go2[surv_go2$cc == "full",]
+surv_go_mll <- surv_go2[surv_go2$cc == "mll",]
+surv_all_go_full <- surv_all_go2[surv_all_go2$cc == "full",]
+surv_all_go_mll <- surv_all_go2[surv_all_go2$cc == "mll",]
+grow_go_full <- grow_go2[grow_go2$cc == "full",]
+grow_go_mll <- grow_go2[grow_go2$cc == "mll",]
+
+# significant lines code
+#geom_smooth(method = "lm", data = fullfit[fullfit$bag_site == "YorkRiver" & fullfit$event == 4,], aes(x = offset_lea_go_yrk, y = surv), col = "purple4", fill = "purple4", se = T, linetype = ifelse(corrs_df[corrs_df$method == "lea" & corrs_df$biotic == "b" & corrs_df$sel == "sel" & corrs_df$bag_site == "YorkRiver" & corrs_df$event == 4,]$signif_surv_adj == T, "solid", "dashed")) +
+```
+
+## Plotting
+
+### Survival
+
+LEA
+
+```{r}
+# means by pop/treatment
+# common garden: LEA
+####################
+surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): Survival",
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21)))+
+  theme_minimal()
+surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): Survival",
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21)))+
+  theme_minimal()
+####################
+
+# current future: LEA
+#####################
+surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): Survival", 
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): Survival", 
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+#####################
+
+# binary outcome
+# common garden: LEA
+####################
+surv_all_go_full %>% 
+  filter(method == "lea") %>%
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): \nBinary Survival",
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21)))+
+  theme_minimal()
+surv_all_go_mll %>% 
+  filter(method == "lea") %>%
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival",
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21)))+
+  theme_minimal()
+surv_all_go_full %>% 
+  filter(method == "lea") %>%
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): \nBinary Survival",
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21)))+
+  theme_minimal()
+####################
+
+# current future: LEA
+#####################
+surv_all_go_full %>%
+  filter(method == "lea") %>%
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): \nBinary Survival", 
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_all_go_mll %>% 
+  filter(method == "lea") %>%
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival", 
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+#####################
+```
+
+RDA
+
+```{r}
+# common garden: RDA
+####################
+surv_go_full %>% 
+  ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (RDA, Full): Survival",
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21)))+
+  theme_minimal()
+surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (RDA, MLL): Survival",
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21)))+
+  theme_minimal()
+####################
+
+# current future: RDA
+#####################
+surv_go_full %>% ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): Survival", 
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): Survival", 
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+#####################
+
+# binary
+# common garden: RDA
+####################
+surv_all_go_full %>% 
+  filter(method == "rda") %>% 
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (RDA, Full): \nBinary Survival",
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21)))+
+  theme_minimal()
+surv_all_go_mll %>% 
+  filter(method == "rda") %>% 
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (RDA, MLL): \nBinary Survival",
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+####################
+
+# current future: RDA
+#####################
+surv_all_go_full %>% 
+  filter(method == "rda") %>% 
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): \nBinary Survival", 
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_all_go_mll %>% 
+  filter(method == "rda") %>% 
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): \nBinary Survival", 
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+#####################
+```
+
+Gradient Forest
+
+```{r}
+# proportions
+# common garden: GF
+###################
+surv_go_full %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): Survival",
+       x = "GF offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_go_mll %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): Survival",
+       x = "GF offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+###################
+
+# current future: GF
+####################
+surv_go_full %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): Survival", 
+       x = "GF offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_go_mll %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): Survival", 
+       x = "GF offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+####################
+
+# binary
+# common garden: GF
+###################
+surv_all_go_full %>% 
+  filter(method == "gf") %>% 
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): \nBinary Survival",
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_all_go_mll %>% 
+  filter(method == "gf") %>% 
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): \nBinary Survival",
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+###################
+
+# current future: GF
+####################
+surv_all_go_full %>% 
+  filter(method == "gf") %>% 
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): \nBinary Survival", 
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_all_go_mll %>% 
+  filter(method == "gf") %>% 
+  ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): \nBinary Survival", 
+       x = "RDA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+####################
+```
+
+### Length
+
+LEA
+
+```{r}
+# common garden: LEA
+####################
+grow_go_full %>% ggplot(aes(x = lea_offset, y = length_std_change, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): Length",
+       x = "LEA offset", y = "Length") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = lea_offset, y = length_std_change, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): Length",
+       x = "LEA offset", y = "Length") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+####################
+
+# current future: LEA
+#####################
+grow_go_full %>% ggplot(aes(x = lea_offset, y = length_std_change, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): Length", 
+       x = "LEA offset", y = "Length") +
+  scale_fill_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#82daff","#0078cf","#0130b9","#002e5a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#82daff","#0078cf","#0130b9","#002e5a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = lea_offset, y = length_std_change, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): Length", 
+       x = "LEA offset", y = "Length") +
+  scale_fill_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#82daff","#0078cf","#0130b9","#002e5a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#82daff","#0078cf","#0130b9","#002e5a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+#####################
+```
+
+```{r}
+# common garden: RDA
+####################
+grow_go_full %>% ggplot(aes(x = rda_offset, y = length_std_change, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (RDA, Full): Length",
+       x = "RDA offset", y = "Length") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = rda_offset, y = length_std_change, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (RDA, MLL): Length",
+       x = "RDA offset", y = "Length") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+####################
+
+# current future: RDA
+#####################
+grow_go_full %>% ggplot(aes(x = rda_offset, y = length_std_change, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): Length", 
+       x = "RDA offset", y = "Length") +
+  scale_fill_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#82daff","#0078cf","#0130b9","#002e5a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#82daff","#0078cf","#0130b9","#002e5a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = rda_offset, y = length_std_change, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): Length", 
+       x = "RDA offset", y = "Length") +
+  scale_fill_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#82daff","#0078cf","#0130b9","#002e5a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#82daff","#0078cf","#0130b9","#002e5a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+#####################
+```
+
+Gradient Forest
+
+```{r}
+# common garden: GF
+###################
+grow_go_full %>% ggplot(aes(x = gf_offset, y = length_std_change, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): Length",
+       x = "GF offset", y = "Length") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = gf_offset, y = length_std_change, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): Length",
+       x = "GF offset", y = "Length") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+###################
+
+# current future: GF
+####################
+grow_go_full %>% ggplot(aes(x = gf_offset, y = length_std_change, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): Length", 
+       x = "GF offset", y = "Length") +
+  scale_fill_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#82daff","#0078cf","#0130b9","#002e5a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#82daff","#0078cf","#0130b9","#002e5a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = gf_offset, y = length_std_change, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): Length", 
+       x = "GF offset", y = "Length") +
+  scale_fill_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#82daff","#0078cf","#0130b9","#002e5a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
+                               "#82daff","#0078cf","#0130b9","#002e5a"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+####################
+```
+
+### Weight
+
+LEA
+
+```{r}
+# common garden: LEA
+####################
+grow_go_full %>% ggplot(aes(x = lea_offset, y = weight_std_change, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): Weight",
+       x = "LEA offset", y = "Weight") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = lea_offset, y = weight_std_change, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): Weight",
+       x = "LEA offset", y = "Weight") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+####################
+
+# current future: LEA
+#####################
+grow_go_full %>% ggplot(aes(x = lea_offset, y = weight_std_change, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): Weight", 
+       x = "LEA offset", y = "Weight") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = lea_offset, y = weight_std_change, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): Weight", 
+       x = "LEA offset", y = "Weight") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+#####################
+```
+
+RDA
+
+```{r}
+# common garden: RDA
+####################
+grow_go_full %>% ggplot(aes(x = rda_offset, y = weight_std_change, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (RDA, Full): Weight",
+       x = "RDA offset", y = "Weight") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = rda_offset, y = weight_std_change, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (RDA, MLL): Weight",
+       x = "RDA offset", y = "Weight") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+####################
+
+# current future: RDA
+#####################
+grow_go_full %>% ggplot(aes(x = rda_offset, y = weight_std_change, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): Weight", 
+       x = "RDA offset", y = "Weight") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = rda_offset, y = weight_std_change, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): Weight", 
+       x = "RDA offset", y = "Weight") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+#####################
+```
+
+Gradient Forest
+
+```{r}
+# common garden: GF
+###################
+grow_go_full %>% ggplot(aes(x = gf_offset, y = weight_std_change, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): Weight",
+       x = "GF offset", y = "Weight") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = gf_offset, y = weight_std_change, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = trt), method = "lm", se = T) + 
+  labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): Weight",
+       x = "GF offset", y = "Weight") +
+  scale_fill_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_colour_manual(name = "Treatment",
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+###################
+
+# current future: GF
+####################
+grow_go_full %>% ggplot(aes(x = gf_offset, y = weight_std_change, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): Weight", 
+       x = "GF offset", y = "Weight") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+grow_go_mll %>% ggplot(aes(x = gf_offset, y = weight_std_change, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+  geom_point(size = 4) + 
+  geom_smooth(aes(col = pop), method = "lm", se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): Weight", 
+       x = "GF offset", y = "Weight") +
+  scale_fill_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+####################
+```
