@@ -15,6 +15,8 @@ library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(stringr)
+library(knitr)
+library(kableExtra)
 
 # data
 # exp fit
@@ -332,10 +334,10 @@ grow_corr_cg$signif_weigh <- ifelse(grow_corr_cg$pval_weigh < 0.05, T, F)
 
 # save outputs
 ##############
-#write.csv(surv_corrs_cf, "results/GO_compare/surv_corrs_cf.csv")
-#write.csv(surv_corrs_cg, "results/GO_compare/surv_corrs_cg.csv")
-#write.csv(grow_corr_cf, "results/GO_compare/grow_corr_cf.csv")
-#write.csv(grow_corr_cg, "results/GO_compare/grow_corr_cg.csv")
+#write.csv(surv_corrs_cf, "results/GO_compare/surv_corrs_cf.csv", row.names = F)
+#write.csv(surv_corrs_cg, "results/GO_compare/surv_corrs_cg.csv", row.names = F)
+#write.csv(grow_corr_cf, "results/GO_compare/grow_corr_cf.csv", row.names = F)
+#write.csv(grow_corr_cg, "results/GO_compare/grow_corr_cg.csv", row.names = F)
 ##############
 ```
 
@@ -585,22 +587,31 @@ hist(surv_all_go$surv) # we will use binary outcomes first
 surv_pop_lea_full <- lm(isAlive ~ pop + offset,
                data = surv_all_go_full[surv_all_go_full$method == "lea",])
 summary(surv_pop_lea_full) 
-#plot(surv_pop_lea_full) # these look pretty bad, probably bc survival is binary
+#plot(surv_pop_lea_full)
 Anova(surv_pop_lea_full) # signif
 
 # model mll (cc)
 surv_pop_lea_mll <- lm(isAlive ~ pop + offset,
                data = surv_all_go_mll[surv_all_go_mll$method == "lea",])
 summary(surv_pop_lea_mll) 
-#plot(surv_pop_lea_mll) # these look pretty bad
+#plot(surv_pop_lea_mll)
 Anova(surv_pop_lea_mll) # signif
 
-# now the tank level pop/trt
-surv_pop_lea_poptrt_full <- lm(surv ~ pop + lea_offset,
-               data = surv_go)
-summary(surv_pop_lea_poptrt_full) 
-#plot(surv_pop_lea_poptrt_full)
-Anova(surv_pop_lea_poptrt_full) # signif
+# model full (no cc) log
+surv_pop_lea_full_log <- glm(isAlive ~ pop + offset,
+               data = surv_all_go_full[surv_all_go_full$method == "lea",],
+               family = binomial)
+summary(surv_pop_lea_full_log) 
+#plot(surv_pop_lea_full_log)
+Anova(surv_pop_lea_full_log) # signif
+
+# model mll (cc) log
+surv_pop_lea_mll_log <- glm(isAlive ~ pop + offset,
+               data = surv_all_go_mll[surv_all_go_mll$method == "lea",],
+               family = binomial)
+summary(surv_pop_lea_mll_log) 
+#plot(surv_pop_lea_mll_log)
+Anova(surv_pop_lea_mll_log) # signif
 ######
 
 ## rda
@@ -609,28 +620,31 @@ Anova(surv_pop_lea_poptrt_full) # signif
 surv_pop_rda_full <- lm(isAlive ~ pop + offset,
                data = surv_all_go_full[surv_all_go_full$method == "rda",])
 summary(surv_pop_rda_full) 
-#plot(surv_pop_rda_full) # these look pretty bad
+#plot(surv_pop_rda_full)
 Anova(surv_pop_rda_full) # signif
 
 # model mll (cc)
 surv_pop_rda_mll <- lm(isAlive ~ pop + offset,
                data = surv_all_go_mll[surv_all_go_mll$method == "rda",])
 summary(surv_pop_rda_mll) 
-#plot(surv_pop_rda_mll) # these look pretty bad
+#plot(surv_pop_rda_mll)
 Anova(surv_pop_rda_mll) # signif
 
-# now the tank level pop/trt
-surv_pop_rda_poptrt_full <- lm(surv ~ pop + rda_offset,
-               data = surv_go[surv_go$cc == "full",])
-summary(surv_pop_rda_poptrt_full) 
-#plot(surv_pop_rda_full)
-Anova(surv_pop_rda_poptrt_full) # rda signif, pop not
+# model full (no cc) log
+surv_pop_rda_full_log <- glm(isAlive ~ pop + offset,
+               data = surv_all_go_full[surv_all_go_full$method == "rda",],
+               family = binomial)
+summary(surv_pop_rda_full_log) 
+#plot(surv_pop_rda_full_log)
+Anova(surv_pop_rda_full_log) # signif
 
-surv_pop_rda_poptrt_mll <- lm(surv ~ pop + rda_offset,
-               data = surv_go[surv_go$cc == "mll",])
-summary(surv_pop_rda_poptrt_mll) 
-#plot(surv_pop_rda_poptrt_mll)
-Anova(surv_pop_rda_poptrt_mll) # neither signif
+# model mll (cc) log
+surv_pop_rda_mll_log <- glm(isAlive ~ pop + offset,
+               data = surv_all_go_mll[surv_all_go_mll$method == "rda",],
+               family = binomial)
+summary(surv_pop_rda_mll_log) 
+#plot(surv_pop_rda_mll_log)
+Anova(surv_pop_rda_mll_log) # signif
 ######
 
 ## gf
@@ -639,82 +653,90 @@ Anova(surv_pop_rda_poptrt_mll) # neither signif
 surv_pop_gf_full <- lm(isAlive ~ pop + offset,
                data = surv_all_go_full[surv_all_go_full$method == "gf",])
 summary(surv_pop_gf_full) 
-#plot(surv_pop_gf_full) # these look pretty bad
+#plot(surv_pop_gf_full)
 Anova(surv_pop_gf_full) # signif
 
 # model mll (cc)
 surv_pop_gf_mll <- lm(isAlive ~ pop + offset,
                data = surv_all_go_mll[surv_all_go_mll$method == "gf",])
 summary(surv_pop_gf_mll) 
-#plot(surv_pop_gf_mll) # these look pretty bad
+#plot(surv_pop_gf_mll)
 Anova(surv_pop_gf_mll) # signif
 
-# now the tank level pop/trt
-surv_pop_gf_poptrt_full <- lm(surv ~ pop + gf_offset,
-               data = surv_go_full)
-summary(surv_pop_gf_poptrt_full) 
-#plot(surv_pop_gf_poptrt_full) # better than binary
-Anova(surv_pop_gf_poptrt_full) # offset signif, pop not
+# model full (no cc) log
+surv_pop_gf_full_log <- glm(isAlive ~ pop + offset,
+               data = surv_all_go_full[surv_all_go_full$method == "gf",],
+               family = binomial)
+summary(surv_pop_gf_full_log) 
+#plot(surv_pop_gf_full_log)
+Anova(surv_pop_gf_full_log) # signif
 
-surv_pop_gf_poptrt_mll <- lm(surv ~ pop + gf_offset,
-               data = surv_go_mll)
-summary(surv_pop_gf_poptrt_mll)
-#plot(surv_pop_gf_poptrt_mll)
-Anova(surv_pop_gf_poptrt_mll) # offset signif, pop not
-####
+# model mll (cc) log
+surv_pop_gf_mll_log <- glm(isAlive ~ pop + offset,
+               data = surv_all_go_mll[surv_all_go_mll$method == "gf",],
+               family = binomial)
+summary(surv_pop_gf_mll_log) 
+#plot(surv_pop_gf_mll_log)
+Anova(surv_pop_gf_mll_log) # signif
+#####
 ```
 
 Length
 
 ```{r}
-# length
-########
+# length/pop
+############
 # quick checks + fixes
 hist(grow_go$length_std_change) 
 hist(log(grow_go$length_std_change)) # log-normal distribution
 
 ## lea
+######
 # model full (no cc)
-len_mod_lea_full <- lm(length_std_change ~ log(lea_offset), data = grow_go_full)
+len_pop_lea_full <- lm(log(length_std_change) ~ pop + lea_offset, data = grow_go_full)
 summary(len_pop_lea_full) 
-#plot(len_pop_lea_full) # diverges pretty significantly on right tail
+#plot(len_pop_lea_full) # diverges pretty significantly on left tail
 Anova(len_pop_lea_full) # signif
 
 # model mll (cc)
-len_pop_lea_mll <- lm(length_std_change ~ log(lea_offset), data = grow_go_mll)
+len_pop_lea_mll <- lm(log(length_std_change) ~ pop + lea_offset, data = grow_go_mll)
 summary(len_pop_lea_mll) 
 #plot(len_pop_lea_mll) # diverges pretty significantly on right tail
 Anova(len_pop_lea_mll) # signif
+######
 
 ## rda
+######
 # model full (no cc)
-len_pop_rda_full <- lm(length_std_change ~ log(rda_offset), data = grow_go_full)
+len_pop_rda_full <- lm(log(length_std_change) ~ pop + rda_offset, data = grow_go_full)
 summary(len_pop_rda_full) 
-#plot(len_pop_rda_full) # diverges pretty significantly on right tail
-Anova(len_pop_rda_full) # signif
+#plot(len_pop_rda_full)
+Anova(len_pop_rda_full) # rda offset not signif
 
 # model mll (cc)
-len_pop_rda_mll <- lm(length_std_change ~ log(rda_offset), data = grow_go_mll)
+len_pop_rda_mll <- lm(log(length_std_change) ~ pop + rda_offset, data = grow_go_mll)
 summary(len_pop_rda_mll) 
-#plot(len_pop_rda_mll) # diverges pretty significantly on right tail
+#plot(len_pop_rda_mll)
 Anova(len_pop_rda_mll) # signif
+######
 
 ## gf
+#####
 # model full (no cc)
-len_pop_gf_full <- lm(length_std_change ~ log(gf_offset), data = grow_go_full)
+len_pop_gf_full <- lm(log(length_std_change) ~ pop + gf_offset, data = grow_go_full)
 summary(len_pop_gf_full) 
-#plot(len_pop_gf_full) # diverges pretty significantly on right tail
+#plot(len_pop_gf_full)
 Anova(len_pop_gf_full) # signif
 
 # model mll (cc)
-len_pop_gf_mll <- lm(length_std_change ~ log(gf_offset), data = grow_go_mll)
+len_pop_gf_mll <- lm(log(length_std_change) ~ pop + gf_offset, data = grow_go_mll)
 summary(len_pop_gf_mll) 
-#plot(len_pop_gf_mll) # diverges pretty significantly on right tail
+#plot(len_pop_gf_mll)
 Anova(len_pop_gf_mll) # signif
-########
+#####
 ```
 
-Growth
+Weight
 
 ```{r}
 # quick checks + fixes
@@ -723,81 +745,49 @@ hist(grow_go$weight_std_change) # normal distribution :D
 ## lea
 ######
 # model full (no cc)
-weigh_pop_lea_full <- lm(weight_std_change ~ lea_offset, data = grow_go_full)
+weigh_pop_lea_full <- lm(weight_std_change ~ pop + lea_offset, data = grow_go_full)
 summary(weigh_pop_lea_full) 
-#plot(weigh_pop_lea_full) # diverges pretty significantly on right tail
+#plot(weigh_pop_lea_full)
 Anova(weigh_pop_lea_full) # signif
 
 # model mll (cc)
-weigh_pop_lea_mll <- lm(weight_std_change ~ lea_offset, data = grow_go_mll)
+weigh_pop_lea_mll <- lm(weight_std_change ~ pop + lea_offset, data = grow_go_mll)
 summary(weigh_pop_lea_mll) 
-#plot(weigh_pop_lea_mll) # diverges pretty significantly on right tail
+#plot(weigh_pop_lea_mll)
 Anova(weigh_pop_lea_mll) # signif
 ######
 
 ## rda
 # model full (no cc)
-weigh_pop_rda_full <- lm(weight_std_change ~ (rda_offset), data = grow_go_full)
+weigh_pop_rda_full <- lm(weight_std_change ~ pop + rda_offset, data = grow_go_full)
 summary(weigh_pop_rda_full) 
-#plot(weigh_pop_rda_full) # diverges pretty significantly on right tail
+#plot(weigh_pop_rda_full) 
 Anova(weigh_pop_rda_full) # signif
 
 # model mll (cc)
-weigh_pop_rda_mll <- lm(weight_std_change ~ (rda_offset), data = grow_go_mll)
+weigh_pop_rda_mll <- lm(weight_std_change ~ pop + rda_offset, data = grow_go_mll)
 summary(weigh_pop_rda_mll) 
-#plot(weigh_pop_rda_mll) # diverges pretty significantly on right tail
+#plot(weigh_pop_rda_mll) 
 Anova(weigh_pop_rda_mll) # signif
 ######
 
 ## gf
 #####
 # model full (no cc)
-weigh_pop_gf_full <- lm(weight_std_change ~ (gf_offset), data = grow_go_full)
+weigh_pop_gf_full <- lm(weight_std_change ~ pop + gf_offset, data = grow_go_full)
 summary(weigh_pop_gf_full) 
-#plot(weigh_pop_gf_full) # diverges pretty significantly on right tail
+#plot(weigh_pop_gf_full) 
 Anova(weigh_pop_gf_full) # signif
 
 # model mll (cc)
-weigh_pop_gf_mll <- lm(weight_std_change ~ (gf_offset), data = grow_go_mll)
+weigh_pop_gf_mll <- lm(weight_std_change ~ pop + gf_offset, data = grow_go_mll)
 summary(weigh_pop_gf_mll) 
-#plot(weigh_pop_gf_mll) # diverges pretty significantly on right tail
+#plot(weigh_pop_gf_mll)
 Anova(weigh_pop_gf_mll) # signif
 #####
 ```
 
-Model Outputs
-
-```{r}
-# save these outputs
-# sink("results/fit_results/survival_modeling.txt")
-# "Survival\n"
-# "LEA MLL\n"
-# summary(surv_mod_lea_mll)
-# Anova(surv_mod_lea_mll)
-# 
-# "LEA Full\n"
-# summary(surv_mod_lea_mll)
-# Anova(surv_mod_lea_mll)
-# 
-# "RDA MLL\n"
-# summary(surv_mod_lea_mll)
-# Anova(surv_mod_lea_mll)
-# 
-# "RDA Full\n"
-# summary(surv_mod_lea_mll)
-# Anova(surv_mod_lea_mll)
-# 
-# "GF MLL\n"
-# summary(surv_mod_lea_mll)
-# Anova(surv_mod_lea_mll)
-# 
-# "GF Full\n"
-# summary(surv_mod_lea_mll)
-# Anova(surv_mod_lea_mll)
-# 
-# sink()
-########
-```
+##### With treatment as fixed effect
 
 Survival 
 
@@ -808,139 +798,159 @@ hist(surv_all_go$surv) # we will use binary outcomes first
 ## lea
 ######
 # model full (no cc)
-surv_pop_lea_full <- lm(isAlive ~ pop + offset,
+surv_trt_lea_full <- lm(isAlive ~ trt + offset,
                data = surv_all_go_full[surv_all_go_full$method == "lea",])
-summary(surv_pop_lea_full) 
-#plot(surv_pop_lea_full) # these look pretty bad, probably bc survival is binary
-Anova(surv_pop_lea_full) # signif
+summary(surv_trt_lea_full) 
+#plot(surv_trt_lea_full)
+Anova(surv_trt_lea_full) # signif
 
 # model mll (cc)
-surv_pop_lea_mll <- lm(isAlive ~ pop + offset,
+surv_trt_lea_mll <- lm(isAlive ~ trt + offset,
                data = surv_all_go_mll[surv_all_go_mll$method == "lea",])
-summary(surv_pop_lea_mll) 
-#plot(surv_pop_lea_mll) # these look pretty bad
-Anova(surv_pop_lea_mll) # signif
+summary(surv_trt_lea_mll) 
+#plot(surv_trt_lea_mll)
+Anova(surv_trt_lea_mll) # signif
 
-# now the tank level pop/trt
-surv_pop_lea_poptrt_full <- lm(surv ~ pop + lea_offset,
-               data = surv_go)
-summary(surv_pop_lea_poptrt_full) 
-#plot(surv_pop_lea_poptrt_full)
-Anova(surv_pop_lea_poptrt_full) # signif
+# model full (no cc) log
+surv_trt_lea_full_log <- glm(isAlive ~ trt + offset,
+               data = surv_all_go_full[surv_all_go_full$method == "lea",],
+               family = binomial)
+summary(surv_trt_lea_full_log) 
+#plot(surv_trt_lea_full_log)
+Anova(surv_trt_lea_full_log) # signif
+
+# model mll (cc) log
+surv_trt_lea_mll_log <- glm(isAlive ~ trt + offset,
+               data = surv_all_go_mll[surv_all_go_mll$method == "lea",],
+               family = binomial)
+summary(surv_trt_lea_mll_log) 
+#plot(surv_trt_lea_mll_log)
+Anova(surv_trt_lea_mll_log) # signif
 ######
 
 ## rda
 ######
 # model full (no cc)
-surv_pop_rda_full <- lm(isAlive ~ pop + offset,
+surv_trt_rda_full <- lm(isAlive ~ trt + offset,
                data = surv_all_go_full[surv_all_go_full$method == "rda",])
-summary(surv_pop_rda_full) 
-#plot(surv_pop_rda_full) # these look pretty bad
-Anova(surv_pop_rda_full) # signif
+summary(surv_trt_rda_full) 
+#plot(surv_trt_rda_full)
+Anova(surv_trt_rda_full) # signif trt, not offset
 
 # model mll (cc)
-surv_pop_rda_mll <- lm(isAlive ~ pop + offset,
+surv_trt_rda_mll <- lm(isAlive ~ trt + offset,
                data = surv_all_go_mll[surv_all_go_mll$method == "rda",])
-summary(surv_pop_rda_mll) 
-#plot(surv_pop_rda_mll) # these look pretty bad
-Anova(surv_pop_rda_mll) # signif
+summary(surv_trt_rda_mll) 
+#plot(surv_trt_rda_mll)
+Anova(surv_trt_rda_mll) # signif trt, not offset
 
-# now the tank level pop/trt
-surv_pop_rda_poptrt_full <- lm(surv ~ pop + rda_offset,
-               data = surv_go[surv_go$cc == "full",])
-summary(surv_pop_rda_poptrt_full) 
-#plot(surv_pop_rda_full)
-Anova(surv_pop_rda_poptrt_full) # rda signif, pop not
+# model full (no cc) log
+surv_trt_rda_full_log <- glm(isAlive ~ trt + offset,
+               data = surv_all_go_full[surv_all_go_full$method == "rda",],
+               family = binomial)
+summary(surv_trt_rda_full_log) 
+#plot(surv_trt_rda_full_log)
+Anova(surv_trt_rda_full_log) # signif trt, not offset
 
-surv_pop_rda_poptrt_mll <- lm(surv ~ pop + rda_offset,
-               data = surv_go[surv_go$cc == "mll",])
-summary(surv_pop_rda_poptrt_mll) 
-#plot(surv_pop_rda_poptrt_mll)
-Anova(surv_pop_rda_poptrt_mll) # neither signif
+# model mll (cc) log
+surv_trt_rda_mll_log <- glm(isAlive ~ trt + offset,
+               data = surv_all_go_mll[surv_all_go_mll$method == "rda",],
+               family = binomial)
+summary(surv_trt_rda_mll_log) 
+#plot(surv_trt_rda_mll_log)
+Anova(surv_trt_rda_mll_log) # signif trt, not offset
 ######
 
 ## gf
 #####
 # model full (no cc)
-surv_pop_gf_full <- lm(isAlive ~ pop + offset,
+surv_trt_gf_full <- lm(isAlive ~ trt + offset,
                data = surv_all_go_full[surv_all_go_full$method == "gf",])
-summary(surv_pop_gf_full) 
-#plot(surv_pop_gf_full) # these look pretty bad
-Anova(surv_pop_gf_full) # signif
+summary(surv_trt_gf_full) 
+#plot(surv_trt_gf_full)
+Anova(surv_trt_gf_full) # signif
 
 # model mll (cc)
-surv_pop_gf_mll <- lm(isAlive ~ pop + offset,
+surv_trt_gf_mll <- lm(isAlive ~ trt + offset,
                data = surv_all_go_mll[surv_all_go_mll$method == "gf",])
-summary(surv_pop_gf_mll) 
-#plot(surv_pop_gf_mll) # these look pretty bad
-Anova(surv_pop_gf_mll) # signif
+summary(surv_trt_gf_mll) 
+#plot(surv_trt_gf_mll)
+Anova(surv_trt_gf_mll) # signif
 
-# now the tank level pop/trt
-surv_pop_gf_poptrt_full <- lm(surv ~ pop + gf_offset,
-               data = surv_go_full)
-summary(surv_pop_gf_poptrt_full) 
-#plot(surv_pop_gf_poptrt_full) # better than binary
-Anova(surv_pop_gf_poptrt_full) # offset signif, pop not
+# model full (no cc)
+surv_trt_gf_full_log <- glm(isAlive ~ trt + offset,
+               data = surv_all_go_full[surv_all_go_full$method == "gf",],
+               family = binomial)
+summary(surv_trt_gf_full_log) 
+#plot(surv_trt_gf_full_log)
+Anova(surv_trt_gf_full_log) # signif
 
-surv_pop_gf_poptrt_mll <- lm(surv ~ pop + gf_offset,
-               data = surv_go_mll)
-summary(surv_pop_gf_poptrt_mll)
-#plot(surv_pop_gf_poptrt_mll)
-Anova(surv_pop_gf_poptrt_mll) # offset signif, pop not
-####
+# model mll (cc)
+surv_trt_gf_mll_log <- glm(isAlive ~ trt + offset,
+               data = surv_all_go_mll[surv_all_go_mll$method == "gf",],
+               family = binomial)
+summary(surv_trt_gf_mll_log) 
+#plot(surv_trt_gf_mll_log)
+Anova(surv_trt_gf_mll_log) # signif
+#####
 ```
 
 Length
 
 ```{r}
-# length
-########
+# length/trt
+############
 # quick checks + fixes
 hist(grow_go$length_std_change) 
 hist(log(grow_go$length_std_change)) # log-normal distribution
 
 ## lea
+######
 # model full (no cc)
-len_mod_lea_full <- lm(length_std_change ~ log(lea_offset), data = grow_go_full)
-summary(len_pop_lea_full) 
-#plot(len_pop_lea_full) # diverges pretty significantly on right tail
-Anova(len_pop_lea_full) # signif
+len_trt_lea_full <- lm(log(length_std_change) ~ trt + lea_offset, data = grow_go_full)
+summary(len_trt_lea_full) 
+#plot(len_trt_lea_full) # diverges pretty significantly on left tail
+Anova(len_trt_lea_full) # signif
 
 # model mll (cc)
-len_pop_lea_mll <- lm(length_std_change ~ log(lea_offset), data = grow_go_mll)
-summary(len_pop_lea_mll) 
-#plot(len_pop_lea_mll) # diverges pretty significantly on right tail
-Anova(len_pop_lea_mll) # signif
+len_trt_lea_mll <- lm(log(length_std_change) ~ trt + lea_offset, data = grow_go_mll)
+summary(len_trt_lea_mll) 
+#plot(len_trt_lea_mll) # diverges pretty significantly on right tail
+Anova(len_trt_lea_mll) # signif
+######
 
 ## rda
+######
 # model full (no cc)
-len_pop_rda_full <- lm(length_std_change ~ log(rda_offset), data = grow_go_full)
-summary(len_pop_rda_full) 
-#plot(len_pop_rda_full) # diverges pretty significantly on right tail
-Anova(len_pop_rda_full) # signif
+len_trt_rda_full <- lm(log(length_std_change) ~ trt + rda_offset, data = grow_go_full)
+summary(len_trt_rda_full) 
+#plot(len_trt_rda_full)
+Anova(len_trt_rda_full) # rda offset not signif
 
 # model mll (cc)
-len_pop_rda_mll <- lm(length_std_change ~ log(rda_offset), data = grow_go_mll)
-summary(len_pop_rda_mll) 
-#plot(len_pop_rda_mll) # diverges pretty significantly on right tail
-Anova(len_pop_rda_mll) # signif
+len_trt_rda_mll <- lm(log(length_std_change) ~ trt + rda_offset, data = grow_go_mll)
+summary(len_trt_rda_mll) 
+#plot(len_trt_rda_mll)
+Anova(len_trt_rda_mll) # signif
+######
 
 ## gf
+#####
 # model full (no cc)
-len_pop_gf_full <- lm(length_std_change ~ log(gf_offset), data = grow_go_full)
-summary(len_pop_gf_full) 
-#plot(len_pop_gf_full) # diverges pretty significantly on right tail
-Anova(len_pop_gf_full) # signif
+len_trt_gf_full <- lm(log(length_std_change) ~ trt + gf_offset, data = grow_go_full)
+summary(len_trt_gf_full) 
+#plot(len_trt_gf_full)
+Anova(len_trt_gf_full) # signif
 
 # model mll (cc)
-len_pop_gf_mll <- lm(length_std_change ~ log(gf_offset), data = grow_go_mll)
-summary(len_pop_gf_mll) 
-#plot(len_pop_gf_mll) # diverges pretty significantly on right tail
-Anova(len_pop_gf_mll) # signif
-########
+len_trt_gf_mll <- lm(log(length_std_change) ~ trt + gf_offset, data = grow_go_mll)
+summary(len_trt_gf_mll) 
+#plot(len_trt_gf_mll)
+Anova(len_trt_gf_mll) # signif
+#####
 ```
 
-Growth
+Weight
 
 ```{r}
 # quick checks + fixes
@@ -949,78 +959,190 @@ hist(grow_go$weight_std_change) # normal distribution :D
 ## lea
 ######
 # model full (no cc)
-weigh_pop_lea_full <- lm(weight_std_change ~ lea_offset, data = grow_go_full)
-summary(weigh_pop_lea_full) 
-#plot(weigh_pop_lea_full) # diverges pretty significantly on right tail
-Anova(weigh_pop_lea_full) # signif
+weigh_trt_lea_full <- lm(weight_std_change ~ trt + lea_offset, data = grow_go_full)
+summary(weigh_trt_lea_full) 
+#plot(weigh_trt_lea_full)
+Anova(weigh_trt_lea_full) # signif
 
 # model mll (cc)
-weigh_pop_lea_mll <- lm(weight_std_change ~ lea_offset, data = grow_go_mll)
-summary(weigh_pop_lea_mll) 
-#plot(weigh_pop_lea_mll) # diverges pretty significantly on right tail
-Anova(weigh_pop_lea_mll) # signif
+weigh_trt_lea_mll <- lm(weight_std_change ~ trt + lea_offset, data = grow_go_mll)
+summary(weigh_trt_lea_mll) 
+#plot(weigh_trt_lea_mll)
+Anova(weigh_trt_lea_mll) # signif
 ######
 
 ## rda
 # model full (no cc)
-weigh_pop_rda_full <- lm(weight_std_change ~ (rda_offset), data = grow_go_full)
-summary(weigh_pop_rda_full) 
-#plot(weigh_pop_rda_full) # diverges pretty significantly on right tail
-Anova(weigh_pop_rda_full) # signif
+weigh_trt_rda_full <- lm(weight_std_change ~ trt + rda_offset, data = grow_go_full)
+summary(weigh_trt_rda_full) 
+#plot(weigh_trt_rda_full) 
+Anova(weigh_trt_rda_full) # signif
 
 # model mll (cc)
-weigh_pop_rda_mll <- lm(weight_std_change ~ (rda_offset), data = grow_go_mll)
-summary(weigh_pop_rda_mll) 
-#plot(weigh_pop_rda_mll) # diverges pretty significantly on right tail
-Anova(weigh_pop_rda_mll) # signif
+weigh_trt_rda_mll <- lm(weight_std_change ~ trt + rda_offset, data = grow_go_mll)
+summary(weigh_trt_rda_mll) 
+#plot(weigh_trt_rda_mll) 
+Anova(weigh_trt_rda_mll) # signif
 ######
 
 ## gf
 #####
 # model full (no cc)
-weigh_pop_gf_full <- lm(weight_std_change ~ (gf_offset), data = grow_go_full)
-summary(weigh_pop_gf_full) 
-#plot(weigh_pop_gf_full) # diverges pretty significantly on right tail
-Anova(weigh_pop_gf_full) # signif
+weigh_trt_gf_full <- lm(weight_std_change ~ trt + gf_offset, data = grow_go_full)
+summary(weigh_trt_gf_full) 
+#plot(weigh_trt_gf_full) 
+Anova(weigh_trt_gf_full) # signif
 
 # model mll (cc)
-weigh_pop_gf_mll <- lm(weight_std_change ~ (gf_offset), data = grow_go_mll)
-summary(weigh_pop_gf_mll) 
-#plot(weigh_pop_gf_mll) # diverges pretty significantly on right tail
-Anova(weigh_pop_gf_mll) # signif
+weigh_trt_gf_mll <- lm(weight_std_change ~ trt + gf_offset, data = grow_go_mll)
+summary(weigh_trt_gf_mll) 
+#plot(weigh_trt_gf_mll)
+Anova(weigh_trt_gf_mll) # signif
 #####
 ```
 
-Model Outputs
+##### Model Outputs
+
+Survival
 
 ```{r}
-# # save these outputs
-# sink("results/fit_results/survival_modeling.txt")
-# "Survival\n"
-# "LEA MLL\n"
-# summary(surv_mod_lea_mll)
-# Anova(surv_mod_lea_mll)
-# 
-# "LEA Full\n"
-# summary(surv_mod_lea_mll)
-# Anova(surv_mod_lea_mll)
-# 
-# "RDA MLL\n"
-# summary(surv_mod_lea_mll)
-# Anova(surv_mod_lea_mll)
-# 
-# "RDA Full\n"
-# summary(surv_mod_lea_mll)
-# Anova(surv_mod_lea_mll)
-# 
-# "GF MLL\n"
-# summary(surv_mod_lea_mll)
-# Anova(surv_mod_lea_mll)
-# 
-# "GF Full\n"
-# summary(surv_mod_lea_mll)
-# Anova(surv_mod_lea_mll)
-# 
-# sink()
-########
+# list of info for all survival ancova tables
+surv_mod_info <- list(
+  list(model = Anova(surv_pop_lea_full), title = "ANCOVA: Survival, LEA, Full, Population", labels = c("Population", "Offset")),
+  list(model = Anova(surv_trt_lea_full), title = "ANCOVA: Survival, LEA, Full, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(surv_pop_rda_full), title = "ANCOVA: Survival, RDA, Full, Population", labels = c("Population", "Offset")),
+  list(model = Anova(surv_trt_rda_full), title = "ANCOVA: Survival, RDA, Full, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(surv_pop_gf_full), title = "ANCOVA: Survival, GF, Full, Population", labels = c("Population", "Offset")),
+  list(model = Anova(surv_trt_gf_full), title = "ANCOVA: Survival, GF, Full, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(surv_pop_lea_mll), title = "ANCOVA: Survival, LEA, MLL, Population", labels = c("Population", "Offset")),
+  list(model = Anova(surv_trt_lea_mll), title = "ANCOVA: Survival, LEA, MLL, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(surv_pop_rda_mll), title = "ANCOVA: Survival, RDA, MLL, Population", labels = c("Population", "Offset")),
+  list(model = Anova(surv_trt_rda_mll), title = "ANCOVA: Survival, RDA, MLL, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(surv_pop_gf_mll), title = "ANCOVA: Survival, GF, MLL, Population", labels = c("Population", "Offset")),
+  list(model = Anova(surv_trt_gf_mll), title = "ANCOVA: Survival, GF, MLL, Treatment", labels = c("Treatment", "Offset")))
+
+# format for html
+surv_tables <- lapply(surv_mod_info, function(x) {
+  df <- as.data.frame(x$model)
+  rownames(df)[1:length(x$labels)] <- x$labels
+  k_table <- kable(df, format = "html", caption = x$title, digits = 4) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "bordered"), 
+                  full_width = FALSE, position = "left")
+  return(as.character(k_table))
+})
+
+# combine + save
+surv_output <- paste(
+  "<!DOCTYPE html><html><head><title>ANCOVA Results</title></head><body>",
+  paste(surv_tables, collapse = "<br><hr><br>"),
+  "</body></html>"
+)
+cat(surv_output, file = "results/GO_compare/survival_ancovas.html")
+
+# for logistic regression as well
+surv_log_mod_info <- list(
+  list(model = Anova(surv_pop_lea_full_log), title = "Log Regression: Survival, LEA, Full, Population", labels = c("Population", "Offset")),
+  list(model = Anova(surv_trt_lea_full_log), title = "Log Regression: Survival, LEA, Full, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(surv_pop_rda_full_log), title = "Log Regression: Survival, RDA, Full, Population", labels = c("Population", "Offset")),
+  list(model = Anova(surv_trt_rda_full_log), title = "Log Regression: Survival, RDA, Full, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(surv_pop_gf_full_log), title = "Log Regression: Survival, GF, Full, Population", labels = c("Population", "Offset")),
+  list(model = Anova(surv_trt_gf_full_log), title = "Log Regression: Survival, GF, Full, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(surv_pop_lea_mll_log), title = "Log Regression: Survival, LEA, MLL, Population", labels = c("Population", "Offset")),
+  list(model = Anova(surv_trt_lea_mll_log), title = "Log Regression: Survival, LEA, MLL, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(surv_pop_rda_mll_log), title = "Log Regression: Survival, RDA, MLL, Population", labels = c("Population", "Offset")),
+  list(model = Anova(surv_trt_rda_mll_log), title = "Log Regression: Survival, RDA, MLL, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(surv_pop_gf_mll_log), title = "Log Regression: Survival, GF, MLL, Population", labels = c("Population", "Offset")),
+  list(model = Anova(surv_trt_gf_mll_log), title = "Log Regression: Survival, GF, MLL, Treatment", labels = c("Treatment", "Offset")))
+
+# format for html
+surv_tables_log <- lapply(surv_log_mod_info, function(x) {
+  df <- as.data.frame(x$model)
+  rownames(df)[1:length(x$labels)] <- x$labels
+  k_table <- kable(df, format = "html", caption = x$title, digits = 4) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "bordered"), 
+                  full_width = FALSE, position = "left")
+  return(as.character(k_table))
+})
+
+# combine + save
+surv_output_log <- paste(
+  "<!DOCTYPE html><html><head><title>Log Regression Results</title></head><body>",
+  paste(surv_tables_log, collapse = "<br><hr><br>"),
+  "</body></html>"
+)
+cat(surv_output_log, file = "results/GO_compare/survival_log_regression.html")
+```
+
+Length
+
+```{r}
+# list of info for all survival ancova tables
+len_mod_info <- list(
+  list(model = Anova(len_pop_lea_full), title = "ANCOVA: Length Change (Standardized), LEA, Full, Population", labels = c("Population", "Offset")),
+  list(model = Anova(len_trt_lea_full), title = "ANCOVA: Length Change (Standardized), LEA, Full, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(len_pop_rda_full), title = "ANCOVA: Length Change (Standardized), RDA, Full, Population", labels = c("Population", "Offset")),
+  list(model = Anova(len_trt_rda_full), title = "ANCOVA: Length Change (Standardized), RDA, Full, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(len_pop_gf_full), title = "ANCOVA: Length Change (Standardized), GF, Full, Population", labels = c("Population", "Offset")),
+  list(model = Anova(len_trt_gf_full), title = "ANCOVA: Length Change (Standardized), GF, Full, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(len_pop_lea_mll), title = "ANCOVA: Length Change (Standardized), LEA, MLL, Population", labels = c("Population", "Offset")),
+  list(model = Anova(len_trt_lea_mll), title = "ANCOVA: Length Change (Standardized), LEA, MLL, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(len_pop_rda_mll), title = "ANCOVA: Length Change (Standardized), RDA, MLL, Population", labels = c("Population", "Offset")),
+  list(model = Anova(len_trt_rda_mll), title = "ANCOVA: Length Change (Standardized), RDA, MLL, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(len_pop_gf_mll), title = "ANCOVA: Length Change (Standardized), GF, MLL, Population", labels = c("Population", "Offset")),
+  list(model = Anova(len_trt_gf_mll), title = "ANCOVA: Length Change (Standardized), GF, MLL, Treatment", labels = c("Treatment", "Offset")))
+
+# format for html
+len_tables <- lapply(len_mod_info, function(x) {
+  df <- as.data.frame(x$model)
+  rownames(df)[1:length(x$labels)] <- x$labels
+  k_table <- kable(df, format = "html", caption = x$title, digits = 4) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "bordered"), 
+                  full_width = FALSE, position = "left")
+  return(as.character(k_table))
+})
+
+# combine + save
+len_output <- paste(
+  "<!DOCTYPE html><html><head><title>ANCOVA Results</title></head><body>",
+  paste(len_tables, collapse = "<br><hr><br>"),
+  "</body></html>"
+)
+cat(len_output, file = "results/GO_compare/length_ancovas.html")
+```
+
+Weight
+
+```{r}
+# list of info for all weighival ancova tables
+weigh_mod_info <- list(
+  list(model = Anova(weigh_pop_lea_full), title = "ANCOVA: Weight Change (Standardized), LEA, Full, Population", labels = c("Population", "Offset")),
+  list(model = Anova(weigh_trt_lea_full), title = "ANCOVA: Weight Change (Standardized), LEA, Full, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(weigh_pop_rda_full), title = "ANCOVA: Weight Change (Standardized), RDA, Full, Population", labels = c("Population", "Offset")),
+  list(model = Anova(weigh_trt_rda_full), title = "ANCOVA: Weight Change (Standardized), RDA, Full, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(weigh_pop_gf_full), title = "ANCOVA: Weight Change (Standardized), GF, Full, Population", labels = c("Population", "Offset")),
+  list(model = Anova(weigh_trt_gf_full), title = "ANCOVA: Weight Change (Standardized), GF, Full, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(weigh_pop_lea_mll), title = "ANCOVA: Weight Change (Standardized), LEA, MLL, Population", labels = c("Population", "Offset")),
+  list(model = Anova(weigh_trt_lea_mll), title = "ANCOVA: Weight Change (Standardized), LEA, MLL, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(weigh_pop_rda_mll), title = "ANCOVA: Weight Change (Standardized), RDA, MLL, Population", labels = c("Population", "Offset")),
+  list(model = Anova(weigh_trt_rda_mll), title = "ANCOVA: Weight Change (Standardized), RDA, MLL, Treatment", labels = c("Treatment", "Offset")),
+  list(model = Anova(weigh_pop_gf_mll), title = "ANCOVA: Weight Change (Standardized), GF, MLL, Population", labels = c("Population", "Offset")),
+  list(model = Anova(weigh_trt_gf_mll), title = "ANCOVA: Weight Change (Standardized), GF, MLL, Treatment", labels = c("Treatment", "Offset")))
+
+# format for html
+weigh_tables <- lapply(weigh_mod_info, function(x) {
+  df <- as.data.frame(x$model)
+  rownames(df)[1:length(x$labels)] <- x$labels
+  k_table <- kable(df, format = "html", caption = x$title, digits = 4) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "bordered"), 
+                  full_width = FALSE, position = "left")
+  return(as.character(k_table))
+})
+
+# combine + save
+weigh_output <- paste(
+  "<!DOCTYPE html><html><head><title>ANCOVA Results</title></head><body>",
+  paste(weigh_tables, collapse = "<br><hr><br>"),
+  "</body></html>"
+)
+cat(weigh_output, file = "results/GO_compare/weight_ancovas.html")
 ```
