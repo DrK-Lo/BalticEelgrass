@@ -259,6 +259,6 @@ doc <- read_pptx() %>%
   ph_with(value = dml(ggobj = poptrt_weight_cf), location = ph_location_type(type = "body")) %>%
   add_slide(layout = "Title and Content", master = "Office Theme") %>% 
   ph_with(value = dml(ggobj = poptrt_weight_cg), location = ph_location_type(type = "body"))
-print(doc, target = "results/fit_results/exp_fitness_plots.pptx")
+print(doc, target = "results/figures/exp_fitness_plots.pptx")
 ```
 
