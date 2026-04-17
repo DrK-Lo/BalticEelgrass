@@ -332,6 +332,9 @@ grow_corr_cf$signif_weigh <- ifelse(grow_corr_cf$pval_weigh < 0.05, T, F)
 grow_corr_cg$signif_weigh <- ifelse(grow_corr_cg$pval_weigh < 0.05, T, F)
 #########
 
+# put together
+
+
 # save outputs
 ##############
 #write.csv(surv_corrs_cf, "results/GO_compare/surv_corrs_cf.csv", row.names = F)

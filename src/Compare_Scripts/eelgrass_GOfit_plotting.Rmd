@@ -23,17 +23,15 @@ library(forcats)
 surv_go <- read.csv("results/GO_compare/survival_offset_avgs.csv")
 surv_all_go <- read.csv("results/GO_compare/survival_offset_binary.csv")
 grow_go <- read.csv("results/GO_compare/grow_offset.csv")
-surv_corrs_cf <- read.csv("results/GO_compare/surv_corrs_cf.csv")
-surv_corrs_cg <- read.csv("results/GO_compare/surv_corrs_cg.csv")
-grow_corrs_cf <- read.csv("results/GO_compare/grow_corr_cf.csv")
-grow_corrs_cg <- read.csv("results/GO_compare/grow_corr_cg.csv")
+surv_corrs_cf <- read.csv("results/GO_compare/surv_corrs_cf.csv")[,-1]
+surv_corrs_cg <- read.csv("results/GO_compare/surv_corrs_cg.csv")[,-1]
+grow_corrs_cf <- read.csv("results/GO_compare/grow_corr_cf.csv")[,-1]
+grow_corrs_cg <- read.csv("results/GO_compare/grow_corr_cg.csv")[,-1]
 ```
 
 ## Data Cleaning & Setup
 
 ```{r}
-# quick checks
-
 # add pop coast and trt coast to all dfs for plotting
 pop_coast <- data.frame(pop = c("VIK","VAT","HOG","BAR",
                                 "KUR","KAL","HOR","BJO"),
