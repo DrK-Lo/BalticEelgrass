@@ -56,7 +56,7 @@ sea_scaled_full <- read.csv("data/EnvDat/sea_scaled_envdat_full_2025-12-03.csv")
 
 ## RDA Functions
 
-The rdadapt package does not install consistently across platforms, so I am pulling the code for relevant functions directly from the package github page: 
+The rdadapt package does not install consistently across platforms, so I am pulling the code for relevant functions directly from the [package github page](https://github.com/landscape-genomics/rdadapt): 
 
 ```{r}
 ## rdadapt isn't installing correctly, this is the function i need directly from the git repo
