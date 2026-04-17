@@ -1,0 +1,117 @@
+---
+title: "eelgrass_GO_plotting"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# markdown options
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/BalticEelgrass/")
+
+# libraries
+library(tidyverse)
+
+
+# read in data
+# offsets
+offsets_rda <- read.csv("results/GO_results/RDA_offsets_exptrt_long_2026-01-02.csv")
+offsets_lea <- read.csv("results/GO_results/LEA_offsets_exptrt_long_2025-12-03.csv")
+offsets_gf <- read.csv("results/GO_results/GF_offsets_exptrt_long_2025-12-03.csv")
+
+# pop dat
+exp_pops <- read.csv("data/experiment/eelgrass_exp_sites.csv")
+```
+
+### LEA Plotting
+
+```{r}
+# popsdf
+colnames(exp_pops) <- c("site_full", "pop", "long", "lat")
+exp_pops$order <- 1:8
+offsets_lea_plotting <- merge(offsets_lea, exp_pops, by = "pop")
+
+# plot
+lea_go_mll <- ggplot(offsets_lea_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (gap_mll))) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.07)) +
+  theme_classic() +
+  labs(title = "(A) Genomic Offsets (LEA, MLL)", x = "Population", y = "Treatment", fill = "Offset")
+lea_go_mll
+
+# and the full offsets
+lea_go_full <- ggplot(offsets_lea_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (gap_full))) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.07)) +
+  theme_classic() +
+  labs(title = "(A) Genomic Offsets (LEA)", x = "Population", y = "Treatment", fill = "Offset")
+lea_go_full
+```
+
+
+### RDA Plotting
+
+```{r}
+# plotting df
+offsets_rda_plotting <- merge(exp_pops, offsets_rda, by = "pop")
+
+# plot
+rda_go_mll <- ggplot(offsets_rda_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_mll))) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,4)) +
+  theme_classic() +
+  labs(title = "Genomic Offsets (RDA, MLL)", x = "Population", y = "Treatment", fill = "Offset")
+rda_go_mll
+
+# and the full offsets
+rda_go_full <- ggplot(offsets_rda_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_full))) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,4)) +
+  theme_classic() +
+  labs(title = "(B) Genomic Offsets (RDA)", x = "Population", y = "Treatment", fill = "Offset")
+rda_go_full
+```
+
+### GF Plotting
+
+```{r}
+gf_offsets_plotting <- merge(exp_pops, gf_offsets, by = "pop")
+
+# plot
+# mll
+gfgeno_go_mll <- ggplot(gf_offsets_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_gf_geno_mll))) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.16)) +
+  theme_classic() +
+  labs(title = "Genomic Offsets (GF, MLL)", x = "Population", y = "Treatment", fill = "Offset")
+gfgeno_go_mll
+
+# and the full offsets
+gfgeno_go_full <- ggplot(gf_offsets_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_gf_geno_full))) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.16)) +
+  theme_classic() +
+  labs(title = "(C) Genomic Offsets (GF)", x = "Population", y = "Treatment", fill = "Offset")
+gfgeno_go_full
+```
+
+### Export
+
+```{r}
+doc <- read_pptx() %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = lea_go_mll), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = lea_go_full), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = rda_go_mll), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = rda_go_full), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = gfgeno_go_mll), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = gfgeno_go_full), location = ph_location_type(type = "body"))
+print(doc, target = "results/figures/offsets_poptrt.pptx")
+```
+
