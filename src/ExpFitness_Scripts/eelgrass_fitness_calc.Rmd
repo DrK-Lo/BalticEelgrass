@@ -102,25 +102,28 @@ Plotting averages
 
 ```{r}
 # survival
-ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, fill = surv_mean)) +
+surv_avg_heatmap <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, fill = surv_mean)) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "viridis", direction = 1, limits = c(0,1), na.value = "white") +
   theme_classic() +
   labs(title = "Survival in Mesocosm Treatments", x = "Population", y = "Treatment", fill = "Survival")
+surv_avg_heatmap
 
 # length
-ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, fill = len_mean)) +
+len_avg_heatmap <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, fill = len_mean)) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "viridis", direction = 1, limits = c(0,5), na.value = "white") +
   theme_classic() +
   labs(title = "Length Change in Mesocosm Treatments", x = "Population", y = "Treatment", fill = "∆Length")
+len_avg_heatmap
 
 # weight
-ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, fill = weigh_mean)) +
+weight_avg_heatmap <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, fill = weigh_mean)) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "viridis", direction = 1, limits = c(-0.7,0.4), na.value = "white") +
   theme_classic() +
   labs(title = "Weight Change in Mesocosm Treatments", x = "Population", y = "Treatment", fill = "∆Weight")
+weight_avg_heatmap
 ```
 
 Plotting common garden vs current future comparisons
@@ -131,11 +134,11 @@ Plotting common garden vs current future comparisons
 trt_order <- c("TempControl_21psu", "TempWarm_16psu", "TempControl_7psu", "TempWarm_5psu")
 
 # pop x trt
-ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = surv_mean, fill = trt)) +
+poptrt_surv_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = surv_mean, fill = trt)) +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#5bc0be","#a5be00","#003459","#245501"),
+                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
                     labels = c("Current W Coast", "Current E Coast",
                                "Future W Coast", "Future E Coast")) +
   theme(plot.title = element_text(size = 24), 
@@ -144,10 +147,11 @@ ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = surv_mean, fill = trt)) +
         legend.position = "right") +
   xlab("Population") + 
   ylab("Survival") +
-  ggtitle("Survival by Population & Treatment", subtitle = "Current-Future Comparison")
+  ggtitle("Survival by Population & Treatment", subtitle = "Current Future Comparison")
+poptrt_surv_cf
 
 # pop x trt
-ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = surv_mean, fill = pop)) +
+poptrt_surv_cg <- ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = surv_mean, fill = pop)) +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Population",
@@ -161,14 +165,13 @@ ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = surv_mean, fill = 
   xlab("Population") + 
   ylab("Survival") +
   ggtitle("Survival by Treatment & Population", subtitle = "Common Garden Comparison")
+poptrt_surv_cg
 ###########
 
 ## length
 #########
-trt_order <- c("TempControl_21psu", "TempWarm_16psu", "TempControl_7psu", "TempWarm_5psu")
-
 # pop x trt
-ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = len_mean, fill = trt)) +
+poptrt_len_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = len_mean, fill = trt)) +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Treatment",
@@ -182,9 +185,10 @@ ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = len_mean, fill = trt)) +
   xlab("Population") + 
   ylab("∆Length (cm)") +
   ggtitle("Length Change by Population & Treatment", subtitle = "Current-Future Comparison")
+poptrt_len_cf
 
 # pop x trt
-ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = len_mean, fill = pop)) +
+poptrt_len_cg <- ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = len_mean, fill = pop)) +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Population",
@@ -198,12 +202,13 @@ ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = len_mean, fill = p
   xlab("Population") + 
   ylab("∆Length (cm)") +
   ggtitle("Length Change by Treatment & Population", subtitle = "Common Garden Comparison")
+poptrt_len_cg
 #########
 
 ## weight chg
 #############
 # pop x trt
-ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = weigh_mean, fill = trt)) +
+poptrt_weight_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = weigh_mean, fill = trt)) +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Treatment",
@@ -217,9 +222,10 @@ ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = weigh_mean, fill = trt)) 
   xlab("Population") + 
   ylab("∆Weight (g)") +
   ggtitle("Weight Change by Population & Treatment", subtitle = "Current-Future Comparison")
+poptrt_weight_cf
 
 # pop x trt
-ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = weigh_mean, fill = pop)) +
+poptrt_weight_cg <- ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = weigh_mean, fill = pop)) +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Population",
@@ -233,7 +239,26 @@ ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = weigh_mean, fill =
   xlab("Population") + 
   ylab("∆Weight (g)") +
   ggtitle("Weight Change by Treatment & Population", subtitle = "Common Garden Comparison")
+poptrt_weight_cg
 #############
 ```
 
+## Export plots
+
+```{r}
+doc <- read_pptx() %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = poptrt_surv_cf), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = poptrt_surv_cg), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = poptrt_len_cf), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = poptrt_len_cg), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = poptrt_weight_cf), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = poptrt_weight_cg), location = ph_location_type(type = "body"))
+print(doc, target = "results/fit_results/exp_fitness_plots.pptx")
+```
 
