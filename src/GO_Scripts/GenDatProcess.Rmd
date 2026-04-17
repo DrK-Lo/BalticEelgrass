@@ -110,6 +110,17 @@ gen_MLL_imp_df <- as.data.frame(gen_MLL_imp)
 gen_MLL_imp_trim <- Filter(var, gen_MLL_imp_df)
 gen_MLL_imp_mat <- as.matrix(gen_MLL_imp_trim)
 
+# also trim vcfs
+sites_rm_full <- which(gen_full_imp_df %in% gen_full_imp_trim)
+sites_rm_mll <- which(gen_MLL_imp_df %in% gen_MLL_imp_trim)
+
+vcf_full_trim <- vcf_full[sites_rm_full,]
+vcf_mll_trim <- vcf_mll[sites_rm_mll,]
+
+# rewrite vcf files
+write.vcf(vcf_full_trim, "data/seascape_data/vcf_full_trimmed.vcf")
+write.vcf(vcf_mll_trim, "data/seascape_data/vcf_mll_trimmed.vcf")
+
 # re-write lfmm files
 write.lfmm(gen_full_imp_mat, "data/seascape_data/gen_full_rm_imp_mat.lfmm")
 write.lfmm(gen_MLL_imp_mat, "data/seascape_data/gen_MLL_imp_mat.lfmm")
