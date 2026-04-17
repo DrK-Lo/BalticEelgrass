@@ -6,6 +6,10 @@
 data/largeDat/*
 results/lg_results/*
 
+# ignore gea scripts
+src/GO_scripts/eelgrass_RDA_gea.Rmd
+src/GO_scripts/eelgrass_LEA_gea.Rmd
+
 # Session Data files
 .RData
 .RDataTmp
