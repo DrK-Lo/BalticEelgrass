@@ -76,7 +76,7 @@ LEA
 # means by pop/treatment
 # common garden: LEA
 ####################
-surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+surv_full_cg_lea <- surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
   labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): Survival",
@@ -94,7 +94,8 @@ surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(trt, tr
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+surv_full_cg_lea
+surv_mll_cg_lea <- surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
   labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): Survival",
@@ -112,11 +113,12 @@ surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(trt, trt
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
+surv_mll_cg_lea
 ####################
 
 # current future: LEA
 #####################
-surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+surv_full_cf_lea <- surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = pop), method = "lm", se = F) + 
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): Survival", 
@@ -134,7 +136,8 @@ surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(pop, po
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+surv_full_cf_lea
+surv_mll_cf_lea <- surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = pop), method = "lm", se = F) + 
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): Survival", 
@@ -152,12 +155,13 @@ surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(pop, pop
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
+surv_mll_cf_lea
 #####################
 
 # binary outcome
 # common garden: LEA
 ####################
-surv_all_go_full %>% 
+surv_full_bin_cg_lea <- surv_all_go_full %>% 
   filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
@@ -177,7 +181,8 @@ surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_all_go_mll %>% 
+surv_full_bin_cg_lea
+surv_mll_bin_cg_lea <- surv_all_go_mll %>% 
   filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
@@ -197,11 +202,12 @@ surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
+surv_mll_bin_cg_lea
 ####################
 
 # with log regression
 #####################
-surv_all_go_full %>% 
+surv_full_binlog_cg_lea <- surv_all_go_full %>% 
   filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
@@ -221,7 +227,9 @@ surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_all_go_mll %>% 
+surv_full_binlog_cg_lea
+
+surv_mll_binlog_cg_lea <- surv_all_go_mll %>% 
   filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
@@ -241,11 +249,12 @@ surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
+surv_mll_binlog_cg_lea
 #####################
 
 # current future: LEA
 #####################
-surv_all_go_full %>%
+surv_full_bin_cf_lea <- surv_all_go_full %>%
   filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
@@ -265,7 +274,9 @@ surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_all_go_mll %>% 
+surv_full_bin_cf_lea
+
+surv_mll_bin_cf_lea <- surv_all_go_mll %>% 
   filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
@@ -285,11 +296,12 @@ surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
+surv_mll_bin_cf_lea
 #####################
 
 # with log regression
 #####################
-surv_all_go_full %>%
+surv_full_binlog_cf_lea <- surv_all_go_full %>%
   filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
@@ -309,7 +321,9 @@ surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_all_go_mll %>% 
+surv_full_binlog_cf_lea
+
+surv_mll_binlog_cf_lea <- surv_all_go_mll %>% 
   filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
@@ -329,6 +343,7 @@ surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
+surv_mll_binlog_cf_lea
 #####################
 ```
 
@@ -337,7 +352,7 @@ RDA
 ```{r}
 # common garden: RDA
 ####################
-surv_go_full %>% 
+surv_full_cg_rda <- surv_go_full %>% 
   ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
@@ -356,7 +371,9 @@ surv_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+surv_full_cg_rda
+
+surv_mll_cg_rda <- surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
   labs(title = "Common Garden Fitness vs Genomic Offset (RDA, MLL): Survival",
@@ -374,11 +391,12 @@ surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(trt, trt
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
+surv_mll_cg_rda
 ####################
 
 # current future: RDA
 #####################
-surv_go_full %>% ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+surv_full_cf_rda <- surv_go_full %>% ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = pop), method = "lm", se = F) + 
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): Survival", 
@@ -396,7 +414,9 @@ surv_go_full %>% ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(pop, po
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+surv_full_cf_rda
+
+surv_mll_cf_rda <- surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = pop), method = "lm", se = F) + 
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): Survival", 
@@ -414,12 +434,13 @@ surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = fct_reorder(pop, pop
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
+surv_mll_cf_rda
 #####################
 
 # binary
 # common garden: RDA
 ####################
-surv_all_go_full %>% 
+surv_full_bin_cg_rda <- surv_all_go_full %>% 
   filter(method == "rda") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
@@ -439,7 +460,9 @@ surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_all_go_mll %>% 
+surv_full_bin_cg_rda
+
+surv_mll_bin_cg_rda <- surv_all_go_mll %>% 
   filter(method == "rda") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
@@ -459,11 +482,12 @@ surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
+surv_mll_bin_cg_rda
 ####################
 
 # logistic regression
 #####################
-surv_all_go_full %>% 
+surv_full_binlog_cg_rda <- surv_all_go_full %>% 
   filter(method == "rda") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
@@ -483,7 +507,9 @@ surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_all_go_mll %>% 
+surv_full_binlog_cg_rda
+
+surv_mll_binlog_cg_rda <- surv_all_go_mll %>% 
   filter(method == "rda") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
@@ -503,11 +529,12 @@ surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
+surv_mll_binlog_cg_rda
 ####################
 
 # current future: RDA
 #####################
-surv_all_go_full %>% 
+surv_full_bin_cf_rda <- surv_all_go_full %>% 
   filter(method == "rda") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
@@ -527,7 +554,9 @@ surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_all_go_mll %>% 
+surv_full_bin_cf_rda
+
+surv_mll_bin_cf_rda <- surv_all_go_mll %>% 
   filter(method == "rda") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
@@ -547,11 +576,12 @@ surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
+surv_mll_bin_cf_rda
 #####################
 
-# current future: RDA
-#####################
-surv_all_go_full %>% 
+## logistic
+###########
+surv_full_binlog_cf_rda <- surv_all_go_full %>% 
   filter(method == "rda") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
@@ -571,7 +601,9 @@ surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_all_go_mll %>% 
+surv_full_binlog_cf_rda
+
+surv_mll_binlog_cf_rda <- surv_all_go_mll %>% 
   filter(method == "rda") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
@@ -591,7 +623,8 @@ surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-#####################
+surv_mll_binlog_cf_rda
+###########
 ```
 
 Gradient Forest
@@ -600,7 +633,7 @@ Gradient Forest
 # proportions
 # common garden: GF
 ###################
-surv_go_full %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+surv_full_cg_gf <- surv_go_full %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): Survival",
@@ -618,7 +651,9 @@ surv_go_full %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(trt, trt
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_go_mll %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+surv_full_cg_gf
+
+surv_mll_cg_gf <- surv_go_mll %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): Survival",
@@ -636,11 +671,12 @@ surv_go_mll %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(trt, trt_
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
+surv_mll_cg_gf
 ###################
 
 # current future: GF
 ####################
-surv_go_full %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+surv_full_cf_gf <- surv_go_full %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = pop), method = "lm", se = F) + 
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): Survival", 
@@ -658,7 +694,9 @@ surv_go_full %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(pop, pop
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_go_mll %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+surv_full_cf_gf
+
+surv_mll_cf_gf <- surv_go_mll %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = pop), method = "lm", se = F) + 
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): Survival", 
@@ -676,18 +714,19 @@ surv_go_mll %>% ggplot(aes(x = gf_offset, y = surv, fill = fct_reorder(pop, pop_
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
+surv_mll_cf_gf
 ####################
 
 # binary
 # common garden: GF
 ###################
-surv_all_go_full %>% 
+surv_full_bin_cg_gf <- surv_all_go_full %>% 
   filter(method == "gf") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): \nBinary Survival",
-       x = "RDA offset", y = "Survival") +
+       x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = c("#FFA203","#FE691E","deeppink","deeppink4"),
                     labels = c("Current W Coast", "Current E Coast",
@@ -701,13 +740,15 @@ surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_all_go_mll %>% 
+surv_full_bin_cg_gf
+
+surv_mll_bin_cg_gf <- surv_all_go_mll %>% 
   filter(method == "gf") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): \nBinary Survival",
-       x = "RDA offset", y = "Survival") +
+       x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = c("#FFA203","#FE691E","deeppink","deeppink4"),
                     labels = c("Current W Coast", "Current E Coast",
@@ -721,17 +762,18 @@ surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
+surv_mll_bin_cg_gf
 ###################
 
 # logistic regression
 #####################
-surv_all_go_full %>% 
+surv_full_binlog_cg_gf <- surv_all_go_full %>% 
   filter(method == "gf") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "glm", method.args = list(family = "binomial"), se = T) + 
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): \nBinary Survival, Logistic Regression",
-       x = "RDA offset", y = "Survival") +
+       x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = c("#FFA203","#FE691E","deeppink","deeppink4"),
                     labels = c("Current W Coast", "Current E Coast",
@@ -745,13 +787,15 @@ surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_all_go_mll %>% 
+surv_full_binlog_cg_gf
+
+surv_mll_binlog_cg_gf <- surv_all_go_mll %>% 
   filter(method == "gf") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "glm", method.args = list(family = "binomial"), se = T) + 
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): \nBinary Survival, Logistic Regression",
-       x = "RDA offset", y = "Survival") +
+       x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = c("#FFA203","#FE691E","deeppink","deeppink4"),
                     labels = c("Current W Coast", "Current E Coast",
@@ -765,17 +809,18 @@ surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
+surv_mll_binlog_cg_gf
 #####################
 
 # current future: GF
 ####################
-surv_all_go_full %>% 
+surv_full_bin_cf_gf <- surv_all_go_full %>% 
   filter(method == "gf") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = pop), method = "lm", se = F) + 
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): \nBinary Survival", 
-       x = "RDA offset", y = "Survival") +
+       x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = c("#002e5a","#0130b9","#0078cf","#82daff", 
                                "#d9ed92","#4ad66d","#25a244","#155d27"),
@@ -789,13 +834,15 @@ surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_all_go_mll %>% 
+surv_full_bin_cf_gf
+
+surv_mll_bin_cf_gf <- surv_all_go_mll %>% 
   filter(method == "gf") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = pop), method = "lm", se = F) + 
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): \nBinary Survival", 
-       x = "RDA offset", y = "Survival") +
+       x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = c("#002e5a","#0130b9","#0078cf","#82daff", 
                                "#d9ed92","#4ad66d","#25a244","#155d27"),
@@ -809,17 +856,18 @@ surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
+surv_mll_bin_cf_gf
 ####################
 
-# current future: GF
-####################
-surv_all_go_full %>% 
+# logistic
+##########
+surv_full_binlog_cf_gf <- surv_all_go_full %>% 
   filter(method == "gf") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = pop), method = "glm", method.args = list(family = "binomial"), se = F) + 
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): \nBinary Survival, Logistic Regression", 
-       x = "RDA offset", y = "Survival") +
+       x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = c("#002e5a","#0130b9","#0078cf","#82daff", 
                                "#d9ed92","#4ad66d","#25a244","#155d27"),
@@ -833,13 +881,15 @@ surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_all_go_mll %>% 
+surv_full_binlog_cf_gf
+
+surv_mll_binlog_cf_gf <- surv_all_go_mll %>% 
   filter(method == "gf") %>% 
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = pop), method = "glm", method.args = list(family = "binomial"), se = F) + 
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): \nBinary Survival, Logistic Regression", 
-       x = "RDA offset", y = "Survival") +
+       x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = c("#002e5a","#0130b9","#0078cf","#82daff", 
                                "#d9ed92","#4ad66d","#25a244","#155d27"),
@@ -853,7 +903,8 @@ surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-####################
+surv_mll_binlog_cf_gf
+##########
 ```
 
 ### Length
@@ -941,6 +992,8 @@ grow_go_mll %>% ggplot(aes(x = lea_offset, y = length_std_change, fill = fct_reo
   theme_minimal()
 #####################
 ```
+
+RDA
 
 ```{r}
 # common garden: RDA
@@ -1360,4 +1413,28 @@ grow_go_mll %>% ggplot(aes(x = gf_offset, y = weight_std_change, fill = fct_reor
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 ####################
+```
+
+### Export
+
+```{r}
+# single figure
+library(gridExtra)
+
+grid.arrange(surv_full_binlog_cg_lea, surv_full_binlog_cf_lea, surv_full_binlog_cg_rda, surv_full_binlog_cf_rda, surv_full_binlog_cg_gf, surv_full_binlog_cf_gf, ncol = 2)
+
+doc <- read_pptx() %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_full_binlog_cg_lea), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_full_binlog_cf_lea), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_full_binlog_cg_rda), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_full_binlog_cf_rda), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_full_binlog_cg_gf), location = ph_location_type(type = "body")) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_full_binlog_cf_gf), location = ph_location_type(type = "body"))
+print(doc, target = "results/figures/offsets_compare_poptrt_surv.pptx")
 ```
