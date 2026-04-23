@@ -318,6 +318,7 @@ colnames(popsdf1) <- c("pops1","order1")
 colnames(popsdf2) <- c("pops2","order2")
 euc_dists_long_mg <- merge(popsdf1[,c("pops1","order1")], euc_dists_long, by = "pops1")
 euc_dists_long_mg2 <- merge(popsdf2[,c("pops2","order2")], euc_dists_long_mg, by = "pops2")
+write.csv(euc_dists_long_mg2, "results/GO_results/euclidean_long_trt_exp.csv")
 
 euc_dist_trtpop <- ggplot(euc_dists_long_mg2, aes(x = fct_reorder(pops1, order1), 
                               y = fct_reorder(pops2, order2), 

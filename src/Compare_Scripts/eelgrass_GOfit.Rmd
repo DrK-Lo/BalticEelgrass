@@ -28,6 +28,7 @@ grow <- read.csv("data/experiment/fit_growth_dat.csv")[,-1]
 lea <- read.csv("results/GO_results/LEA_offsets_exptrt_wide_2025-12-03.csv")[,-1]
 rda <- read.csv("results/GO_results/RDA_offsets_exptrt_wide_2026-01-02.csv")[,-1]
 gf <- read.csv("results/GO_results/GF_offsets_exptrt_wide_2025-12-03.csv")[,-1]
+env_dist <- read.csv("results/GO_results/euclidean_long_trt_exp.csv")[,-1]
 ```
 
 ## Genomic Offset - Fitness Offset Comparisons
@@ -63,13 +64,17 @@ gf_long <- gf %>% pivot_longer(
   names_to = "pop",
   values_to = "gf_offset")
 
+# env dist
+env_dist_trt <- env_dist %>% filter(pops1 %in% c("TempWarm-5psu", "TempWarm-16psu", "TempControl-7psu", "TempControl-21psu") & !(pops2 %in% c("TempWarm-5psu", "TempWarm-16psu", "TempControl-7psu", "TempControl-21psu"))) %>% select(pops1, pops2, distances) %>% rename(pop = pops2, trt = pops1, env_dist = distances)
+
 # put everything together
 go1 <- merge(lea_long, rda_long, by = c("trt", "cc", "pop"))
-go_wide <- merge(go1, gf_long[gf_long$mod == "geno", c("trt","pop","cc","gf_offset")], by = c("trt", "cc", "pop"))
+go2 <- merge(go1, gf_long[gf_long$mod == "geno", c("trt","pop","cc","gf_offset")], by = c("trt", "cc", "pop"))
+go_wide <- merge(go2, env_dist_trt, by = c("pop", "trt"))
 
 # long version of all
 go_long <- go_wide %>% pivot_longer(
-  cols = c("lea_offset","rda_offset","gf_offset"),
+  cols = c("lea_offset","rda_offset","gf_offset", "env_dist"),
   names_to = "method",
   values_to = "offset")
 ```
@@ -132,9 +137,9 @@ surv_all_go <- merge(surv_all_go, tanks_df, by = "tank_ID")
 surv_all_go$tank_num <- as.numeric(surv_all_go$tank_num)
 
 # long versions
-surv_go_long <- surv_go %>% pivot_longer(names_to = "method", cols = c("lea_offset", "rda_offset", "gf_offset"), values_to = "offset") %>% as.data.frame()
+surv_go_long <- surv_go %>% pivot_longer(names_to = "method", cols = c("lea_offset", "rda_offset", "gf_offset", "env_dist"), values_to = "offset") %>% as.data.frame()
 surv_go_long$method <- str_split_fixed(surv_go_long$method, "_", 2)[,1]
-grow_go_long <- grow_go %>% pivot_longer(names_to = "method", cols = c("lea_offset", "rda_offset", "gf_offset"), values_to = "offset") %>% as.data.frame()
+grow_go_long <- grow_go %>% pivot_longer(names_to = "method", cols = c("lea_offset", "rda_offset", "gf_offset", "env_dist"), values_to = "offset") %>% as.data.frame()
 grow_go_long$method <- str_split_fixed(grow_go_long$method, "_", 2)[,1]
 # surv all is already long format
 
@@ -208,30 +213,38 @@ surv_corr <- function(df, method, gen_clone, fit_offset) {
 surv_corr_cg <- rbind(surv_corr(surv_go_long, "lea", "full", "cg"),
                       surv_corr(surv_go_long, "rda", "full", "cg"),
                       surv_corr(surv_go_long, "gf", "full", "cg"),
+                      surv_corr(surv_go_long, "env", "full", "cg"),
                       surv_corr(surv_go_long, "lea", "mll", "cg"),
                       surv_corr(surv_go_long, "rda", "mll", "cg"),
-                      surv_corr(surv_go_long, "gf", "mll", "cg"))
+                      surv_corr(surv_go_long, "gf", "mll", "cg"),
+                      surv_corr(surv_go_long, "env", "mll", "cg"))
 
 surv_corr_all_cg <- rbind(surv_corr(surv_all_go, "lea", "full", "cg"),
                       surv_corr(surv_all_go, "rda", "full", "cg"),
                       surv_corr(surv_all_go, "gf", "full", "cg"),
+                      surv_corr(surv_all_go, "env", "full", "cg"),
                       surv_corr(surv_all_go, "lea", "mll", "cg"),
                       surv_corr(surv_all_go, "rda", "mll", "cg"),
-                      surv_corr(surv_all_go, "gf", "mll", "cg"))
+                      surv_corr(surv_all_go, "gf", "mll", "cg"),
+                      surv_corr(surv_all_go, "env", "mll", "cg"))
 
 surv_corr_cf <- rbind(surv_corr(surv_go_long, "lea", "full", "cf"),
                       surv_corr(surv_go_long, "rda", "full", "cf"),
                       surv_corr(surv_go_long, "gf", "full", "cf"),
+                      surv_corr(surv_go_long, "env", "full", "cf"),
                       surv_corr(surv_go_long, "lea", "mll", "cf"),
                       surv_corr(surv_go_long, "rda", "mll", "cf"),
-                      surv_corr(surv_go_long, "gf", "mll", "cf"))
+                      surv_corr(surv_go_long, "gf", "mll", "cf"),
+                      surv_corr(surv_go_long, "env", "mll", "cf"))
 
 surv_corr_all_cf <- rbind(surv_corr(surv_all_go, "lea", "full", "cf"),
                       surv_corr(surv_all_go, "rda", "full", "cf"),
                       surv_corr(surv_all_go, "gf", "full", "cf"),
+                      surv_corr(surv_all_go, "env", "full", "cf"),
                       surv_corr(surv_all_go, "lea", "mll", "cf"),
                       surv_corr(surv_all_go, "rda", "mll", "cf"),
-                      surv_corr(surv_all_go, "gf", "mll", "cf"))
+                      surv_corr(surv_all_go, "gf", "mll", "cf"),
+                      surv_corr(surv_all_go, "env", "mll", "cf"))
 
 # add info about surv
 surv_corr_cg$type_surv <- rep("proportion", nrow(surv_corr_cg))
@@ -314,16 +327,20 @@ grow_corr <- function(df, method, gen_clone, fit_offset) {
 grow_corr_cg <- rbind(grow_corr(grow_go_long, "lea", "full", "cg"),
                       grow_corr(grow_go_long, "rda", "full", "cg"),
                       grow_corr(grow_go_long, "gf", "full", "cg"),
+                      grow_corr(grow_go_long, "env", "full", "cg"),
                       grow_corr(grow_go_long, "lea", "mll", "cg"),
                       grow_corr(grow_go_long, "rda", "mll", "cg"),
-                      grow_corr(grow_go_long, "gf", "mll", "cg"))
+                      grow_corr(grow_go_long, "gf", "mll", "cg"),
+                      grow_corr(grow_go_long, "env", "mll", "cg"))
 
 grow_corr_cf <- rbind(grow_corr(grow_go_long, "lea", "full", "cf"),
                       grow_corr(grow_go_long, "rda", "full", "cf"),
                       grow_corr(grow_go_long, "gf", "full", "cf"),
+                      grow_corr(grow_go_long, "env", "full", "cf"),
                       grow_corr(grow_go_long, "lea", "mll", "cf"),
                       grow_corr(grow_go_long, "rda", "mll", "cf"),
-                      grow_corr(grow_go_long, "gf", "mll", "cf"))
+                      grow_corr(grow_go_long, "gf", "mll", "cf"),
+                      grow_corr(grow_go_long, "env", "mll", "cf"))
 
 # signif T/F
 grow_corr_cf$signif_len <- ifelse(grow_corr_cf$pval_len < 0.05, T, F)
@@ -331,9 +348,6 @@ grow_corr_cg$signif_len <- ifelse(grow_corr_cg$pval_len < 0.05, T, F)
 grow_corr_cf$signif_weigh <- ifelse(grow_corr_cf$pval_weigh < 0.05, T, F)
 grow_corr_cg$signif_weigh <- ifelse(grow_corr_cg$pval_weigh < 0.05, T, F)
 #########
-
-# put together
-
 
 # save outputs
 ##############
