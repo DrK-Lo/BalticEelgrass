@@ -1,0 +1,642 @@
+---
+title: "eelgrass_fitness_offsets"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Documents/Github/BalticEelgrass")
+
+# setwd
+setwd("/Users/camillerumberger/Documents/GitHub/BalticEelgrass")
+
+# libraries
+library(tidyverse)
+library(stringr)
+library(dplyr)
+
+# data
+expfit_poptrt <- read.csv("data/experiment/expfit_poptrt.csv")
+fit_surv <- read.csv("data/experiment/expfit_trim.csv")
+fit_growth <- read.csv("data/experiment/fit_growth_dat.csv")
+poptrts_df <- read.csv("data/experiment/poptrts_df.csv")
+```
+
+# Fitness Offsets
+
+This script is intended to calculate "fitness offsets" (sensu [Lotterhos 2024](https://academic.oup.com/evlett/article/8/3/331/7603943)) for the GO Eelgrass mesocosm experiment. "Local-foreign" (i.e. common garden) and "home-away" (i.e. current future) will be calculated here, using both absolute and relative fitness. 
+
+I will do this by using the "current" treatment for each respective coast as the home and local environment for current-future and common garden fitness offsets, respectively. 
+
+I NEED TO CALCULATE RELATIVE FITNESS STILL.
+
+## Data Prep
+
+```{r}
+# trts & pops
+#############
+# trts and pops
+trts <- data.frame(trt = c("TempControl_21psu", "TempControl_7psu", "TempWarm_16psu", "TempWarm_5psu"), trt_name = c("Current West Coast", "Current East Coast", "Future West Coast", "Future East Coast"), trt_coast = c("West", "East", "West", "East"), heat = c("Current", "Current", "Future", "Future"))
+pops <- poptrts_df %>% filter(!(poptrt %in% trts$trt)) %>% select(poptrt, order, coast) %>% rename(pop = poptrt, pop_coast = coast)
+
+# combine
+trt_pop <- data.frame(trt = rep(levels(as.factor(fit_surv$trt)), 8), pop = (rep(levels(as.factor(fit_surv$pop)), each = 4)))
+trt_pop2 <- merge(trt_pop, trts, by = "trt")
+trt_pop3 <- merge(trt_pop2, pops, by = "pop")
+
+# home-away & local foreign info
+# ha
+trt_pop3$HA <- ifelse(trt_pop3$pop_coast == trt_pop3$trt_coast & trt_pop3$heat == "Current", "Home", "Away")
+
+# lf - for now going to use exclusively coast, not current/future heat to determine local vs foreign, LF1 is keeping current criteria (the same as HA)
+trt_pop3$LF <- ifelse(trt_pop3$pop_coast == trt_pop3$trt_coast, "Local", "Foreign")
+trt_pop3$LF1 <- trt_pop3$HA <- ifelse(trt_pop3$pop_coast == trt_pop3$trt_coast & trt_pop3$heat == "Current", "Local", "Foreign")
+#############
+
+# fitness dat
+############
+# data quick checks
+summary(fit_surv)
+summary(fit_growth)
+summary(expfit_poptrt)
+
+# trim
+fit_surv_trim <- fit_surv %>% select(pop, trt, pop_trt, bagnum, isAlive)
+fit_growth_trim <- fit_growth %>% select(pop, trt, pop_trt, length_std_change, weight_std_change)
+
+# combo trtpop with fitness
+fit_trtpop <- merge(trt_pop3, expfit_poptrt, by = c("pop", "trt", "order"))
+surv_trtpop <- merge(trt_pop3, fit_surv_trim, by = c("pop", "trt"))
+grow_trtpop <- merge(trt_pop3, fit_growth_trim, by = c("pop", "trt"))
+
+# matrix version pop columns trt rows
+surv_fit_trtpop <- fit_trtpop %>%
+  group_by(trt, pop) %>%
+  summarize(surv_mean = mean(surv_mean, na.rm = TRUE), .groups = "drop") %>% 
+  pivot_wider(names_from = pop, 
+    values_from = surv_mean)
+len_fit_trtpop <- fit_trtpop %>%
+  group_by(trt, pop) %>%
+  summarize(len_mean = mean(len_mean, na.rm = TRUE), .groups = "drop") %>% 
+  pivot_wider(names_from = pop, 
+    values_from = len_mean)
+weigh_fit_trtpop <- fit_trtpop %>%
+  group_by(trt, pop) %>%
+  summarize(weigh_mean = mean(weigh_mean, na.rm = TRUE), .groups = "drop") %>% 
+  pivot_wider(names_from = pop, 
+    values_from = weigh_mean)
+############
+```
+
+## Relative Fitness
+
+```{r}
+# relative fitness by trt (LF)
+##############################
+rel_lf <- function(df) {
+  max_temp <- as.numeric(apply(df[,-1], 2, max, na.rm = T))
+  rel_fit <- sweep(df[,-1], 2, max_temp, "/")
+  return(rel_fit)
+}
+
+rel_lf_neg <- function(df) {
+  max_temp <- as.numeric(apply(df[,-1], 2, max, na.rm = T))
+  min_temp <- as.numeric(apply(df[,-1], 2, min, na.rm = T))
+  norm <- sweep(df[,-1], 2, min_temp, "-")
+  rel_fit <- sweep(norm, 2, max_temp - min_temp, "/")
+  return(rel_fit)
+}
+
+# rel fit
+lf_rel_surv <- rel_lf(surv_fit_trtpop)
+lf_rel_len <- rel_lf(len_fit_trtpop)
+lf_rel_weigh <- rel_lf_neg(weigh_fit_trtpop)
+##############################
+
+# relative fitness by pop (HA)
+##############################
+# fn
+rel_ha <- function(df) {
+  max_temp <- as.numeric(apply(df[,-1], 1, max, na.rm = T))
+  rel_fit <- sweep(df[,-1], 1, max_temp, "/")
+  return(rel_fit)
+}
+
+rel_ha_neg <- function(df) {
+  max_temp <- as.numeric(apply(df[,-1], 1, max, na.rm = T))
+  min_temp <- as.numeric(apply(df[,-1], 1, min, na.rm = T))
+  norm <- sweep(df[,-1], 1, min_temp, "-")
+  rel_fit <- sweep(norm, 1, max_temp - min_temp, "/")
+  return(rel_fit)
+}
+
+# calc ha rel
+ha_rel_surv <- rel_ha(surv_fit_trtpop)
+ha_rel_len <- rel_ha(len_fit_trtpop)
+ha_rel_weigh <- rel_ha_neg(weigh_fit_trtpop)
+##############################
+
+# by coasts
+###########
+# abs fit
+surv_w <- surv_fit_trtpop %>% filter(trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% select(trt, VIK, VAT, HOG, BAR)
+surv_e <- surv_fit_trtpop %>% filter(trt %in% c("TempControl_7psu", "TempWarm_5psu")) %>% select(trt, KUR, KAL, HOR, BJO)
+len_w <- len_fit_trtpop %>% filter(trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% select(trt, VIK, VAT, HOG, BAR)
+len_e <- len_fit_trtpop %>% filter(trt %in% c("TempControl_7psu", "TempWarm_5psu")) %>% select(trt, KUR, KAL, HOR, BJO)
+weigh_w <- weigh_fit_trtpop %>% filter(trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% select(trt, VIK, VAT, HOG, BAR)
+weigh_e <- weigh_fit_trtpop %>% filter(trt %in% c("TempControl_7psu", "TempWarm_5psu")) %>% select(trt, KUR, KAL, HOR, BJO)
+
+# rel ha
+surv_w_ha_rel <- rel_ha(surv_w)
+surv_e_ha_rel <- rel_ha(surv_e)
+len_w_ha_rel <- rel_ha(len_w)
+len_e_ha_rel <- rel_ha(len_e)
+weigh_w_ha_rel <- rel_ha_neg(weigh_w)
+weigh_e_ha_rel <- rel_ha_neg(weigh_e)
+
+# rel cg
+surv_w_lf_rel <- rel_lf(surv_w)
+surv_e_lf_rel <- rel_lf(surv_e)
+len_w_lf_rel <- rel_lf(len_w)
+len_e_lf_rel <- rel_lf(len_e)
+weigh_w_lf_rel <- rel_lf_neg(weigh_w)
+weigh_e_lf_rel <- rel_lf_neg(weigh_e)
+###########
+```
+
+## Current Future -- How to deal with positive offsets? With NAs in growth data?
+
+```{r}
+# functions
+###########
+curr_fut <- function(df) {
+  trt <- df$trt
+  df <- as.matrix(df[,-1])
+  home <- (c(unlist(df[1, 1:4]), unlist(df[2, 5:8])))
+  cf <- sweep(df, 2, home, function(w, d) ifelse(is.na(w) | is.na(d), NA, w - d))
+  cf_df <- cbind(trt, as.data.frame(cf))
+  long <- melt(cf_df, id.vars = "trt", variable.name = "pop", value.name = "fit_off")
+  long$method <- "cf"
+  long$fit <- "abs"
+  return(long)
+}
+
+curr_fut_rel <- function(df) {
+  trt <- df$trt
+  df <- as.matrix(df[,-1])
+  home <- (c(unlist(df[1, 1:4]), unlist(df[2, 5:8])))
+  cf <- sweep(df, 2, home, function(w, d) ifelse(is.na(w) | is.na(d), NA, (w - d) / (d)))
+  cf_df <- cbind(trt, as.data.frame(cf))
+  long <- melt(cf_df, id.vars = "trt", variable.name = "pop", value.name = "fit_off")
+  long$method <- "cf"
+  long$fit <- "rel"
+  return(long)
+}
+
+# function
+curr_fut1 <- function(df) {
+  trt <- df$trt
+  df <- as.matrix(df[,-1])
+  home <- unlist(df[1, 1:4])
+  cf <- sweep(df, 2, home, function(w, d) ifelse(is.na(w) | is.na(d), NA, w - d))
+  cf_df <- cbind(trt, as.data.frame(cf))
+  long <- melt(cf_df, id.vars = "trt", variable.name = "pop", value.name = "fit_off")
+  long$method <- "cf"
+  long$fit <- "rel"
+  return(long)
+}
+
+curr_fut_rel1 <- function(df) {
+  trt <- df$trt
+  df <- as.matrix(df[,-1])
+  home <- unlist(df[1, 1:4])
+  cf <- sweep(df, 2, home, function(w, d) ifelse(is.na(w) | is.na(d), NA, (w - d) / (d)))
+  cf_df <- cbind(trt, as.data.frame(cf))
+  long <- melt(cf_df, id.vars = "trt", variable.name = "pop", value.name = "fit_off")
+  long$method <- "cf"
+  long$fit <- "rel"
+  return(long)
+}
+###########
+
+# calc fitness offset
+#####################
+# absolute
+# surv
+surv_cf_off <- curr_fut(surv_fit_trtpop)
+surv_cf_w_off <- curr_fut1(surv_w)
+surv_cf_e_off <- curr_fut1(surv_e)
+
+# len
+len_cf_off <- curr_fut(len_fit_trtpop)
+len_cf_w_off <- curr_fut1(len_w)
+len_cf_e_off <- curr_fut1(len_e)
+
+# weigh
+weigh_cf_off <- curr_fut(weigh_fit_trtpop)
+weigh_cf_w_off <- curr_fut1(weigh_w)
+weigh_cf_e_off <- curr_fut1(weigh_e)
+
+# relative
+# surv - check on NAs vs true zeros
+surv_rel_cf_off <- curr_fut_rel(surv_fit_trtpop)
+surv_rel_cf_w_off <- curr_fut_rel1(surv_w)
+surv_rel_cf_e_off <- curr_fut_rel1(surv_e)
+
+# len
+len_rel_cf_off <- curr_fut_rel(len_fit_trtpop)
+len_rel_cf_w_off <- curr_fut_rel1(len_w)
+len_rel_cf_e_off <- curr_fut_rel1(len_w)
+
+# weigh -- 
+weigh_rel_cf_off <- curr_fut_rel(weigh_fit_trtpop)
+weigh_rel_cf_w_off <- curr_fut_rel1(weigh_w)
+weigh_rel_cf_e_off <- curr_fut_rel1(weigh_e)
+#####################
+```
+
+## Common Garden -- How to deal with positive offsets? With NAs in growth data?
+
+```{r}
+# functions
+###########
+comm_gard <- function(df) {
+  trt <- df$trt
+  df <- as.matrix(df[,-1])
+  local <- (c(unlist(df[1, 1:4]), unlist(df[2, 5:8])))
+  cg <- sweep(df, 1, local, function(w, d) ifelse(is.na(w) | is.na(d), NA, w - d))
+  cg_df <- cbind(trt, as.data.frame(cg))
+  long <- melt(cg_df, id.vars = "trt", variable.name = "pop", value.name = "fit_off")
+  long$method <- "cg"
+  long$fit <- "abs"
+  return(long)
+}
+
+comm_gard_rel <- function(df) {
+  trt <- df$trt
+  df <- as.matrix(df[,-1])
+  local <- (c(unlist(df[1, 1:4]), unlist(df[2, 5:8])))
+  cg <- sweep(df, 1, local, function(w, d) ifelse(is.na(w) | is.na(d), NA, (w - d) / (d)))
+  cg_df <- cbind(trt, as.data.frame(cg))
+  long <- melt(cg_df, id.vars = "trt", variable.name = "pop", value.name = "fit_off")
+  long$method <- "cg"
+  long$fit <- "rel"
+  return(long)
+}
+
+comm_gard1 <- function(df) {
+  trt <- df$trt
+  df <- as.matrix(df[,-1])
+  local <- unlist(df[1, 1:4])
+  cg <- sweep(df, 1, local, function(w, d) ifelse(is.na(w) | is.na(d), NA, w - d))
+  cg_df <- cbind(trt, as.data.frame(cg))
+  long <- melt(cg_df, id.vars = "trt", variable.name = "pop", value.name = "fit_off")
+  long$method <- "cg"
+  long$fit <- "abs"
+  return(long)
+}
+
+comm_gard_rel1 <- function(df) {
+  trt <- df$trt
+  df <- as.matrix(df[,-1])
+  local <- local <- unlist(df[1, 1:4])
+  cg <- sweep(df, 1, local, function(w, d) ifelse(is.na(w) | is.na(d), NA, (w - d) / (d)))
+  cg_df <- cbind(trt, as.data.frame(cg))
+  long <- melt(cg_df, id.vars = "trt", variable.name = "pop", value.name = "fit_off")
+  long$method <- "cg"
+  long$fit <- "rel"
+  return(long)
+}
+###########
+
+# calc fitness offset
+#####################
+# absolute
+# surv
+surv_cg_off <- comm_gard(surv_fit_trtpop)
+surv_cg_w_off <- comm_gard1(surv_w)
+surv_cg_e_off <- comm_gard1(surv_e)
+
+# len
+len_cg_off <- comm_gard(len_fit_trtpop)
+len_cg_w_off <- comm_gard1(len_w)
+len_cg_e_off <- comm_gard1(len_e)
+
+# weigh
+weigh_cg_off <- comm_gard1(weigh_fit_trtpop)
+weigh_cg_w_off <- comm_gard1(weigh_w)
+weigh_cg_e_off <- comm_gard1(weigh_e)
+
+# relative
+# surv - check on NAs vs true zeros
+surv_rel_cg_off <- comm_gard_rel(surv_fit_trtpop)
+surv_rel_cg_w_off <- comm_gard_rel1(surv_w)
+surv_rel_cg_e_off <- comm_gard_rel1(surv_e)
+
+# len
+len_rel_cg_off <- comm_gard_rel(len_fit_trtpop)
+len_rel_cg_w_off <- comm_gard_rel1(len_w)
+len_rel_cg_e_off <- comm_gard_rel1(len_w)
+
+# weigh
+weigh_rel_cg_off <- comm_gard_rel(weigh_fit_trtpop)
+weigh_rel_cg_w_off <- comm_gard_rel1(weigh_w)
+weigh_rel_cg_e_off <- comm_gard_rel1(weigh_e)
+#####################
+```
+
+## Combine
+
+```{r}
+# combine fitness offsets
+#########################
+# one df for all the clim chg comparisons, one for the complete set - start w complete
+cf_offsets <- rbind(surv_cf_off, len_cf_off, weigh_cf_off, surv_rel_cf_off, len_rel_cf_off, weigh_rel_cf_off) 
+cg_offsets <- rbind(surv_cg_off, len_cg_off, weigh_cg_off, surv_rel_cg_off, len_rel_cg_off, weigh_rel_cg_off)
+
+cf_offsets$metric <- rep(c("surv","len","weigh"), each = 32)
+cg_offsets$metric <- rep(c("surv","len","weigh"), each = 32)
+
+# all together
+fit_offsets <- rbind(cf_offsets, cg_offsets)
+#########################
+
+# clim only
+###########
+cf_offsets_e <- rbind(surv_cf_e_off, len_cf_e_off, weigh_cf_e_off, surv_rel_cf_e_off, len_rel_cf_e_off, weigh_rel_cf_e_off)
+cf_offsets_e$coast <- "East"
+cf_offsets_w <- rbind(surv_cf_w_off, len_cf_w_off, weigh_cf_w_off, surv_rel_cf_w_off, len_rel_cf_w_off, weigh_rel_cf_w_off)
+cf_offsets_w$coast <- "West"
+
+cg_offsets_e <- rbind(surv_cg_e_off, len_cg_e_off, weigh_cg_e_off, surv_rel_cg_e_off, len_rel_cg_e_off, weigh_rel_cg_e_off)
+cg_offsets_e$coast <- "East"
+cg_offsets_w <- rbind(surv_cg_w_off, len_cg_w_off, weigh_cg_w_off, surv_rel_cg_w_off, len_rel_cg_w_off, weigh_rel_cg_w_off)
+cg_offsets_w$coast <- "West"
+
+fit_offsets_clim <- rbind(cf_offsets_w, cf_offsets_e, cg_offsets_w, cg_offsets_e)
+fit_offsets_clim$metric <- rep(rep(c("surv","len","weigh"), each = 32), 2)
+
+head(fit_offsets_clim)
+###########
+```
+
+## Plotting Fitness Offsets
+
+```{r}
+# pop and trt order info
+poptrts_df <- read.csv("data/experiment/poptrts_df.csv")
+pop_ord <- poptrts_df %>% 
+  filter(coast != "trt") %>% 
+  select(poptrt, order) %>% 
+  rename(pop = poptrt, pop_ord = order)
+trt_ord <- poptrts_df %>% 
+  filter(coast == "trt") %>% 
+  select(poptrt) %>% 
+  rename(trt = poptrt) %>% 
+  mutate(trt = gsub("-", "_", trt)) %>% 
+  mutate(trt_ord = 1:4)
+
+# combine with fitness offsets
+fit_offsets_plot <- merge(fit_offsets, pop_ord, by = c("pop"))
+fit_offsets_plot <- merge(fit_offsets_plot, trt_ord, by = c("trt"))
+
+fit_offsets_clim_plot <- merge(fit_offsets_clim, pop_ord, by = c("pop"))
+fit_offsets_clim_plot <- merge(fit_offsets_clim_plot, trt_ord, by = c("trt"))
+```
+
+
+Survival Plots 
+
+```{r}
+# plot
+surv_cg_heatmap_abs <- fit_offsets_plot %>% 
+  filter(method == "cg" & fit == "abs" & metric == "surv") %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = 0, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Common Garden Fitness Offset,\nAbsolute Survival", x = "Population", y = "Treatment", fill = "Fitness Offset")
+surv_cg_heatmap_abs
+
+surv_cf_heatmap_abs <- fit_offsets_plot %>% 
+  filter(method == "cf" & fit == "abs" & metric == "surv") %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = 0, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Current-Future Fitness Offset,\nAbsolute Survival", x = "Population", y = "Treatment", fill = "Fitness Offset")
+surv_cf_heatmap_abs
+
+surv_cg_heatmap_rel <- fit_offsets_plot %>% 
+  filter(method == "cg" & fit == "rel" & metric == "surv") %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = 0, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Common Garden Fitness Offset,\nRelative Survival", x = "Population", y = "Treatment", fill = "Fitness Offset")
+surv_cg_heatmap_rel
+
+surv_cf_heatmap_rel <- fit_offsets_plot %>% 
+  filter(method == "cf" & fit == "rel" & metric == "surv") %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = 0, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Current-Future Fitness Offset,\nRelative Survival", x = "Population", y = "Treatment", fill = "Fitness Offset")
+surv_cf_heatmap_rel
+
+# log transformed relative surv
+# start by transforming data
+log_trns <- function(df, method1, fit1, metric1) {
+  temp = df %>% filter(method == as.character(method1) & fit == as.character(fit1) & metric == as.character(metric1))
+  min = min(temp$fit_off, na.rm = T)
+  temp$pos_fit_off = temp$fit_off + abs(min) + 0.001
+  temp$log_fit_off = log(temp$pos_fit_off)
+  return(temp)
+}
+
+surv_cg_rel_log <- log_trns(fit_offsets_plot, "cg", "rel", "surv")
+mid <- log(abs(min(surv_cg_rel_log$fit_off, na.rm = T)) + 0.001) # new midpoint
+
+surv_cg_heatmap_rel_log <- surv_cg_rel_log %>%
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = log_fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = mid, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Common Garden Fitness Offset,\nRelative Survival (Log)", x = "Population", y = "Treatment", fill = "Fitness Offset")
+surv_cg_heatmap_rel_log
+
+surv_cf_rel_log <- log_trns(fit_offsets_plot, "cf", "rel", "surv")
+mid <- log(abs(min(surv_cf_rel_log$fit_off, na.rm = T)) + 0.001) # new midpoint
+
+surv_cf_heatmap_rel <- surv_cf_rel_log %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = log_fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = -0.11, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Current-Future Fitness Offset,\nRelative Survival (Log)", x = "Population", y = "Treatment", fill = "Fitness Offset")
+surv_cf_heatmap_rel
+```
+
+Length Plots 
+
+```{r}
+# plot
+len_cg_heatmap_abs <- fit_offsets_plot %>% 
+  filter(method == "cg" & fit == "abs" & metric == "len") %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = 0, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Common Garden Fitness Offset,\nAbsolute Length Change", x = "Population", y = "Treatment", fill = "Fitness Offset")
+len_cg_heatmap_abs
+
+len_cf_heatmap_abs <- fit_offsets_plot %>% 
+  filter(method == "cf" & fit == "abs" & metric == "len") %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = 0, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Current-Future Fitness Offset,\nAbsolute Length Change", x = "Population", y = "Treatment", fill = "Fitness Offset")
+len_cf_heatmap_abs
+
+len_cg_heatmap_rel <- fit_offsets_plot %>% 
+  filter(method == "cg" & fit == "rel" & metric == "len") %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = 0, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Common Garden Fitness Offset,\nRelative Length Change", x = "Population", y = "Treatment", fill = "Fitness Offset")
+len_cg_heatmap_rel
+
+len_cf_heatmap_rel <- fit_offsets_plot %>% 
+  filter(method == "cf" & fit == "rel" & metric == "len") %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = 0, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Current-Future Fitness Offset,\nRelative Length Change", x = "Population", y = "Treatment", fill = "Fitness Offset")
+len_cf_heatmap_rel
+
+# log transformed relative len
+# start by transforming data
+log_trns <- function(df, method1, fit1, metric1) {
+  temp = df %>% filter(method == as.character(method1) & fit == as.character(fit1) & metric == as.character(metric1))
+  min = min(temp$fit_off, na.rm = T)
+  temp$pos_fit_off = temp$fit_off + abs(min) + 0.001
+  temp$log_fit_off = log(temp$pos_fit_off)
+  return(temp)
+}
+
+len_cg_rel_log <- log_trns(fit_offsets_plot, "cg", "rel", "len")
+mid <- log(abs(min(len_cg_rel_log$fit_off, na.rm = T)) + 0.001) # new midpoint
+
+len_cg_heatmap_rel_log <- len_cg_rel_log %>%
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = log_fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = mid, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Common Garden Fitness Offset,\nRelative Length Change (Log)", x = "Population", y = "Treatment", fill = "Fitness Offset")
+len_cg_heatmap_rel_log
+
+len_cf_rel_log <- log_trns(fit_offsets_plot, "cf", "rel", "len")
+mid <- log(abs(min(len_cf_rel_log$fit_off, na.rm = T)) + 0.001) # new midpoint
+
+len_cf_heatmap_rel <- len_cf_rel_log %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = log_fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = -0.11, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Current-Future Fitness Offset,\nRelative Length Change (Log)", x = "Population", y = "Treatment", fill = "Fitness Offset")
+len_cf_heatmap_rel
+```
+
+Weight Plots 
+
+```{r}
+# plot
+weigh_cg_heatmap_abs <- fit_offsets_plot %>% 
+  filter(method == "cg" & fit == "abs" & metric == "weigh") %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = 0, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Common Garden Fitness Offset,\nAbsolute Weight Change", x = "Population", y = "Treatment", fill = "Fitness Offset")
+weigh_cg_heatmap_abs
+
+weigh_cf_heatmap_abs <- fit_offsets_plot %>% 
+  filter(method == "cf" & fit == "abs" & metric == "weigh") %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = 0, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Current-Future Fitness Offset,\nAbsolute Weight Change", x = "Population", y = "Treatment", fill = "Fitness Offset")
+weigh_cf_heatmap_abs
+
+weigh_cg_heatmap_rel <- fit_offsets_plot %>% 
+  filter(method == "cg" & fit == "rel" & metric == "weigh") %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = 0, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Common Garden Fitness Offset,\nRelative Weight Change", x = "Population", y = "Treatment", fill = "Fitness Offset")
+weigh_cg_heatmap_rel
+
+weigh_cf_heatmap_rel <- fit_offsets_plot %>% 
+  filter(method == "cf" & fit == "rel" & metric == "weigh") %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = 0, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Current-Future Fitness Offset,\nRelative Weight Change", x = "Population", y = "Treatment", fill = "Fitness Offset")
+weigh_cf_heatmap_rel
+
+# log transformed relative weigh
+# start by transforming data
+log_trns_w <- function(df, method1, fit1, metric1) {
+  temp = df %>% filter(method == as.character(method1) & fit == as.character(fit1) & metric == as.character(metric1))
+  min = min(temp$fit_off, na.rm = T)
+  temp$pos_fit_off = temp$fit_off + abs(min) + 0.001
+  temp$log_fit_off = log(temp$pos_fit_off)
+  return(temp)
+}
+
+weigh_cg_rel_log <- log_trns_w(fit_offsets_plot, "cg", "rel", "weigh")
+mid <- log(abs(min(weigh_cg_rel_log$fit_off, na.rm = T)) + 0.001) # new midpoint
+
+weigh_cg_heatmap_rel_log <- weigh_cg_rel_log %>%
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = log_fit_off)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = mid, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Common Garden Fitness Offset,\nRelative Weight Change (Log)", x = "Population", y = "Treatment", fill = "Fitness Offset")
+weigh_cg_heatmap_rel_log
+
+weigh_cf_rel_log <- log_trns_w(fit_offsets_plot, "cf", "rel", "weigh")
+mid <- log(abs(min(weigh_cf_rel_log$fit_off, na.rm = T)) + 0.001) # new midpoint
+
+weigh_cf_heatmap_rel <- weigh_cf_rel_log %>% 
+  ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = log_fit_off)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = round(log_fit_off, 3))) +
+  scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = mid, guide = "colourbar", na.value = "gray") +
+  theme_classic() +
+  labs(title = "Current-Future Fitness Offset,\nRelative Weight Change (Log)", x = "Population", y = "Treatment", fill = "Fitness Offset")
+weigh_cf_heatmap_rel
+```
+Export 
+
+```{r}
+# combining log dfs
+fit_offsets_log <- rbind(surv_cg_rel_log, surv_cf_rel_log, len_cg_rel_log, len_cf_rel_log, weigh_cg_rel_log, weigh_cf_rel_log)
+
+# export fitness offsets for go comparisons
+fit_offsets_plot
+fit_offsets_clim_plot
+
+write.csv(fit_offsets_plot, paste0("results/fit_results/fit_offsets_", Sys.Date(), ".csv"), row.names = F)
+write.csv(fit_offsets_clim_plot, paste0("results/fit_results/fit_offsets_clim_", Sys.Date(), ".csv"), row.names = F)
+write.csv(fit_offsets_log, paste0("results/fit_results/fit_offsets_log_", Sys.Date(), ".csv"), row.names = F)
+```
