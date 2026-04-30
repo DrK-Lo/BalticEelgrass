@@ -94,6 +94,7 @@ expfit <- merge(surv, grow, by = c("pop", "trt"), all = T)
 exp_pops$order <- 1:8
 exp_pops$pop <- exp_pops$site_abbrev
 expfit_mg <- merge(exp_pops, expfit, by = "pop")
+write.csv(expfit_mg, "data/experiment/expfit_poptrt.csv", row.names = F)
 ```
 
 ## Plotting
