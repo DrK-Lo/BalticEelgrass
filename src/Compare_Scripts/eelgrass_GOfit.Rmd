@@ -17,12 +17,20 @@ library(ggplot2)
 library(stringr)
 library(knitr)
 library(kableExtra)
+library(emmeans)
+library(multcomp)
+library(multcompView)
 
 # data
 # exp fit
 fit_full <- read.csv("data/experiment/eelgrass_mesocosm_start_end_complete.csv")[,-1]
 surv <- read.csv("data/experiment/survival_dat_trt_pop.csv")[,-1]
 grow <- read.csv("data/experiment/fit_growth_dat.csv")[,-1]
+
+# fit offsets
+fit_off <- read.csv("results/fit_results/fit_offsets_2026-04-30.csv")
+fit_off_clim <- read.csv("results/fit_results/fit_offsets_clim_2026-04-30.csv")
+fit_off_log <- read.csv("results/fit_results/fit_offsets_log_2026-04-30.csv")
 
 # go
 lea <- read.csv("results/GO_results/LEA_offsets_exptrt_wide_2025-12-03.csv")[,-1]
@@ -65,7 +73,7 @@ gf_long <- gf %>% pivot_longer(
   values_to = "gf_offset")
 
 # env dist
-env_dist_trt <- env_dist %>% filter(pops1 %in% c("TempWarm-5psu", "TempWarm-16psu", "TempControl-7psu", "TempControl-21psu") & !(pops2 %in% c("TempWarm-5psu", "TempWarm-16psu", "TempControl-7psu", "TempControl-21psu"))) %>% select(pops1, pops2, distances) %>% rename(pop = pops2, trt = pops1, env_dist = distances)
+env_dist_trt <- env_dist %>% filter(pops1 %in% c("TempWarm-5psu", "TempWarm-16psu", "TempControl-7psu", "TempControl-21psu") & !(pops2 %in% c("TempWarm-5psu", "TempWarm-16psu", "TempControl-7psu", "TempControl-21psu"))) %>% dplyr::select(pops1, pops2, distances) %>% rename(pop = pops2, trt = pops1, env_dist = distances)
 
 # put everything together
 go1 <- merge(lea_long, rda_long, by = c("trt", "cc", "pop"))
@@ -147,13 +155,24 @@ grow_go_long$method <- str_split_fixed(grow_go_long$method, "_", 2)[,1]
 trts <- levels(as.factor(surv_go$trt))
 pops <- levels(as.factor(surv_go$pop))
 
+# add fitness offsets
+surv_go_long_off <- fit_off %>% filter(metric == "surv") %>% rename(method_fit = method) %>% pivot_wider(id_cols = c(trt, pop, trt_ord, pop_ord, metric), names_from = c(method_fit, fit), names_sep = "_", values_from = fit_off) %>% mutate(trt = gsub("_", "-", trt))
+surv_go_long_offset <- merge(surv_go_long, surv_go_long_off, by = c("trt", "pop"))
+
+grow_go_long_off <- fit_off %>% filter(metric %in% c("len", "weigh")) %>% rename(method_fit = method) %>% pivot_wider(id_cols = c(trt, pop, trt_ord, pop_ord, metric), names_from = c(method_fit, fit), names_sep = "_", values_from = fit_off) %>% mutate(trt = gsub("_", "-", trt))
+grow_go_long_offset <- merge(grow_go_long, grow_go_long_off, by = c("trt", "pop"))
+
 # save combined dfs
 #write.csv(surv_go, "results/GO_compare/survival_offset_avgs.csv", row.names = F)
 #write.csv(surv_all_go, "results/GO_compare/survival_offset_binary.csv", row.names = F)
 #write.csv(grow_go, "results/GO_compare/grow_offset.csv", row.names = F)
+#write.csv(surv_go_long_offset, "results/GO_compare/surv_fitoffset.csv", row.names = F)
+#write.csv(grow_go_long_offset, "results/GO_compare/grow_fitoffset.csv", row.names = F)
 ```
 
 #### Correlations
+
+Correlations CG & CF
 
 ```{r}
 ## SURVIVAL
@@ -358,6 +377,212 @@ grow_corr_cg$signif_weigh <- ifelse(grow_corr_cg$pval_weigh < 0.05, T, F)
 ##############
 ```
 
+Fitness Offset Correlations CG & CF
+
+```{r}
+## SURVIVAL
+###########
+# function for correlations both common garden/current future offset
+surv_corr <- function(df, method, gen_clone, fit_offset) {
+  # subset data
+  df_subset <- df[df$method == method & df$cc == gen_clone,]
+  
+  if(fit_offset == "cg") {
+    # make df
+    corrs_cg <- data.frame(method = NA, trt = NA, cc = NA, kendall_surv = NA, pval_surv = NA)
+    
+    # common garden
+    for (i in 1:length(trts)){
+      # subset
+      trt_temp <- trts[i]
+      temp <- df_subset[df_subset$trt == trt_temp,]
+    
+      # metadata
+      corrs_cg[i,]$method <- method
+      corrs_cg[i,]$cc <- gen_clone
+      corrs_cg[i,]$trt <- trt_temp  
+      
+      # correlation
+      test <- cor.test(temp$surv, temp$offset, method = "kendall")
+      corrs_cg[i,]$kendall_surv <- test$estimate
+      corrs_cg[i,]$pval_surv <- test$p.value
+    }
+    return(corrs_cg)
+  } else if (fit_offset == "cf") {
+    # make df
+    corrs_cf <- data.frame(method = NA, pop = NA, cc = NA, kendall_surv = NA, pval_surv = NA)
+    
+    # current future
+    for (i in 1:length(pops)){
+      # subset
+      pop_temp <- pops[i]
+      temp <- df_subset[df_subset$pop == pop_temp,]
+    
+      # metadata
+      corrs_cf[i,]$method <- method
+      corrs_cf[i,]$cc <- gen_clone
+      corrs_cf[i,]$pop <- pop_temp  
+      
+      # correlation
+      test <- cor.test(temp$surv, temp$offset, method = "kendall")
+      corrs_cf[i,]$kendall_surv <- test$estimate
+      corrs_cf[i,]$pval_surv <- test$p.value
+    }
+    return(corrs_cf)
+  } else {
+    print("Please choose cg for common garden or cf for current-future")
+  }
+}
+
+surv_corr_cg <- rbind(surv_corr(surv_go_long, "lea", "full", "cg"),
+                      surv_corr(surv_go_long, "rda", "full", "cg"),
+                      surv_corr(surv_go_long, "gf", "full", "cg"),
+                      surv_corr(surv_go_long, "env", "full", "cg"),
+                      surv_corr(surv_go_long, "lea", "mll", "cg"),
+                      surv_corr(surv_go_long, "rda", "mll", "cg"),
+                      surv_corr(surv_go_long, "gf", "mll", "cg"),
+                      surv_corr(surv_go_long, "env", "mll", "cg"))
+
+surv_corr_all_cg <- rbind(surv_corr(surv_all_go, "lea", "full", "cg"),
+                      surv_corr(surv_all_go, "rda", "full", "cg"),
+                      surv_corr(surv_all_go, "gf", "full", "cg"),
+                      surv_corr(surv_all_go, "env", "full", "cg"),
+                      surv_corr(surv_all_go, "lea", "mll", "cg"),
+                      surv_corr(surv_all_go, "rda", "mll", "cg"),
+                      surv_corr(surv_all_go, "gf", "mll", "cg"),
+                      surv_corr(surv_all_go, "env", "mll", "cg"))
+
+surv_corr_cf <- rbind(surv_corr(surv_go_long, "lea", "full", "cf"),
+                      surv_corr(surv_go_long, "rda", "full", "cf"),
+                      surv_corr(surv_go_long, "gf", "full", "cf"),
+                      surv_corr(surv_go_long, "env", "full", "cf"),
+                      surv_corr(surv_go_long, "lea", "mll", "cf"),
+                      surv_corr(surv_go_long, "rda", "mll", "cf"),
+                      surv_corr(surv_go_long, "gf", "mll", "cf"),
+                      surv_corr(surv_go_long, "env", "mll", "cf"))
+
+surv_corr_all_cf <- rbind(surv_corr(surv_all_go, "lea", "full", "cf"),
+                      surv_corr(surv_all_go, "rda", "full", "cf"),
+                      surv_corr(surv_all_go, "gf", "full", "cf"),
+                      surv_corr(surv_all_go, "env", "full", "cf"),
+                      surv_corr(surv_all_go, "lea", "mll", "cf"),
+                      surv_corr(surv_all_go, "rda", "mll", "cf"),
+                      surv_corr(surv_all_go, "gf", "mll", "cf"),
+                      surv_corr(surv_all_go, "env", "mll", "cf"))
+
+# add info about surv
+surv_corr_cg$type_surv <- rep("proportion", nrow(surv_corr_cg))
+surv_corr_cf$type_surv <- rep("proportion", nrow(surv_corr_cf))
+surv_corr_all_cg$type_surv <- rep("binary", nrow(surv_corr_all_cg))
+surv_corr_all_cf$type_surv <- rep("binary", nrow(surv_corr_all_cf))
+
+# combine into single df
+surv_corrs_cf <- rbind(surv_corr_cf, surv_corr_all_cf)
+surv_corrs_cg <- rbind(surv_corr_cg, surv_corr_all_cg)
+
+# signif T/F
+surv_corrs_cf$signif <- ifelse(surv_corrs_cf$pval_surv < 0.05, T, F)
+surv_corrs_cg$signif <- ifelse(surv_corrs_cg$pval_surv < 0.05, T, F)
+###########
+
+## GROWTH
+#########
+grow_corr <- function(df, method, gen_clone, fit_offset) {
+  # subset data
+  df_subset <- df[df$method == method & df$cc == gen_clone,]
+  
+  if(fit_offset == "cg") {
+    # make df
+    corrs_cg <- data.frame(method = NA, trt = NA, cc = NA, kendall_len = NA, pval_len = NA, kendall_weigh = NA, pval_weigh = NA)
+    
+    # common garden
+    for (i in 1:length(trts)){
+      # subset
+      trt_temp <- trts[i]
+      temp <- df_subset[df_subset$trt == trt_temp,]
+    
+      # metadata
+      corrs_cg[i,]$method <- method
+      corrs_cg[i,]$cc <- gen_clone
+      corrs_cg[i,]$trt <- trt_temp  
+      
+      # correlation
+      test_len <- cor.test(temp$length_std_change, temp$offset, method = "kendall")
+      corrs_cg[i,]$kendall_len <- test_len$estimate
+      corrs_cg[i,]$pval_len <- test_len$p.value
+      
+      test_weigh <- cor.test(temp$weight_std_change, temp$offset, method = "kendall")
+      corrs_cg[i,]$kendall_weigh <- test_weigh$estimate
+      corrs_cg[i,]$pval_weigh <- test_weigh$p.value
+    }
+    return(corrs_cg)
+    
+  } else if (fit_offset == "cf") {
+    # make df
+    corrs_cf <- data.frame(method = NA, pop = NA, cc = NA, kendall_len = NA, pval_len = NA, kendall_weigh = NA, pval_weigh = NA)
+    
+    # current future
+    for (i in 1:length(pops)){
+      # subset
+      pop_temp <- pops[i]
+      temp <- df_subset[df_subset$pop == pop_temp,]
+    
+      # metadata
+      corrs_cf[i,]$method <- method
+      corrs_cf[i,]$cc <- gen_clone
+      corrs_cf[i,]$pop <- pop_temp  
+      
+      # correlation
+      test_len <- cor.test(temp$length_std_change, temp$offset, method = "kendall")
+      corrs_cf[i,]$kendall_len <- test_len$estimate
+      corrs_cf[i,]$pval_len <- test_len$p.value
+      
+      test_weigh <- cor.test(temp$weight_std_change, temp$offset, method = "kendall")
+      corrs_cf[i,]$kendall_weigh <- test_weigh$estimate
+      corrs_cf[i,]$pval_weigh <- test_weigh$p.value
+    }
+    return(corrs_cf)
+    
+  } else {
+    print("Please choose cg for common garden or cf for current-future")
+  }
+}
+
+grow_corr_cg <- rbind(grow_corr(grow_go_long, "lea", "full", "cg"),
+                      grow_corr(grow_go_long, "rda", "full", "cg"),
+                      grow_corr(grow_go_long, "gf", "full", "cg"),
+                      grow_corr(grow_go_long, "env", "full", "cg"),
+                      grow_corr(grow_go_long, "lea", "mll", "cg"),
+                      grow_corr(grow_go_long, "rda", "mll", "cg"),
+                      grow_corr(grow_go_long, "gf", "mll", "cg"),
+                      grow_corr(grow_go_long, "env", "mll", "cg"))
+
+grow_corr_cf <- rbind(grow_corr(grow_go_long, "lea", "full", "cf"),
+                      grow_corr(grow_go_long, "rda", "full", "cf"),
+                      grow_corr(grow_go_long, "gf", "full", "cf"),
+                      grow_corr(grow_go_long, "env", "full", "cf"),
+                      grow_corr(grow_go_long, "lea", "mll", "cf"),
+                      grow_corr(grow_go_long, "rda", "mll", "cf"),
+                      grow_corr(grow_go_long, "gf", "mll", "cf"),
+                      grow_corr(grow_go_long, "env", "mll", "cf"))
+
+# signif T/F
+grow_corr_cf$signif_len <- ifelse(grow_corr_cf$pval_len < 0.05, T, F)
+grow_corr_cg$signif_len <- ifelse(grow_corr_cg$pval_len < 0.05, T, F)
+grow_corr_cf$signif_weigh <- ifelse(grow_corr_cf$pval_weigh < 0.05, T, F)
+grow_corr_cg$signif_weigh <- ifelse(grow_corr_cg$pval_weigh < 0.05, T, F)
+#########
+
+# save outputs
+##############
+#write.csv(surv_corrs_cf, "results/GO_compare/surv_corrs_cf.csv", row.names = F)
+#write.csv(surv_corrs_cg, "results/GO_compare/surv_corrs_cg.csv", row.names = F)
+#write.csv(grow_corr_cf, "results/GO_compare/grow_corr_cf.csv", row.names = F)
+#write.csv(grow_corr_cg, "results/GO_compare/grow_corr_cg.csv", row.names = F)
+##############
+```
+
+
 #### Modeling
 
 ##### GO only
@@ -365,16 +590,16 @@ grow_corr_cg$signif_weigh <- ifelse(grow_corr_cg$pval_weigh < 0.05, T, F)
 Survival 
 
 ```{r}
-# survival
-##########
 # quick checks + fixes
 hist(surv_all_go$surv) # we will use binary outcomes first
 
 ## lea
+######
 # model full (no cc)
 surv_mod_lea_full <- glm(isAlive ~ offset,
                family = binomial(link = "logit"),
-               data = surv_all_go_full[surv_all_go_full$method == "lea",])
+               data = surv_all_go_full[surv_all_go_full$method == "lea",],
+               na.action = na.exclude)
 summary(surv_mod_lea_full) 
 #plot(surv_mod_lea_full) # these look pretty bad
 Anova(surv_mod_lea_full) # signif
@@ -395,7 +620,20 @@ summary(surv_mod_lea_poptrt_full)
 #plot(surv_mod_lea_full)
 Anova(surv_mod_lea_poptrt_full) # signif
 
+surv_mod_lea_poptrt_mll <- glm(surv ~ lea_offset,
+               family = binomial(link = "logit"),
+               data = surv_go[surv_go$cc == "mll",])
+summary(surv_mod_lea_poptrt_mll) 
+#plot(surv_mod_lea_poptrt_mll)
+Anova(surv_mod_lea_poptrt_mll) # signif
+
+# which pops diff?
+emm_surv_lea_full <- emmeans(surv_mod_lea_full, "offset")
+pairs(emm_surv_lea_full, adjust = "tukey")
+######
+
 ## rda
+######
 # model full (no cc)
 surv_mod_rda_full <- glm(isAlive ~ offset,
                family = binomial(link = "logit"),
@@ -418,17 +656,18 @@ surv_mod_rda_poptrt_full <- glm(surv ~ rda_offset,
                data = surv_go[surv_go$cc == "full",])
 summary(surv_mod_rda_poptrt_full) 
 #plot(surv_mod_rda_full)
-Anova(surv_mod_rda_poptrt_full) # signif
+Anova(surv_mod_rda_poptrt_full) # not signif
 
 surv_mod_rda_poptrt_mll <- glm(surv ~ rda_offset,
                family = binomial(link = "logit"),
                data = surv_go[surv_go$cc == "mll",])
 summary(surv_mod_rda_poptrt_mll) 
 #plot(surv_mod_rda_poptrt_mll)
-Anova(surv_mod_rda_poptrt_mll) # signif
-
+Anova(surv_mod_rda_poptrt_mll) # not signif
+######
 
 ## gf
+#####
 # model full (no cc)
 surv_mod_gf_full <- glm(isAlive ~ offset,
                family = binomial(link = "logit"),
@@ -451,15 +690,15 @@ surv_mod_gf_poptrt_full <- glm(surv ~ gf_offset,
                data = surv_go_full)
 summary(surv_mod_gf_poptrt_full) 
 #plot(surv_mod_gf_poptrt_full) # better than binary model
-Anova(surv_mod_gf_poptrt_full) # signif
+Anova(surv_mod_gf_poptrt_full) # not signif
 
 surv_mod_gf_poptrt_mll <- glm(surv ~ gf_offset,
                family = binomial(link = "logit"),
                data = surv_go_mll)
 summary(surv_mod_gf_poptrt_mll) 
 #plot(surv_mod_gf_poptrt_mll)
-Anova(surv_mod_gf_poptrt_mll) # signif
-##########
+Anova(surv_mod_gf_poptrt_mll) # not signif
+######
 ```
 
 Length
@@ -606,6 +845,8 @@ surv_pop_lea_full <- lm(isAlive ~ pop + offset,
 summary(surv_pop_lea_full) 
 #plot(surv_pop_lea_full)
 Anova(surv_pop_lea_full) # signif
+emm_survpop_lea_full <- emmeans(surv_pop_lea_full, "pop")
+letters_survpop_lea_full <- cld(emm_survpop_lea_full, Letters = letters, adjust = "tukey")
 
 # model mll (cc)
 surv_pop_lea_mll <- lm(isAlive ~ pop + offset,
@@ -613,6 +854,8 @@ surv_pop_lea_mll <- lm(isAlive ~ pop + offset,
 summary(surv_pop_lea_mll) 
 #plot(surv_pop_lea_mll)
 Anova(surv_pop_lea_mll) # signif
+emm_survpop_lea_mll <- emmeans(surv_pop_lea_mll, "pop")
+letters_survpop_lea_mll <- cld(emm_survpop_lea_mll, Letters = letters, adjust = "tukey")
 
 # model full (no cc) log
 surv_pop_lea_full_log <- glm(isAlive ~ pop + offset,
@@ -621,6 +864,8 @@ surv_pop_lea_full_log <- glm(isAlive ~ pop + offset,
 summary(surv_pop_lea_full_log) 
 #plot(surv_pop_lea_full_log)
 Anova(surv_pop_lea_full_log) # signif
+emm_survpop_lea_full_log <- emmeans(surv_pop_lea_full_log, "pop")
+letters_survpop_lea_full_log <- cld(emm_survpop_lea_full_log, Letters = letters, adjust = "tukey")
 
 # model mll (cc) log
 surv_pop_lea_mll_log <- glm(isAlive ~ pop + offset,
@@ -629,6 +874,8 @@ surv_pop_lea_mll_log <- glm(isAlive ~ pop + offset,
 summary(surv_pop_lea_mll_log) 
 #plot(surv_pop_lea_mll_log)
 Anova(surv_pop_lea_mll_log) # signif
+emm_survpop_lea_mll_log <- emmeans(surv_pop_lea_mll_log, "pop")
+letters_survpop_lea_mll_log <- cld(emm_survpop_lea_mll_log, Letters = letters, adjust = "tukey")
 ######
 
 ## rda
@@ -639,6 +886,8 @@ surv_pop_rda_full <- lm(isAlive ~ pop + offset,
 summary(surv_pop_rda_full) 
 #plot(surv_pop_rda_full)
 Anova(surv_pop_rda_full) # signif
+emm_survpop_rda_full <- emmeans(surv_pop_rda_full, "pop")
+letters_survpop_rda_full <- cld(emm_survpop_rda_full, Letters = letters, adjust = "tukey")
 
 # model mll (cc)
 surv_pop_rda_mll <- lm(isAlive ~ pop + offset,
@@ -646,6 +895,8 @@ surv_pop_rda_mll <- lm(isAlive ~ pop + offset,
 summary(surv_pop_rda_mll) 
 #plot(surv_pop_rda_mll)
 Anova(surv_pop_rda_mll) # signif
+emm_survpop_rda_mll <- emmeans(surv_pop_rda_mll, "pop")
+letters_survpop_rda_mll <- cld(emm_survpop_rda_mll, Letters = letters, adjust = "tukey")
 
 # model full (no cc) log
 surv_pop_rda_full_log <- glm(isAlive ~ pop + offset,
@@ -654,6 +905,8 @@ surv_pop_rda_full_log <- glm(isAlive ~ pop + offset,
 summary(surv_pop_rda_full_log) 
 #plot(surv_pop_rda_full_log)
 Anova(surv_pop_rda_full_log) # signif
+emm_survpop_rda_full_log <- emmeans(surv_pop_rda_full_log, "pop")
+letters_survpop_rda_full_log <- cld(emm_survpop_rda_full_log, Letters = letters, adjust = "tukey")
 
 # model mll (cc) log
 surv_pop_rda_mll_log <- glm(isAlive ~ pop + offset,
@@ -662,6 +915,8 @@ surv_pop_rda_mll_log <- glm(isAlive ~ pop + offset,
 summary(surv_pop_rda_mll_log) 
 #plot(surv_pop_rda_mll_log)
 Anova(surv_pop_rda_mll_log) # signif
+emm_survpop_rda_mll_log <- emmeans(surv_pop_rda_mll_log, "pop")
+letters_survpop_rda_mll_log <- cld(emm_survpop_rda_mll_log, Letters = letters, adjust = "tukey")
 ######
 
 ## gf
@@ -672,6 +927,8 @@ surv_pop_gf_full <- lm(isAlive ~ pop + offset,
 summary(surv_pop_gf_full) 
 #plot(surv_pop_gf_full)
 Anova(surv_pop_gf_full) # signif
+emm_survpop_gf_full <- emmeans(surv_pop_gf_full, "pop")
+letters_survpop_gf_full <- cld(emm_survpop_gf_full, Letters = letters, adjust = "tukey")
 
 # model mll (cc)
 surv_pop_gf_mll <- lm(isAlive ~ pop + offset,
@@ -679,6 +936,8 @@ surv_pop_gf_mll <- lm(isAlive ~ pop + offset,
 summary(surv_pop_gf_mll) 
 #plot(surv_pop_gf_mll)
 Anova(surv_pop_gf_mll) # signif
+emm_survpop_gf_mll <- emmeans(surv_pop_gf_mll, "pop")
+letters_survpop_gf_mll <- cld(emm_survpop_gf_mll, Letters = letters, adjust = "tukey")
 
 # model full (no cc) log
 surv_pop_gf_full_log <- glm(isAlive ~ pop + offset,
@@ -687,6 +946,8 @@ surv_pop_gf_full_log <- glm(isAlive ~ pop + offset,
 summary(surv_pop_gf_full_log) 
 #plot(surv_pop_gf_full_log)
 Anova(surv_pop_gf_full_log) # signif
+emm_survpop_gf_full_log <- emmeans(surv_pop_gf_full_log, "pop")
+letters_survpop_gf_full_log <- cld(emm_survpop_gf_full_log, Letters = letters, adjust = "tukey")
 
 # model mll (cc) log
 surv_pop_gf_mll_log <- glm(isAlive ~ pop + offset,
@@ -695,6 +956,8 @@ surv_pop_gf_mll_log <- glm(isAlive ~ pop + offset,
 summary(surv_pop_gf_mll_log) 
 #plot(surv_pop_gf_mll_log)
 Anova(surv_pop_gf_mll_log) # signif
+emm_survpop_gf_mll_log <- emmeans(surv_pop_gf_mll_log, "pop")
+letters_survpop_gf_mll_log <- cld(emm_survpop_gf_mll_log, Letters = letters, adjust = "tukey")
 #####
 ```
 
@@ -804,13 +1067,33 @@ Anova(weigh_pop_gf_mll) # signif
 #####
 ```
 
+Offset Only
+
+```{r}
+# distributions
+hist(lea_long[lea_long$cc == "mll",]$lea_offset)
+hist(rda_long[rda_long$cc == "mll",]$rda_offset)
+hist(gf_long[gf_long$cc == "mll",]$gf_offset)
+hist(lea_long[lea_long$cc == "full",]$lea_offset)
+hist(rda_long[rda_long$cc == "full",]$rda_offset)
+hist(gf_long[gf_long$cc == "full",]$gf_offset)
+
+# lea
+lea_mll_pop <- glm(lea_offset ~ as.factor(pop), 
+                   data = lea_long[lea_long$cc == "mll",], 
+                   family = "binomial")
+check_overdispersion(lea_mll_pop) # none detected
+lea_mll_pop_res <- res2(lea_mll_pop)
+Anova(lea_mll_pop, type = "III")
+```
+
 ##### With treatment as fixed effect
 
 Survival 
 
 ```{r}
 # quick checks + fixes
-hist(surv_all_go$surv) # we will use binary outcomes first
+#hist(surv_all_go$surv) # we will use binary outcomes first
 
 ## lea
 ######
