@@ -290,7 +290,7 @@ surv_env_df <- fit_trim_env_mlg %>% group_by(pop, trt) %>%
     mean_surv = mean(isAlive),
     .groups = 'drop'
   ) %>% as.data.frame()
-fit_env_trim <- fit_trim_env_mlg %>% select(pop, trt, median_sal, median_temp, max_temp, min_sal)
+fit_env_trim <- fit_trim_env_mlg %>% dplyr::select(pop, trt, median_sal, median_temp, max_temp, min_sal)
 env_surv_mg <- merge(fit_env_trim, surv_env_df, by = c("pop", "trt"))
 
 # quick and dirty correlation

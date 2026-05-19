@@ -91,9 +91,10 @@ grow <- fit_growth %>%
 expfit <- merge(surv, grow, by = c("pop", "trt"), all = T)
 
 # add pop info
-exp_pops$order <- 1:8
+exp_pops$pop_order <- 1:8
 exp_pops$pop <- exp_pops$site_abbrev
 expfit_mg <- merge(exp_pops, expfit, by = "pop")
+expfit_mg$trt <- gsub("_", "-", expfit_mg$trt)
 write.csv(expfit_mg, "data/experiment/expfit_poptrt.csv", row.names = F)
 ```
 
@@ -132,33 +133,35 @@ Plotting common garden vs current future comparisons
 ```{r}
 ## survival
 ###########
-trt_order <- c("TempControl_21psu", "TempWarm_16psu", "TempControl_7psu", "TempWarm_5psu")
+pop_colors <- c(VIK = "#002e5a", VAT = "#0130b9", HOG = "#0078cf", BAR = "#82daff", KUR = "#d9ed92", KAL = "#4ad66d", HOR = "#25a244", BJO = "#155d27")
+trt_colors <- c("TempControl-21psu" = "#FFA203", "TempControl-7psu" = "#FE691E",  "TempWarm-16psu" = "deeppink", "TempWarm-5psu" = "deeppink4")
+trt_labels <- c("TempControl-21psu" = "Current W Coast", "TempControl-7psu" = "Current E Coast",  "TempWarm-16psu" = "Future W Coast", "TempWarm-5psu" = "Future E Coast")
+trt_order <- c("TempControl-21psu", "TempWarm-16psu", "TempControl-7psu", "TempWarm-5psu")
 
 # pop x trt
-poptrt_surv_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = surv_mean, fill = trt)) +
+poptrt_surv_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, pop_order), y = surv_mean, fill = factor(trt, levels = names(trt_colors)))) +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels,
+                    breaks = names(trt_colors)) +
   theme(plot.title = element_text(size = 24), 
         plot.subtitle = element_text(size = 15),
         legend.title = element_text(size = 15),
         legend.position = "right") +
-  xlab("Population") + 
+  xlab("Population") +
   ylab("Survival") +
   ggtitle("Survival by Population & Treatment", subtitle = "Current Future Comparison")
 poptrt_surv_cf
 
 # pop x trt
-poptrt_surv_cg <- ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = surv_mean, fill = pop)) +
+poptrt_surv_cg <- ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = surv_mean, fill = factor(pop, level = names(pop_colors)))) +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Population",
-                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors,
+                    breaks = names(pop_colors)) +
   theme(plot.title = element_text(size = 24), 
         plot.subtitle = element_text(size = 15),
         legend.title = element_text(size = 15),
@@ -176,9 +179,8 @@ poptrt_len_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = len_mean
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   theme(plot.title = element_text(size = 24), 
         plot.subtitle = element_text(size = 15),
         legend.title = element_text(size = 15),
@@ -193,9 +195,7 @@ poptrt_len_cg <- ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = l
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Population",
-                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   theme(plot.title = element_text(size = 24), 
         plot.subtitle = element_text(size = 15),
         legend.title = element_text(size = 15),
@@ -213,9 +213,8 @@ poptrt_weight_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = weigh
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   theme(plot.title = element_text(size = 24), 
         plot.subtitle = element_text(size = 15),
         legend.title = element_text(size = 15),
@@ -230,9 +229,7 @@ poptrt_weight_cg <- ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y 
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Population",
-                    values = c("#023e8a","#0096c7","#90e0ef","#caf0f8", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   theme(plot.title = element_text(size = 24), 
         plot.subtitle = element_text(size = 15),
         legend.title = element_text(size = 15),

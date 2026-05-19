@@ -10,6 +10,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = "~/Documents/GitHub/BalticEelgrass")
+setwd("~/Documents/GitHub/BalticEelgrass")
 
 # packages
 library(tidyverse)
@@ -38,12 +39,20 @@ pop_coast <- data.frame(pop = c("VIK","VAT","HOG","BAR",
                         pop_ord = 1:8,
                         pop_coast = c("West", "West", "West", "West", 
                                       "East", "East", "East", "East"),
-                        pop_coast_ord = c(1,1,1,1,2,2,2,2))
+                        pop_coast_ord = c(1,1,1,1,2,2,2,2),
+                        pop_col = c("#002e5a","#0130b9","#0078cf","#82daff", 
+                               "#d9ed92","#4ad66d","#25a244","#155d27"),
+                        pop_label = c("Vik", "Vattenholmen", "Hogarnas",
+                                      "Barseback", "Kurland", "Kalmarsund",
+                                      "Hornsudde", "Bjorko"))
 trt_coast <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", 
                                 "TempWarm-16psu", "TempWarm-5psu"),
                         trt_ord = 1:4,
                         trt_coast = c("West", "East", "West", "East"),
-                        trt_coast_ord = c(1,2,1,2))
+                        trt_coast_ord = c(1,2,1,2), 
+                        trt_col = trt_colors,
+                        trt_label = c("Current W Coast", "Current E Coast",
+                                      "Future W Coast", "Future E Coast"))
 surv_go1 <- merge(surv_go, pop_coast, by = "pop")
 surv_go2 <- merge(surv_go1, trt_coast, by = "trt")
 
@@ -72,6 +81,11 @@ grow_go_mll <- grow_go2[grow_go2$cc == "mll",]
 LEA
 
 ```{r}
+# plotting prep
+pop_colors <- c(VIK = "#002e5a", VAT = "#0130b9", HOG = "#0078cf", BAR = "#82daff", KUR = "#d9ed92", KAL = "#4ad66d", HOR = "#25a244", BJO = "#155d27")
+trt_colors <- c("TempControl-21psu" = "#FFA203", "TempControl-7psu" = "#FE691E",  "TempWarm-16psu" = "deeppink", "TempWarm-5psu" = "deeppink4")
+trt_labels <- c("TempControl-21psu" = "Current W Coast", "TempControl-7psu" = "Current E Coast",  "TempWarm-16psu" = "Future W Coast", "TempWarm-5psu" = "Future E Coast")
+
 # means by pop/treatment
 # common garden: Env Dist
 ####################
@@ -81,13 +95,11 @@ surv_full_cg_env <- surv_go_full %>% ggplot(aes(x = env_dist, y = surv, fill = f
   labs(title = "Common Garden Fitness vs Environmental Distance (Full): Survival",
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -100,11 +112,11 @@ surv_mll_cg_env <- surv_go_mll %>% ggplot(aes(x = env_dist, y = surv, fill = fct
   labs(title = "Common Garden Fitness vs Environmental Distance (MLL): Survival",
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    values = trt_colors,
                     labels = c("Current W Coast", "Current E Coast",
                                "Future W Coast", "Future E Coast")) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
+                    values = trt_colors,
                     labels = c("Current W Coast", "Current E Coast",
                                "Future W Coast", "Future E Coast")) +
   scale_shape_manual(name = "Coast",
@@ -123,13 +135,9 @@ surv_full_cf_env <- surv_go_full %>% ggplot(aes(x = env_dist, y = surv, fill = f
   labs(title = "Current-Future Fitness vs Environmental Distance (Full): Survival", 
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -142,13 +150,9 @@ surv_mll_cf_env <- surv_go_mll %>% ggplot(aes(x = env_dist, y = surv, fill = fct
   labs(title = "Current-Future Fitness vs Environmental Distance (MLL): Survival", 
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -168,13 +172,11 @@ surv_full_bin_cg_env <- surv_all_go_full %>%
   labs(title = "Common Garden Fitness vs Environmental Distance (Full): \nBinary Survival",
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -189,13 +191,11 @@ surv_mll_bin_cg_env <- surv_all_go_mll %>%
   labs(title = "Common Garden Fitness vs Environmental Distance (MLL): \nBinary Survival",
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -214,13 +214,11 @@ surv_full_binlog_cg_env <- surv_all_go_full %>%
   labs(title = "Common Garden Fitness vs Environmental Distance (Full): \nBinary Survival, Logistic Regression",
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -236,13 +234,11 @@ surv_mll_binlog_cg_env <- surv_all_go_mll %>%
   labs(title = "Common Garden Fitness vs Environmental Distance (MLL): \nBinary Survival, Logistic Regression",
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -261,13 +257,9 @@ surv_full_bin_cf_env <- surv_all_go_full %>%
   labs(title = "Current-Future Fitness vs Environmental Distance (Full): \nBinary Survival", 
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -283,13 +275,9 @@ surv_mll_bin_cf_env <- surv_all_go_mll %>%
   labs(title = "Current-Future Fitness vs Environmental Distance (MLL): \nBinary Survival", 
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -308,13 +296,9 @@ surv_full_binlog_cf_env <- surv_all_go_full %>%
   labs(title = "Current-Future Fitness vs Environmental Distance (Full): \nBinary Survival, Logistic Regression", 
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -330,13 +314,9 @@ surv_mll_binlog_cf_env <- surv_all_go_mll %>%
   labs(title = "Current-Future Fitness vs Environmental Distance (MLL): \nBinary Survival, Logistic Regression", 
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -358,13 +338,11 @@ surv_full_cg_rda <- surv_go_full %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (RDA, Full): Survival",
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = ctrt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -378,13 +356,11 @@ surv_mll_cg_rda <- surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = f
   labs(title = "Common Garden Fitness vs Genomic Offset (RDA, MLL): Survival",
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -401,13 +377,9 @@ surv_full_cf_rda <- surv_go_full %>% ggplot(aes(x = rda_offset, y = surv, fill =
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): Survival", 
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -421,13 +393,9 @@ surv_mll_cf_rda <- surv_go_mll %>% ggplot(aes(x = rda_offset, y = surv, fill = f
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): Survival", 
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -447,13 +415,11 @@ surv_full_bin_cg_rda <- surv_all_go_full %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (RDA, Full): \nBinary Survival",
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -469,13 +435,11 @@ surv_mll_bin_cg_rda <- surv_all_go_mll %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (RDA, MLL): \nBinary Survival",
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -494,13 +458,11 @@ surv_full_binlog_cg_rda <- surv_all_go_full %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (RDA, Full): \nBinary Survival, Logistic Regression",
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -516,13 +478,11 @@ surv_mll_binlog_cg_rda <- surv_all_go_mll %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (RDA, MLL): \nBinary Survival, Logistic Regression",
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -541,13 +501,9 @@ surv_full_bin_cf_rda <- surv_all_go_full %>%
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): \nBinary Survival", 
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -563,13 +519,9 @@ surv_mll_bin_cf_rda <- surv_all_go_mll %>%
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): \nBinary Survival", 
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -588,13 +540,9 @@ surv_full_binlog_cf_rda <- surv_all_go_full %>%
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): \nBinary Survival, Logistic Regression", 
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -610,13 +558,9 @@ surv_mll_binlog_cf_rda <- surv_all_go_mll %>%
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): \nBinary Survival, Logistic Regression", 
        x = "RDA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -638,13 +582,11 @@ surv_full_cg_gf <- surv_go_full %>% ggplot(aes(x = gf_offset, y = surv, fill = f
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): Survival",
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -658,13 +600,11 @@ surv_mll_cg_gf <- surv_go_mll %>% ggplot(aes(x = gf_offset, y = surv, fill = fct
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): Survival",
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -681,13 +621,9 @@ surv_full_cf_gf <- surv_go_full %>% ggplot(aes(x = gf_offset, y = surv, fill = f
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): Survival", 
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -701,13 +637,9 @@ surv_mll_cf_gf <- surv_go_mll %>% ggplot(aes(x = gf_offset, y = surv, fill = fct
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): Survival", 
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -727,13 +659,11 @@ surv_full_bin_cg_gf <- surv_all_go_full %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): \nBinary Survival",
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -749,13 +679,11 @@ surv_mll_bin_cg_gf <- surv_all_go_mll %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): \nBinary Survival",
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -774,13 +702,11 @@ surv_full_binlog_cg_gf <- surv_all_go_full %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): \nBinary Survival, Logistic Regression",
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -796,13 +722,11 @@ surv_mll_binlog_cg_gf <- surv_all_go_mll %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): \nBinary Survival, Logistic Regression",
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -821,13 +745,9 @@ surv_full_bin_cf_gf <- surv_all_go_full %>%
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): \nBinary Survival", 
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -843,13 +763,9 @@ surv_mll_bin_cf_gf <- surv_all_go_mll %>%
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): \nBinary Survival", 
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -868,13 +784,9 @@ surv_full_binlog_cf_gf <- surv_all_go_full %>%
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): \nBinary Survival, Logistic Regression", 
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -890,13 +802,9 @@ surv_mll_binlog_cf_gf <- surv_all_go_mll %>%
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): \nBinary Survival, Logistic Regression", 
        x = "GF offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -918,13 +826,11 @@ surv_full_cg_lea <- surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill =
   labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): Survival",
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -937,13 +843,11 @@ surv_mll_cg_lea <- surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = f
   labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): Survival",
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -960,13 +864,9 @@ surv_full_cf_lea <- surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill =
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): Survival", 
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -979,13 +879,9 @@ surv_mll_cf_lea <- surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = f
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): Survival", 
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1005,13 +901,11 @@ surv_full_bin_cg_lea <- surv_all_go_full %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): \nBinary Survival",
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1026,13 +920,11 @@ surv_mll_bin_cg_lea <- surv_all_go_mll %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival",
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1051,13 +943,11 @@ surv_full_binlog_cg_lea <- surv_all_go_full %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): \nBinary Survival, Logistic Regression",
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1073,13 +963,11 @@ surv_mll_binlog_cg_lea <- surv_all_go_mll %>%
   labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival, Logistic Regression",
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1098,13 +986,9 @@ surv_full_bin_cf_lea <- surv_all_go_full %>%
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): \nBinary Survival", 
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1120,13 +1004,9 @@ surv_mll_bin_cf_lea <- surv_all_go_mll %>%
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival", 
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1145,13 +1025,9 @@ surv_full_binlog_cf_lea <- surv_all_go_full %>%
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): \nBinary Survival, Logistic Regression", 
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1167,13 +1043,9 @@ surv_mll_binlog_cf_lea <- surv_all_go_mll %>%
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival, Logistic Regression", 
        x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1196,13 +1068,11 @@ len_full_cg_lea <- grow_go_full %>% ggplot(aes(x = lea_offset, y = length_std_ch
   labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): Length",
        x = "LEA offset", y = "Length") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1216,13 +1086,11 @@ len_mll_cg_lea <- grow_go_mll %>% ggplot(aes(x = lea_offset, y = length_std_chan
   labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): Length",
        x = "LEA offset", y = "Length") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1239,13 +1107,9 @@ len_full_cf_lea <- grow_go_full %>% ggplot(aes(x = lea_offset, y = length_std_ch
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): Length", 
        x = "LEA offset", y = "Length") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1259,13 +1123,9 @@ len_mll_cf_lea <- grow_go_mll %>% ggplot(aes(x = lea_offset, y = length_std_chan
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): Length", 
        x = "LEA offset", y = "Length") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1286,13 +1146,11 @@ len_full_cg_rda <- grow_go_full %>% ggplot(aes(x = rda_offset, y = length_std_ch
   labs(title = "Common Garden Fitness vs Genomic Offset (RDA, Full): Length",
        x = "RDA offset", y = "Length") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1306,13 +1164,11 @@ len_mll_cg_rda <- grow_go_mll %>% ggplot(aes(x = rda_offset, y = length_std_chan
   labs(title = "Common Garden Fitness vs Genomic Offset (RDA, MLL): Length",
        x = "RDA offset", y = "Length") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1329,13 +1185,9 @@ len_full_cf_rda <- grow_go_full %>% ggplot(aes(x = rda_offset, y = length_std_ch
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): Length", 
        x = "RDA offset", y = "Length") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1349,13 +1201,9 @@ len_mll_cf_rda <- grow_go_mll %>% ggplot(aes(x = rda_offset, y = length_std_chan
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): Length", 
        x = "RDA offset", y = "Length") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1376,13 +1224,11 @@ len_full_cg_gf <- grow_go_full %>% ggplot(aes(x = gf_offset, y = length_std_chan
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): Length",
        x = "GF offset", y = "Length") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1396,13 +1242,11 @@ len_mll_cg_gf <- grow_go_mll %>% ggplot(aes(x = gf_offset, y = length_std_change
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): Length",
        x = "GF offset", y = "Length") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1419,13 +1263,9 @@ len_full_cf_gf <- grow_go_full %>% ggplot(aes(x = gf_offset, y = length_std_chan
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): Length", 
        x = "GF offset", y = "Length") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1439,13 +1279,9 @@ len_mll_cf_gf <- grow_go_mll %>% ggplot(aes(x = gf_offset, y = length_std_change
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): Length", 
        x = "GF offset", y = "Length") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1466,13 +1302,11 @@ len_cg_env <- grow_go_full %>% ggplot(aes(x = env_dist, y = length_std_change, f
   labs(title = "Common Garden Fitness vs Environmental Distance: Length",
        x = "Environmental Distance", y = "Length") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1489,13 +1323,9 @@ len_cf_env <- grow_go_full %>% ggplot(aes(x = env_dist, y = length_std_change, f
   labs(title = "Current-Future Fitness vs Environmental Distance: Length", 
        x = "Environmental Distance", y = "Length") +
   scale_fill_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#155d27","#25a244","#4ad66d","#b7efc5", 
-                               "#82daff","#0078cf","#0130b9","#002e5a"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1519,13 +1349,11 @@ weigh_full_cg_lea <- grow_go_full %>% ggplot(aes(x = lea_offset, y = weight_std_
   labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): Weight",
        x = "LEA offset", y = "Weight") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1539,13 +1367,11 @@ weigh_mll_cg_lea <- grow_go_mll %>% ggplot(aes(x = lea_offset, y = weight_std_ch
   labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): Weight",
        x = "LEA offset", y = "Weight") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1562,13 +1388,9 @@ weigh_full_cf_lea <- grow_go_full %>% ggplot(aes(x = lea_offset, y = weight_std_
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): Weight", 
        x = "LEA offset", y = "Weight") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1582,13 +1404,9 @@ weigh_mll_cf_lea <- grow_go_mll %>% ggplot(aes(x = lea_offset, y = weight_std_ch
   labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): Weight", 
        x = "LEA offset", y = "Weight") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1609,13 +1427,11 @@ weigh_full_cg_rda <- grow_go_full %>% ggplot(aes(x = rda_offset, y = weight_std_
   labs(title = "Common Garden Fitness vs Genomic Offset (RDA, Full): Weight",
        x = "RDA offset", y = "Weight") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1629,13 +1445,11 @@ weigh_mll_cg_rda <- grow_go_mll %>% ggplot(aes(x = rda_offset, y = weight_std_ch
   labs(title = "Common Garden Fitness vs Genomic Offset (RDA, MLL): Weight",
        x = "RDA offset", y = "Weight") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1652,13 +1466,9 @@ weigh_full_cf_rda <- grow_go_full %>% ggplot(aes(x = rda_offset, y = weight_std_
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): Weight", 
        x = "RDA offset", y = "Weight") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1672,13 +1482,9 @@ weigh_mll_cf_rda <- grow_go_mll %>% ggplot(aes(x = rda_offset, y = weight_std_ch
   labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): Weight", 
        x = "RDA offset", y = "Weight") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1699,13 +1505,11 @@ weigh_full_cg_gf <- grow_go_full %>% ggplot(aes(x = gf_offset, y = weight_std_ch
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, Full): Weight",
        x = "GF offset", y = "Weight") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1719,13 +1523,11 @@ weigh_mll_cg_gf <- grow_go_mll %>% ggplot(aes(x = gf_offset, y = weight_std_chan
   labs(title = "Common Garden Fitness vs Genomic Offset (GF, MLL): Weight",
        x = "GF offset", y = "Weight") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1742,13 +1544,9 @@ weigh_full_cf_gf <- grow_go_full %>% ggplot(aes(x = gf_offset, y = weight_std_ch
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): Weight", 
        x = "GF offset", y = "Weight") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1762,13 +1560,9 @@ weigh_mll_cf_gf <- grow_go_mll %>% ggplot(aes(x = gf_offset, y = weight_std_chan
   labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): Weight", 
        x = "GF offset", y = "Weight") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1789,13 +1583,11 @@ weigh_cg_env <- grow_go_full %>% ggplot(aes(x = env_dist, y = weight_std_change,
   labs(title = "Common Garden Fitness vs Environmental Distance: Weight",
        x = "Environmental Distance", y = "Weight") +
   scale_fill_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
-                    values = c("#FFA203","#FE691E","deeppink","deeppink4"),
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    values = trt_colors,
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
@@ -1812,13 +1604,9 @@ weigh_cf_env <- grow_go_full %>% ggplot(aes(x = env_dist, y = weight_std_change,
   labs(title = "Current-Future Fitness vs Environmental Distance: Weight", 
        x = "Environmental Distance", y = "Weight") +
   scale_fill_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_colour_manual(name = "Population",
-                    values = c("#002e5a","#0130b9","#0078cf","#82daff", 
-                               "#d9ed92","#4ad66d","#25a244","#155d27"),
-                    labels = c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")) +
+                    values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +

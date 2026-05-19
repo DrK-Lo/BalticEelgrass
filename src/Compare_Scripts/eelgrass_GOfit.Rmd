@@ -629,7 +629,7 @@ Anova(surv_mod_lea_poptrt_mll) # signif
 
 # which pops diff?
 emm_surv_lea_full <- emmeans(surv_mod_lea_full, "offset")
-pairs(emm_surv_lea_full, adjust = "tukey")
+pairs(emm_surv_lea_full)
 ######
 
 ## rda
@@ -846,7 +846,7 @@ summary(surv_pop_lea_full)
 #plot(surv_pop_lea_full)
 Anova(surv_pop_lea_full) # signif
 emm_survpop_lea_full <- emmeans(surv_pop_lea_full, "pop")
-letters_survpop_lea_full <- cld(emm_survpop_lea_full, Letters = letters, adjust = "tukey")
+letters_survpop_lea_full <- cld(emm_survpop_lea_full, Letters = letters)
 
 # model mll (cc)
 surv_pop_lea_mll <- lm(isAlive ~ pop + offset,
@@ -855,7 +855,7 @@ summary(surv_pop_lea_mll)
 #plot(surv_pop_lea_mll)
 Anova(surv_pop_lea_mll) # signif
 emm_survpop_lea_mll <- emmeans(surv_pop_lea_mll, "pop")
-letters_survpop_lea_mll <- cld(emm_survpop_lea_mll, Letters = letters, adjust = "tukey")
+letters_survpop_lea_mll <- cld(emm_survpop_lea_mll, Letters = letters)
 
 # model full (no cc) log
 surv_pop_lea_full_log <- glm(isAlive ~ pop + offset,
@@ -865,7 +865,7 @@ summary(surv_pop_lea_full_log)
 #plot(surv_pop_lea_full_log)
 Anova(surv_pop_lea_full_log) # signif
 emm_survpop_lea_full_log <- emmeans(surv_pop_lea_full_log, "pop")
-letters_survpop_lea_full_log <- cld(emm_survpop_lea_full_log, Letters = letters, adjust = "tukey")
+letters_survpop_lea_full_log <- cld(emm_survpop_lea_full_log, Letters = letters)
 
 # model mll (cc) log
 surv_pop_lea_mll_log <- glm(isAlive ~ pop + offset,
@@ -875,7 +875,7 @@ summary(surv_pop_lea_mll_log)
 #plot(surv_pop_lea_mll_log)
 Anova(surv_pop_lea_mll_log) # signif
 emm_survpop_lea_mll_log <- emmeans(surv_pop_lea_mll_log, "pop")
-letters_survpop_lea_mll_log <- cld(emm_survpop_lea_mll_log, Letters = letters, adjust = "tukey")
+letters_survpop_lea_mll_log <- cld(emm_survpop_lea_mll_log, Letters = letters)
 ######
 
 ## rda
@@ -887,7 +887,7 @@ summary(surv_pop_rda_full)
 #plot(surv_pop_rda_full)
 Anova(surv_pop_rda_full) # signif
 emm_survpop_rda_full <- emmeans(surv_pop_rda_full, "pop")
-letters_survpop_rda_full <- cld(emm_survpop_rda_full, Letters = letters, adjust = "tukey")
+letters_survpop_rda_full <- cld(emm_survpop_rda_full, Letters = letters)
 
 # model mll (cc)
 surv_pop_rda_mll <- lm(isAlive ~ pop + offset,
@@ -896,7 +896,7 @@ summary(surv_pop_rda_mll)
 #plot(surv_pop_rda_mll)
 Anova(surv_pop_rda_mll) # signif
 emm_survpop_rda_mll <- emmeans(surv_pop_rda_mll, "pop")
-letters_survpop_rda_mll <- cld(emm_survpop_rda_mll, Letters = letters, adjust = "tukey")
+letters_survpop_rda_mll <- cld(emm_survpop_rda_mll, Letters = letters)
 
 # model full (no cc) log
 surv_pop_rda_full_log <- glm(isAlive ~ pop + offset,
@@ -906,7 +906,7 @@ summary(surv_pop_rda_full_log)
 #plot(surv_pop_rda_full_log)
 Anova(surv_pop_rda_full_log) # signif
 emm_survpop_rda_full_log <- emmeans(surv_pop_rda_full_log, "pop")
-letters_survpop_rda_full_log <- cld(emm_survpop_rda_full_log, Letters = letters, adjust = "tukey")
+letters_survpop_rda_full_log <- cld(emm_survpop_rda_full_log, Letters = letters)
 
 # model mll (cc) log
 surv_pop_rda_mll_log <- glm(isAlive ~ pop + offset,
@@ -916,7 +916,7 @@ summary(surv_pop_rda_mll_log)
 #plot(surv_pop_rda_mll_log)
 Anova(surv_pop_rda_mll_log) # signif
 emm_survpop_rda_mll_log <- emmeans(surv_pop_rda_mll_log, "pop")
-letters_survpop_rda_mll_log <- cld(emm_survpop_rda_mll_log, Letters = letters, adjust = "tukey")
+letters_survpop_rda_mll_log <- cld(emm_survpop_rda_mll_log, Letters = letters)
 ######
 
 ## gf
@@ -928,7 +928,7 @@ summary(surv_pop_gf_full)
 #plot(surv_pop_gf_full)
 Anova(surv_pop_gf_full) # signif
 emm_survpop_gf_full <- emmeans(surv_pop_gf_full, "pop")
-letters_survpop_gf_full <- cld(emm_survpop_gf_full, Letters = letters, adjust = "tukey")
+letters_survpop_gf_full <- cld(emm_survpop_gf_full, Letters = letters)
 
 # model mll (cc)
 surv_pop_gf_mll <- lm(isAlive ~ pop + offset,
@@ -937,7 +937,7 @@ summary(surv_pop_gf_mll)
 #plot(surv_pop_gf_mll)
 Anova(surv_pop_gf_mll) # signif
 emm_survpop_gf_mll <- emmeans(surv_pop_gf_mll, "pop")
-letters_survpop_gf_mll <- cld(emm_survpop_gf_mll, Letters = letters, adjust = "tukey")
+letters_survpop_gf_mll <- cld(emm_survpop_gf_mll, Letters = letters)
 
 # model full (no cc) log
 surv_pop_gf_full_log <- glm(isAlive ~ pop + offset,
@@ -947,7 +947,7 @@ summary(surv_pop_gf_full_log)
 #plot(surv_pop_gf_full_log)
 Anova(surv_pop_gf_full_log) # signif
 emm_survpop_gf_full_log <- emmeans(surv_pop_gf_full_log, "pop")
-letters_survpop_gf_full_log <- cld(emm_survpop_gf_full_log, Letters = letters, adjust = "tukey")
+letters_survpop_gf_full_log <- cld(emm_survpop_gf_full_log, Letters = letters)
 
 # model mll (cc) log
 surv_pop_gf_mll_log <- glm(isAlive ~ pop + offset,
@@ -957,7 +957,7 @@ summary(surv_pop_gf_mll_log)
 #plot(surv_pop_gf_mll_log)
 Anova(surv_pop_gf_mll_log) # signif
 emm_survpop_gf_mll_log <- emmeans(surv_pop_gf_mll_log, "pop")
-letters_survpop_gf_mll_log <- cld(emm_survpop_gf_mll_log, Letters = letters, adjust = "tukey")
+letters_survpop_gf_mll_log <- cld(emm_survpop_gf_mll_log, Letters = letters)
 #####
 ```
 
@@ -977,12 +977,16 @@ len_pop_lea_full <- lm(log(length_std_change) ~ pop + lea_offset, data = grow_go
 summary(len_pop_lea_full) 
 #plot(len_pop_lea_full) # diverges pretty significantly on left tail
 Anova(len_pop_lea_full) # signif
+emm_lenpop_lea_full <- emmeans(len_pop_lea_full, "pop")
+letters_lenpop_lea_full <- cld(emm_lenpop_lea_full, Letters = letters)
 
 # model mll (cc)
 len_pop_lea_mll <- lm(log(length_std_change) ~ pop + lea_offset, data = grow_go_mll)
 summary(len_pop_lea_mll) 
 #plot(len_pop_lea_mll) # diverges pretty significantly on right tail
 Anova(len_pop_lea_mll) # signif
+emm_lenpop_lea_mll <- emmeans(len_pop_lea_mll, "pop")
+letters_lenpop_lea_mll <- cld(emm_lenpop_lea_mll, Letters = letters)
 ######
 
 ## rda
@@ -992,12 +996,16 @@ len_pop_rda_full <- lm(log(length_std_change) ~ pop + rda_offset, data = grow_go
 summary(len_pop_rda_full) 
 #plot(len_pop_rda_full)
 Anova(len_pop_rda_full) # rda offset not signif
+emm_lenpop_rda_full <- emmeans(len_pop_rda_full, "pop")
+letters_lenpop_rda_full <- cld(emm_lenpop_rda_full, Letters = letters)
 
 # model mll (cc)
 len_pop_rda_mll <- lm(log(length_std_change) ~ pop + rda_offset, data = grow_go_mll)
 summary(len_pop_rda_mll) 
 #plot(len_pop_rda_mll)
 Anova(len_pop_rda_mll) # signif
+emm_lenpop_rda_mll <- emmeans(len_pop_rda_mll, "pop")
+letters_lenpop_rda_mll <- cld(emm_lenpop_rda_mll, Letters = letters)
 ######
 
 ## gf
@@ -1007,12 +1015,16 @@ len_pop_gf_full <- lm(log(length_std_change) ~ pop + gf_offset, data = grow_go_f
 summary(len_pop_gf_full) 
 #plot(len_pop_gf_full)
 Anova(len_pop_gf_full) # signif
+emm_lenpop_gf_full <- emmeans(len_pop_gf_full, "pop")
+letters_lenpop_gf_full <- cld(emm_lenpop_gf_full, Letters = letters)
 
 # model mll (cc)
 len_pop_gf_mll <- lm(log(length_std_change) ~ pop + gf_offset, data = grow_go_mll)
 summary(len_pop_gf_mll) 
 #plot(len_pop_gf_mll)
 Anova(len_pop_gf_mll) # signif
+emm_lenpop_gf_mll <- emmeans(len_pop_gf_mll, "pop")
+letters_lenpop_gf_mll <- cld(emm_lenpop_gf_mll, Letters = letters)
 #####
 ```
 
@@ -1029,6 +1041,8 @@ weigh_pop_lea_full <- lm(weight_std_change ~ pop + lea_offset, data = grow_go_fu
 summary(weigh_pop_lea_full) 
 #plot(weigh_pop_lea_full)
 Anova(weigh_pop_lea_full) # signif
+emm_weighpop_lea_full <- emmeans(weigh_pop_lea_full, "pop")
+letters_weighpop_lea_full <- cld(emm_weighpop_lea_full, Letters = letters)
 
 # model mll (cc)
 weigh_pop_lea_mll <- lm(weight_std_change ~ pop + lea_offset, data = grow_go_mll)
@@ -1067,25 +1081,6 @@ Anova(weigh_pop_gf_mll) # signif
 #####
 ```
 
-Offset Only
-
-```{r}
-# distributions
-hist(lea_long[lea_long$cc == "mll",]$lea_offset)
-hist(rda_long[rda_long$cc == "mll",]$rda_offset)
-hist(gf_long[gf_long$cc == "mll",]$gf_offset)
-hist(lea_long[lea_long$cc == "full",]$lea_offset)
-hist(rda_long[rda_long$cc == "full",]$rda_offset)
-hist(gf_long[gf_long$cc == "full",]$gf_offset)
-
-# lea
-lea_mll_pop <- glm(lea_offset ~ as.factor(pop), 
-                   data = lea_long[lea_long$cc == "mll",], 
-                   family = "binomial")
-check_overdispersion(lea_mll_pop) # none detected
-lea_mll_pop_res <- res2(lea_mll_pop)
-Anova(lea_mll_pop, type = "III")
-```
 
 ##### With treatment as fixed effect
 
@@ -1103,6 +1098,8 @@ surv_trt_lea_full <- lm(isAlive ~ trt + offset,
 summary(surv_trt_lea_full) 
 #plot(surv_trt_lea_full)
 Anova(surv_trt_lea_full) # signif
+emm_survtrt_lea_full <- emmeans(surv_trt_lea_full, "trt")
+letters_survtrt_lea_full <- cld(emm_survtrt_lea_full, Letters = letters)
 
 # model mll (cc)
 surv_trt_lea_mll <- lm(isAlive ~ trt + offset,
@@ -1110,6 +1107,8 @@ surv_trt_lea_mll <- lm(isAlive ~ trt + offset,
 summary(surv_trt_lea_mll) 
 #plot(surv_trt_lea_mll)
 Anova(surv_trt_lea_mll) # signif
+emm_survtrt_lea_mll <- emmeans(surv_trt_lea_mll, "trt")
+letters_survtrt_lea_mll <- cld(emm_survtrt_lea_mll, Letters = letters)
 
 # model full (no cc) log
 surv_trt_lea_full_log <- glm(isAlive ~ trt + offset,
@@ -1118,6 +1117,8 @@ surv_trt_lea_full_log <- glm(isAlive ~ trt + offset,
 summary(surv_trt_lea_full_log) 
 #plot(surv_trt_lea_full_log)
 Anova(surv_trt_lea_full_log) # signif
+emm_survtrt_lea_full_log <- emmeans(surv_trt_lea_full_log, "trt")
+letters_survtrt_lea_full_log <- cld(emm_survtrt_lea_full_log, Letters = letters)
 
 # model mll (cc) log
 surv_trt_lea_mll_log <- glm(isAlive ~ trt + offset,
@@ -1126,6 +1127,8 @@ surv_trt_lea_mll_log <- glm(isAlive ~ trt + offset,
 summary(surv_trt_lea_mll_log) 
 #plot(surv_trt_lea_mll_log)
 Anova(surv_trt_lea_mll_log) # signif
+emm_survtrt_lea_mll_log <- emmeans(surv_trt_lea_mll_log, "trt")
+letters_survtrt_lea_mll_log <- cld(emm_survtrt_lea_mll_log, Letters = letters)
 ######
 
 ## rda
@@ -1136,6 +1139,8 @@ surv_trt_rda_full <- lm(isAlive ~ trt + offset,
 summary(surv_trt_rda_full) 
 #plot(surv_trt_rda_full)
 Anova(surv_trt_rda_full) # signif trt, not offset
+emm_survtrt_rda_full <- emmeans(surv_trt_rda_full, "trt")
+letters_survtrt_rda_full <- cld(emm_survtrt_rda_full, Letters = letters)
 
 # model mll (cc)
 surv_trt_rda_mll <- lm(isAlive ~ trt + offset,
@@ -1143,6 +1148,8 @@ surv_trt_rda_mll <- lm(isAlive ~ trt + offset,
 summary(surv_trt_rda_mll) 
 #plot(surv_trt_rda_mll)
 Anova(surv_trt_rda_mll) # signif trt, not offset
+emm_survtrt_rda_mll <- emmeans(surv_trt_rda_mll, "trt")
+letters_survtrt_rda_mll <- cld(emm_survtrt_rda_mll, Letters = letters)
 
 # model full (no cc) log
 surv_trt_rda_full_log <- glm(isAlive ~ trt + offset,
@@ -1151,6 +1158,8 @@ surv_trt_rda_full_log <- glm(isAlive ~ trt + offset,
 summary(surv_trt_rda_full_log) 
 #plot(surv_trt_rda_full_log)
 Anova(surv_trt_rda_full_log) # signif trt, not offset
+emm_survtrt_rda_full_log <- emmeans(surv_trt_rda_full_log, "trt")
+letters_survtrt_rda_full_log <- cld(emm_survtrt_rda_full_log, Letters = letters)
 
 # model mll (cc) log
 surv_trt_rda_mll_log <- glm(isAlive ~ trt + offset,
@@ -1159,6 +1168,8 @@ surv_trt_rda_mll_log <- glm(isAlive ~ trt + offset,
 summary(surv_trt_rda_mll_log) 
 #plot(surv_trt_rda_mll_log)
 Anova(surv_trt_rda_mll_log) # signif trt, not offset
+emm_survtrt_rda_mll_log <- emmeans(surv_trt_rda_mll_log, "trt")
+letters_survtrt_rda_mll_log <- cld(emm_survtrt_rda_mll_log, Letters = letters)
 ######
 
 ## gf
@@ -1169,6 +1180,8 @@ surv_trt_gf_full <- lm(isAlive ~ trt + offset,
 summary(surv_trt_gf_full) 
 #plot(surv_trt_gf_full)
 Anova(surv_trt_gf_full) # signif
+emm_survtrt_gf_full <- emmeans(surv_trt_gf_full, "trt")
+letters_survtrt_gf_full <- cld(emm_survtrt_gf_full, Letters = letters)
 
 # model mll (cc)
 surv_trt_gf_mll <- lm(isAlive ~ trt + offset,
@@ -1176,6 +1189,8 @@ surv_trt_gf_mll <- lm(isAlive ~ trt + offset,
 summary(surv_trt_gf_mll) 
 #plot(surv_trt_gf_mll)
 Anova(surv_trt_gf_mll) # signif
+emm_survtrt_gf_mll <- emmeans(surv_trt_gf_mll, "trt")
+letters_survtrt_gf_mll <- cld(emm_survtrt_gf_mll, Letters = letters)
 
 # model full (no cc)
 surv_trt_gf_full_log <- glm(isAlive ~ trt + offset,
@@ -1184,6 +1199,8 @@ surv_trt_gf_full_log <- glm(isAlive ~ trt + offset,
 summary(surv_trt_gf_full_log) 
 #plot(surv_trt_gf_full_log)
 Anova(surv_trt_gf_full_log) # signif
+emm_survtrt_gf_full_log <- emmeans(surv_trt_gf_full_log, "trt")
+letters_survtrt_gf_ful_log <- cld(emm_survtrt_gf_full_log, Letters = letters)
 
 # model mll (cc)
 surv_trt_gf_mll_log <- glm(isAlive ~ trt + offset,
@@ -1192,6 +1209,8 @@ surv_trt_gf_mll_log <- glm(isAlive ~ trt + offset,
 summary(surv_trt_gf_mll_log) 
 #plot(surv_trt_gf_mll_log)
 Anova(surv_trt_gf_mll_log) # signif
+emm_survtrt_gf_mll_log <- emmeans(surv_trt_gf_mll_log, "trt")
+letters_survtrt_gf_mll_log <- cld(emm_survtrt_gf_mll_log, Letters = letters)
 #####
 ```
 
@@ -1211,12 +1230,16 @@ len_trt_lea_full <- lm(log(length_std_change) ~ trt + lea_offset, data = grow_go
 summary(len_trt_lea_full) 
 #plot(len_trt_lea_full) # diverges pretty significantly on left tail
 Anova(len_trt_lea_full) # signif
+emm_lentrt_lea_full <- emmeans(len_trt_lea_full, "trt")
+letters_lentrt_lea_full <- cld(emm_lentrt_lea_full, Letters = letters)
 
 # model mll (cc)
 len_trt_lea_mll <- lm(log(length_std_change) ~ trt + lea_offset, data = grow_go_mll)
 summary(len_trt_lea_mll) 
 #plot(len_trt_lea_mll) # diverges pretty significantly on right tail
-Anova(len_trt_lea_mll) # signif
+Anova(len_trt_lea_mll) # not signif
+emm_lentrt_lea_mll <- emmeans(len_trt_lea_mll, "trt")
+letters_lentrt_lea_mll <- cld(emm_lentrt_lea_mll, Letters = letters)
 ######
 
 ## rda
@@ -1225,13 +1248,17 @@ Anova(len_trt_lea_mll) # signif
 len_trt_rda_full <- lm(log(length_std_change) ~ trt + rda_offset, data = grow_go_full)
 summary(len_trt_rda_full) 
 #plot(len_trt_rda_full)
-Anova(len_trt_rda_full) # rda offset not signif
+Anova(len_trt_rda_full) # signif
+emm_lentrt_rda_full <- emmeans(len_trt_rda_full, "trt")
+letters_lentrt_rda_full <- cld(emm_lentrt_rda_full, Letters = letters)
 
 # model mll (cc)
 len_trt_rda_mll <- lm(log(length_std_change) ~ trt + rda_offset, data = grow_go_mll)
 summary(len_trt_rda_mll) 
 #plot(len_trt_rda_mll)
 Anova(len_trt_rda_mll) # signif
+emm_lentrt_rda_mll <- emmeans(len_trt_rda_mll, "trt")
+letters_lentrt_rda_mll <- cld(emm_lentrt_rda_mll, Letters = letters)
 ######
 
 ## gf
@@ -1241,12 +1268,16 @@ len_trt_gf_full <- lm(log(length_std_change) ~ trt + gf_offset, data = grow_go_f
 summary(len_trt_gf_full) 
 #plot(len_trt_gf_full)
 Anova(len_trt_gf_full) # signif
+emm_lentrt_gf_full <- emmeans(len_trt_rda_mll, "trt")
+letters_lentrt_rda_mll <- cld(emm_lentrt_gf_full, Letters = letters)
 
 # model mll (cc)
 len_trt_gf_mll <- lm(log(length_std_change) ~ trt + gf_offset, data = grow_go_mll)
 summary(len_trt_gf_mll) 
 #plot(len_trt_gf_mll)
 Anova(len_trt_gf_mll) # signif
+emm_lentrt_rda_mll <- emmeans(len_trt_rda_mll, "trt")
+letters_lentrt_rda_mll <- cld(emm_lentrt_rda_mll, Letters = letters)
 #####
 ```
 
@@ -1263,12 +1294,16 @@ weigh_trt_lea_full <- lm(weight_std_change ~ trt + lea_offset, data = grow_go_fu
 summary(weigh_trt_lea_full) 
 #plot(weigh_trt_lea_full)
 Anova(weigh_trt_lea_full) # signif
+emm_weightrt_lea_full <- emmeans(weigh_trt_lea_full, "trt")
+letters_weightrt_lea_full <- cld(emm_weightrt_lea_full, Letters = letters)
 
 # model mll (cc)
 weigh_trt_lea_mll <- lm(weight_std_change ~ trt + lea_offset, data = grow_go_mll)
 summary(weigh_trt_lea_mll) 
 #plot(weigh_trt_lea_mll)
 Anova(weigh_trt_lea_mll) # signif
+emm_weightrt_lea_mll <- emmeans(weigh_trt_lea_mll, "trt")
+letters_weightrt_lea_mll <- cld(emm_weightrt_lea_mll, Letters = letters)
 ######
 
 ## rda
@@ -1277,12 +1312,16 @@ weigh_trt_rda_full <- lm(weight_std_change ~ trt + rda_offset, data = grow_go_fu
 summary(weigh_trt_rda_full) 
 #plot(weigh_trt_rda_full) 
 Anova(weigh_trt_rda_full) # signif
+emm_weightrt_rda_full <- emmeans(weigh_trt_rda_full, "trt")
+letters_weightrt_rda_full <- cld(emm_weightrt_rda_full, Letters = letters)
 
 # model mll (cc)
 weigh_trt_rda_mll <- lm(weight_std_change ~ trt + rda_offset, data = grow_go_mll)
 summary(weigh_trt_rda_mll) 
 #plot(weigh_trt_rda_mll) 
 Anova(weigh_trt_rda_mll) # signif
+emm_weightrt_rda_mll <- emmeans(weigh_trt_rda_mll, "trt")
+letters_weightrt_rda_mll <- cld(emm_weightrt_rda_mll, Letters = letters)
 ######
 
 ## gf
@@ -1292,12 +1331,16 @@ weigh_trt_gf_full <- lm(weight_std_change ~ trt + gf_offset, data = grow_go_full
 summary(weigh_trt_gf_full) 
 #plot(weigh_trt_gf_full) 
 Anova(weigh_trt_gf_full) # signif
+emm_weightrt_gf_full <- emmeans(weigh_trt_gf_full, "trt")
+letters_weightrt_gf_full <- cld(emm_weightrt_gf_full, Letters = letters)
 
 # model mll (cc)
 weigh_trt_gf_mll <- lm(weight_std_change ~ trt + gf_offset, data = grow_go_mll)
 summary(weigh_trt_gf_mll) 
 #plot(weigh_trt_gf_mll)
 Anova(weigh_trt_gf_mll) # signif
+emm_weightrt_gf_mll <- emmeans(weigh_trt_gf_mll, "trt")
+letters_weightrt_gf_mll <- cld(emm_weightrt_gf_mll, Letters = letters)
 #####
 ```
 
