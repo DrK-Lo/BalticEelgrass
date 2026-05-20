@@ -620,7 +620,7 @@ mid <- log(abs(min(weigh_cf_rel_log$fit_off, na.rm = T)) + 0.001) # new midpoint
 weigh_cf_heatmap_rel <- weigh_cf_rel_log %>% 
   ggplot(aes(x = fct_reorder(pop, pop_ord), y = fct_reorder(trt, trt_ord), fill = log_fit_off)) +
   geom_tile(color = "white") +
-  geom_text(aes(label = round(log_fit_off, 3))) +
+#  geom_text(aes(label = round(log_fit_off, 3))) +
   scale_fill_gradient2(low = "#F27A11", high = "green4", mid = "#fbfedd", midpoint = mid, guide = "colourbar", na.value = "gray") +
   theme_classic() +
   labs(title = "Current-Future Fitness Offset,\nRelative Weight Change (Log)", x = "Population", y = "Treatment", fill = "Fitness Offset")

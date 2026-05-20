@@ -81,19 +81,14 @@ grow_go_mll <- grow_go2[grow_go2$cc == "mll",]
 LEA
 
 ```{r}
-# plotting prep
-pop_colors <- c(VIK = "#002e5a", VAT = "#0130b9", HOG = "#0078cf", BAR = "#82daff", KUR = "#d9ed92", KAL = "#4ad66d", HOR = "#25a244", BJO = "#155d27")
-trt_colors <- c("TempControl-21psu" = "#FFA203", "TempControl-7psu" = "#FE691E",  "TempWarm-16psu" = "deeppink", "TempWarm-5psu" = "deeppink4")
-trt_labels <- c("TempControl-21psu" = "Current W Coast", "TempControl-7psu" = "Current E Coast",  "TempWarm-16psu" = "Future W Coast", "TempWarm-5psu" = "Future E Coast")
-
 # means by pop/treatment
-# common garden: Env Dist
+# common garden: LEA
 ####################
-surv_full_cg_env <- surv_go_full %>% ggplot(aes(x = env_dist, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+surv_full_cg_lea <- surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
-  labs(title = "Common Garden Fitness vs Environmental Distance (Full): Survival",
-       x = "Environmental Distance", y = "Survival") +
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): Survival",
+       x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = trt_colors,
                     labels = trt_labels) +
@@ -105,35 +100,33 @@ surv_full_cg_env <- surv_go_full %>% ggplot(aes(x = env_dist, y = surv, fill = f
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_full_cg_env
-surv_mll_cg_env <- surv_go_mll %>% ggplot(aes(x = env_dist, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+surv_full_cg_lea
+surv_mll_cg_lea <- surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
-  labs(title = "Common Garden Fitness vs Environmental Distance (MLL): Survival",
-       x = "Environmental Distance", y = "Survival") +
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): Survival",
+       x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = trt_colors,
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
                     values = trt_colors,
-                    labels = c("Current W Coast", "Current E Coast",
-                               "Future W Coast", "Future E Coast")) +
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_mll_cg_env
+surv_mll_cg_lea
 ####################
 
-# current future: Env Dist
+# current future: LEA
 #####################
-surv_full_cf_env <- surv_go_full %>% ggplot(aes(x = env_dist, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+surv_full_cf_lea <- surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_ord)), method = "lm", se = F) + 
-  labs(title = "Current-Future Fitness vs Environmental Distance (Full): Survival", 
-       x = "Environmental Distance", y = "Survival") +
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): Survival", 
+       x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = pop_colors) +
   scale_colour_manual(name = "Population",
@@ -143,12 +136,12 @@ surv_full_cf_env <- surv_go_full %>% ggplot(aes(x = env_dist, y = surv, fill = f
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_full_cf_env
-surv_mll_cf_env <- surv_go_mll %>% ggplot(aes(x = env_dist, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+surv_full_cf_lea
+surv_mll_cf_lea <- surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_ord)), method = "lm", se = F) + 
-  labs(title = "Current-Future Fitness vs Environmental Distance (MLL): Survival", 
-       x = "Environmental Distance", y = "Survival") +
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): Survival", 
+       x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = pop_colors) +
   scale_colour_manual(name = "Population",
@@ -158,19 +151,19 @@ surv_mll_cf_env <- surv_go_mll %>% ggplot(aes(x = env_dist, y = surv, fill = fct
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_mll_cf_env
+surv_mll_cf_lea
 #####################
 
 # binary outcome
-# common garden: Env Dist
+# common garden: LEA
 ####################
-surv_full_bin_cg_env <- surv_all_go_full %>% 
-  filter(method == "env") %>%
+surv_full_bin_cg_lea <- surv_all_go_full %>% 
+  filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
-  labs(title = "Common Garden Fitness vs Environmental Distance (Full): \nBinary Survival",
-       x = "Environmental Distance", y = "Survival") +
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): \nBinary Survival",
+       x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = trt_colors,
                     labels = trt_labels) +
@@ -182,14 +175,14 @@ surv_full_bin_cg_env <- surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_full_bin_cg_env
-surv_mll_bin_cg_env <- surv_all_go_mll %>% 
-  filter(method == "env") %>%
+surv_full_bin_cg_lea
+surv_mll_bin_cg_lea <- surv_all_go_mll %>% 
+  filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
-  labs(title = "Common Garden Fitness vs Environmental Distance (MLL): \nBinary Survival",
-       x = "Environmental Distance", y = "Survival") +
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival",
+       x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = trt_colors,
                     labels = trt_labels) +
@@ -201,18 +194,18 @@ surv_mll_bin_cg_env <- surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_mll_bin_cg_env
+surv_mll_bin_cg_lea
 ####################
 
 # with log regression
 #####################
-surv_full_binlog_cg_env <- surv_all_go_full %>% 
-  filter(method == "env") %>%
+surv_full_binlog_cg_lea <- surv_all_go_full %>% 
+  filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "glm", method.args = list(family = "binomial"), se = T) + 
-  labs(title = "Common Garden Fitness vs Environmental Distance (Full): \nBinary Survival, Logistic Regression",
-       x = "Environmental Distance", y = "Survival") +
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): \nBinary Survival, Logistic Regression",
+       x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = trt_colors,
                     labels = trt_labels) +
@@ -224,15 +217,15 @@ surv_full_binlog_cg_env <- surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_full_binlog_cg_env
+surv_full_binlog_cg_lea
 
-surv_mll_binlog_cg_env <- surv_all_go_mll %>% 
-  filter(method == "env") %>%
+surv_mll_binlog_cg_lea <- surv_all_go_mll %>% 
+  filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "glm", method.args = list(family = "binomial"), se = T) + 
-  labs(title = "Common Garden Fitness vs Environmental Distance (MLL): \nBinary Survival, Logistic Regression",
-       x = "Environmental Distance", y = "Survival") +
+  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival, Logistic Regression",
+       x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = trt_colors,
                     labels = trt_labels) +
@@ -244,18 +237,18 @@ surv_mll_binlog_cg_env <- surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_mll_binlog_cg_env
+surv_mll_binlog_cg_lea
 #####################
 
-# current future: Env Dist
+# current future: LEA
 #####################
-surv_full_bin_cf_env <- surv_all_go_full %>%
-  filter(method == "env") %>%
+surv_full_bin_cf_lea <- surv_all_go_full %>%
+  filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_ord)), method = "lm", se = F) + 
-  labs(title = "Current-Future Fitness vs Environmental Distance (Full): \nBinary Survival", 
-       x = "Environmental Distance", y = "Survival") +
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): \nBinary Survival", 
+       x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = pop_colors) +
   scale_colour_manual(name = "Population",
@@ -265,15 +258,15 @@ surv_full_bin_cf_env <- surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_full_bin_cf_env
+surv_full_bin_cf_lea
 
-surv_mll_bin_cf_env <- surv_all_go_mll %>% 
-  filter(method == "env") %>%
+surv_mll_bin_cf_lea <- surv_all_go_mll %>% 
+  filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_ord)), method = "lm", se = F) + 
-  labs(title = "Current-Future Fitness vs Environmental Distance (MLL): \nBinary Survival", 
-       x = "Environmental Distance", y = "Survival") +
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival", 
+       x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = pop_colors) +
   scale_colour_manual(name = "Population",
@@ -283,18 +276,18 @@ surv_mll_bin_cf_env <- surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_mll_bin_cf_env
+surv_mll_bin_cf_lea
 #####################
 
 # with log regression
 #####################
-surv_full_binlog_cf_env <- surv_all_go_full %>%
-  filter(method == "env") %>%
+surv_full_binlog_cf_lea <- surv_all_go_full %>%
+  filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_ord)), method = "glm", method.args = list(family = "binomial"), se = F) + 
-  labs(title = "Current-Future Fitness vs Environmental Distance (Full): \nBinary Survival, Logistic Regression", 
-       x = "Environmental Distance", y = "Survival") +
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): \nBinary Survival, Logistic Regression", 
+       x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = pop_colors) +
   scale_colour_manual(name = "Population",
@@ -304,15 +297,15 @@ surv_full_binlog_cf_env <- surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_full_binlog_cf_env
+surv_full_binlog_cf_lea
 
-surv_mll_binlog_cf_env <- surv_all_go_mll %>% 
-  filter(method == "env") %>%
+surv_mll_binlog_cf_lea <- surv_all_go_mll %>% 
+  filter(method == "lea") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_ord)), method = "glm", method.args = list(family = "binomial"), se = F) + 
-  labs(title = "Current-Future Fitness vs Environmental Distance (MLL): \nBinary Survival, Logistic Regression", 
-       x = "Environmental Distance", y = "Survival") +
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival, Logistic Regression", 
+       x = "LEA offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = pop_colors) +
   scale_colour_manual(name = "Population",
@@ -322,7 +315,7 @@ surv_mll_binlog_cf_env <- surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_mll_binlog_cf_env
+surv_mll_binlog_cf_lea
 #####################
 ```
 
@@ -817,14 +810,19 @@ surv_mll_binlog_cf_gf
 Env Dist
 
 ```{r}
+# plotting prep
+pop_colors <- c(VIK = "#002e5a", VAT = "#0130b9", HOG = "#0078cf", BAR = "#82daff", KUR = "#d9ed92", KAL = "#4ad66d", HOR = "#25a244", BJO = "#155d27")
+trt_colors <- c("TempControl-21psu" = "#FFA203", "TempControl-7psu" = "#FE691E",  "TempWarm-16psu" = "deeppink", "TempWarm-5psu" = "deeppink4")
+trt_labels <- c("TempControl-21psu" = "Current W Coast", "TempControl-7psu" = "Current E Coast",  "TempWarm-16psu" = "Future W Coast", "TempWarm-5psu" = "Future E Coast")
+
 # means by pop/treatment
-# common garden: LEA
+# common garden: Env Dist
 ####################
-surv_full_cg_lea <- surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+surv_full_cg_env <- surv_go_full %>% ggplot(aes(x = env_dist, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
-  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): Survival",
-       x = "LEA offset", y = "Survival") +
+  labs(title = "Common Garden Fitness vs Environmental Distance (Full): Survival",
+       x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = trt_colors,
                     labels = trt_labels) +
@@ -836,33 +834,35 @@ surv_full_cg_lea <- surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill =
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_full_cg_lea
-surv_mll_cg_lea <- surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
+surv_full_cg_env
+surv_mll_cg_env <- surv_go_mll %>% ggplot(aes(x = env_dist, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
-  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): Survival",
-       x = "LEA offset", y = "Survival") +
+  labs(title = "Common Garden Fitness vs Environmental Distance (MLL): Survival",
+       x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = trt_colors,
-                    labels = trt_labels) +
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
   scale_colour_manual(name = "Treatment",
                     values = trt_colors,
-                    labels = trt_labels) +
+                    labels = c("Current W Coast", "Current E Coast",
+                               "Future W Coast", "Future E Coast")) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_mll_cg_lea
+surv_mll_cg_env
 ####################
 
-# current future: LEA
+# current future: Env Dist
 #####################
-surv_full_cf_lea <- surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+surv_full_cf_env <- surv_go_full %>% ggplot(aes(x = env_dist, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_ord)), method = "lm", se = F) + 
-  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): Survival", 
-       x = "LEA offset", y = "Survival") +
+  labs(title = "Current-Future Fitness vs Environmental Distance (Full): Survival", 
+       x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = pop_colors) +
   scale_colour_manual(name = "Population",
@@ -872,12 +872,12 @@ surv_full_cf_lea <- surv_go_full %>% ggplot(aes(x = lea_offset, y = surv, fill =
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_full_cf_lea
-surv_mll_cf_lea <- surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
+surv_full_cf_env
+surv_mll_cf_env <- surv_go_mll %>% ggplot(aes(x = env_dist, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_ord)), method = "lm", se = F) + 
-  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): Survival", 
-       x = "LEA offset", y = "Survival") +
+  labs(title = "Current-Future Fitness vs Environmental Distance (MLL): Survival", 
+       x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = pop_colors) +
   scale_colour_manual(name = "Population",
@@ -887,19 +887,19 @@ surv_mll_cf_lea <- surv_go_mll %>% ggplot(aes(x = lea_offset, y = surv, fill = f
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_mll_cf_lea
+surv_mll_cf_env
 #####################
 
 # binary outcome
-# common garden: LEA
+# common garden: Env Dist
 ####################
-surv_full_bin_cg_lea <- surv_all_go_full %>% 
-  filter(method == "lea") %>%
+surv_full_bin_cg_env <- surv_all_go_full %>% 
+  filter(method == "env") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
-  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): \nBinary Survival",
-       x = "LEA offset", y = "Survival") +
+  labs(title = "Common Garden Fitness vs Environmental Distance (Full): \nBinary Survival",
+       x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = trt_colors,
                     labels = trt_labels) +
@@ -911,14 +911,14 @@ surv_full_bin_cg_lea <- surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_full_bin_cg_lea
-surv_mll_bin_cg_lea <- surv_all_go_mll %>% 
-  filter(method == "lea") %>%
+surv_full_bin_cg_env
+surv_mll_bin_cg_env <- surv_all_go_mll %>% 
+  filter(method == "env") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "lm", se = T) + 
-  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival",
-       x = "LEA offset", y = "Survival") +
+  labs(title = "Common Garden Fitness vs Environmental Distance (MLL): \nBinary Survival",
+       x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = trt_colors,
                     labels = trt_labels) +
@@ -930,18 +930,18 @@ surv_mll_bin_cg_lea <- surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_mll_bin_cg_lea
+surv_mll_bin_cg_env
 ####################
 
 # with log regression
 #####################
-surv_full_binlog_cg_lea <- surv_all_go_full %>% 
-  filter(method == "lea") %>%
+surv_full_binlog_cg_env <- surv_all_go_full %>% 
+  filter(method == "env") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "glm", method.args = list(family = "binomial"), se = T) + 
-  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, Full): \nBinary Survival, Logistic Regression",
-       x = "LEA offset", y = "Survival") +
+  labs(title = "Common Garden Fitness vs Environmental Distance (Full): \nBinary Survival, Logistic Regression",
+       x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = trt_colors,
                     labels = trt_labels) +
@@ -953,15 +953,15 @@ surv_full_binlog_cg_lea <- surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_full_binlog_cg_lea
+surv_full_binlog_cg_env
 
-surv_mll_binlog_cg_lea <- surv_all_go_mll %>% 
-  filter(method == "lea") %>%
+surv_mll_binlog_cg_env <- surv_all_go_mll %>% 
+  filter(method == "env") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(trt, trt_ord), shape = fct_reorder(trt_coast, trt_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = trt), method = "glm", method.args = list(family = "binomial"), se = T) + 
-  labs(title = "Common Garden Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival, Logistic Regression",
-       x = "LEA offset", y = "Survival") +
+  labs(title = "Common Garden Fitness vs Environmental Distance (MLL): \nBinary Survival, Logistic Regression",
+       x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Treatment",
                     values = trt_colors,
                     labels = trt_labels) +
@@ -973,18 +973,18 @@ surv_mll_binlog_cg_lea <- surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21)))+
   theme_minimal()
-surv_mll_binlog_cg_lea
+surv_mll_binlog_cg_env
 #####################
 
-# current future: LEA
+# current future: Env Dist
 #####################
-surv_full_bin_cf_lea <- surv_all_go_full %>%
-  filter(method == "lea") %>%
+surv_full_bin_cf_env <- surv_all_go_full %>%
+  filter(method == "env") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_ord)), method = "lm", se = F) + 
-  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): \nBinary Survival", 
-       x = "LEA offset", y = "Survival") +
+  labs(title = "Current-Future Fitness vs Environmental Distance (Full): \nBinary Survival", 
+       x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = pop_colors) +
   scale_colour_manual(name = "Population",
@@ -994,15 +994,15 @@ surv_full_bin_cf_lea <- surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_full_bin_cf_lea
+surv_full_bin_cf_env
 
-surv_mll_bin_cf_lea <- surv_all_go_mll %>% 
-  filter(method == "lea") %>%
+surv_mll_bin_cf_env <- surv_all_go_mll %>% 
+  filter(method == "env") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_ord)), method = "lm", se = F) + 
-  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival", 
-       x = "LEA offset", y = "Survival") +
+  labs(title = "Current-Future Fitness vs Environmental Distance (MLL): \nBinary Survival", 
+       x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = pop_colors) +
   scale_colour_manual(name = "Population",
@@ -1012,18 +1012,18 @@ surv_mll_bin_cf_lea <- surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_mll_bin_cf_lea
+surv_mll_bin_cf_env
 #####################
 
 # with log regression
 #####################
-surv_full_binlog_cf_lea <- surv_all_go_full %>%
-  filter(method == "lea") %>%
+surv_full_binlog_cf_env <- surv_all_go_full %>%
+  filter(method == "env") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_ord)), method = "glm", method.args = list(family = "binomial"), se = F) + 
-  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): \nBinary Survival, Logistic Regression", 
-       x = "LEA offset", y = "Survival") +
+  labs(title = "Current-Future Fitness vs Environmental Distance (Full): \nBinary Survival, Logistic Regression", 
+       x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = pop_colors) +
   scale_colour_manual(name = "Population",
@@ -1033,15 +1033,15 @@ surv_full_binlog_cf_lea <- surv_all_go_full %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_full_binlog_cf_lea
+surv_full_binlog_cf_env
 
-surv_mll_binlog_cf_lea <- surv_all_go_mll %>% 
-  filter(method == "lea") %>%
+surv_mll_binlog_cf_env <- surv_all_go_mll %>% 
+  filter(method == "env") %>%
   ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_ord), shape = fct_reorder(pop_coast, pop_coast_ord))) +
   geom_point(size = 4) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_ord)), method = "glm", method.args = list(family = "binomial"), se = F) + 
-  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival, Logistic Regression", 
-       x = "LEA offset", y = "Survival") +
+  labs(title = "Current-Future Fitness vs Environmental Distance (MLL): \nBinary Survival, Logistic Regression", 
+       x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = pop_colors) +
   scale_colour_manual(name = "Population",
@@ -1051,9 +1051,11 @@ surv_mll_binlog_cf_lea <- surv_all_go_mll %>%
                     labels = c("West Coast", "East Coast")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
-surv_mll_binlog_cf_lea
+surv_mll_binlog_cf_env
 #####################
 ```
+
+
 
 ### Length
 
