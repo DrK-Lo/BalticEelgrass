@@ -95,7 +95,7 @@ exp_pops$pop_order <- 1:8
 exp_pops$pop <- exp_pops$site_abbrev
 expfit_mg <- merge(exp_pops, expfit, by = "pop")
 expfit_mg$trt <- gsub("_", "-", expfit_mg$trt)
-write.csv(expfit_mg, "data/experiment/expfit_poptrt.csv", row.names = F)
+#write.csv(expfit_mg, "data/experiment/expfit_poptrt.csv", row.names = F)
 ```
 
 ## Plotting
@@ -103,8 +103,15 @@ write.csv(expfit_mg, "data/experiment/expfit_poptrt.csv", row.names = F)
 Plotting averages
 
 ```{r}
+# better trt names
+trt_names2 <- c("TempControl-21psu" = "Current W Coast", "TempControl-7psu" = "Current E Coast", "TempWarm-16psu" = "Future W Coast", "TempWarm-5psu" = "Future E Coast")
+trt_ord2 <- c("TempControl-21psu" = 1, "TempControl-7psu" = 2, "TempWarm-16psu" = 3, "TempWarm-5psu" = 4)
+expfit_mg <- expfit_mg %>% mutate(trt_name = trt_names2[trt], trt_order = trt_ord2[trt]) 
+expfit_mg$trt_name <- unname(expfit_mg$trt_name)
+expfit_mg$trt_order <- unname(expfit_mg$trt_order)
+
 # survival
-surv_avg_heatmap <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, fill = surv_mean)) +
+surv_avg_heatmap <- ggplot(expfit_mg, aes(x = fct_reorder(pop, pop_order), y = fct_reorder(trt_name, trt_order), fill = surv_mean)) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "viridis", direction = 1, limits = c(0,1), na.value = "white") +
   theme_classic() +
@@ -112,7 +119,7 @@ surv_avg_heatmap <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, 
 surv_avg_heatmap
 
 # length
-len_avg_heatmap <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, fill = len_mean)) +
+len_avg_heatmap <- ggplot(expfit_mg, aes(x = fct_reorder(pop, pop_order), fct_reorder(trt_name, trt_order), fill = len_mean)) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "viridis", direction = 1, limits = c(0,5), na.value = "white") +
   theme_classic() +
@@ -120,7 +127,7 @@ len_avg_heatmap <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, f
 len_avg_heatmap
 
 # weight
-weight_avg_heatmap <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = trt, fill = weigh_mean)) +
+weight_avg_heatmap <- ggplot(expfit_mg, aes(x = fct_reorder(pop, pop_order), fct_reorder(trt_name, trt_order), fill = weigh_mean)) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "viridis", direction = 1, limits = c(-0.7,0.4), na.value = "white") +
   theme_classic() +
@@ -133,13 +140,15 @@ Plotting common garden vs current future comparisons
 ```{r}
 ## survival
 ###########
-pop_colors <- c(VIK = "#002e5a", VAT = "#0130b9", HOG = "#0078cf", BAR = "#82daff", KUR = "#d9ed92", KAL = "#4ad66d", HOR = "#25a244", BJO = "#155d27")
-trt_colors <- c("TempControl-21psu" = "#FFA203", "TempControl-7psu" = "#FE691E",  "TempWarm-16psu" = "deeppink", "TempWarm-5psu" = "deeppink4")
 trt_labels <- c("TempControl-21psu" = "Current W Coast", "TempControl-7psu" = "Current E Coast",  "TempWarm-16psu" = "Future W Coast", "TempWarm-5psu" = "Future E Coast")
-trt_order <- c("TempControl-21psu", "TempWarm-16psu", "TempControl-7psu", "TempWarm-5psu")
+pop_colors <- c(VIK = "#002e5a", VAT = "#0130b9", HOG = "#0078cf", BAR = "#82daff", KUR = "#d9ed92", KAL = "#4ad66d", HOR = "#25a244", BJO = "#155d27")
+trt_colors <- c("Current W Coast" = "#FFA203", "Current E Coast" = "#FE691E",  "Future W Coast" = "deeppink", "Future E Coast" = "deeppink4")
+trt_order <- c("Current W Coast", "Current E Coast", "Future W Coast", "Future E Coast")
+expfit_mg$trt_factor <- factor(expfit_mg$trt_name, levels = trt_order)
+expfit_mg$pop_factor <- factor(expfit_mg$pop, levels = names(pop_colors))
 
 # pop x trt
-poptrt_surv_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, pop_order), y = surv_mean, fill = factor(trt, levels = names(trt_colors)))) +
+poptrt_surv_cf <- ggplot(expfit_mg, aes(x = pop_factor, y = surv_mean, fill = trt_factor)) +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Treatment",
@@ -156,7 +165,8 @@ poptrt_surv_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, pop_order), y = sur
 poptrt_surv_cf
 
 # pop x trt
-poptrt_surv_cg <- ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = surv_mean, fill = factor(pop, level = names(pop_colors)))) +
+poptrt_surv_cg <- ggplot(expfit_mg, aes(x = trt_factor, y = surv_mean, fill = pop_factor)) +
+  geom_bar(stat = "identity", position = "dodge")+
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Population",
@@ -175,7 +185,7 @@ poptrt_surv_cg
 ## length
 #########
 # pop x trt
-poptrt_len_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = len_mean, fill = trt)) +
+poptrt_len_cf <- ggplot(expfit_mg, aes(x = pop_factor, y = len_mean, fill = trt_factor)) +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Treatment",
@@ -191,7 +201,8 @@ poptrt_len_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = len_mean
 poptrt_len_cf
 
 # pop x trt
-poptrt_len_cg <- ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = len_mean, fill = pop)) +
+poptrt_len_cg <- ggplot(expfit_mg, aes(x = trt_factor, y = len_mean, fill = pop_factor)) +
+  geom_bar(stat = "identity", position = "dodge") +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Population",
@@ -209,7 +220,7 @@ poptrt_len_cg
 ## weight chg
 #############
 # pop x trt
-poptrt_weight_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = weigh_mean, fill = trt)) +
+poptrt_weight_cf <- ggplot(expfit_mg, aes(x = pop_factor, y = weigh_mean, fill = trt_factor)) +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Treatment",
@@ -225,7 +236,7 @@ poptrt_weight_cf <- ggplot(expfit_mg, aes(x = fct_reorder(pop, order), y = weigh
 poptrt_weight_cf
 
 # pop x trt
-poptrt_weight_cg <- ggplot(expfit_mg, aes(x = factor(trt, level = trt_order), y = weigh_mean, fill = pop)) +
+poptrt_weight_cg <- ggplot(expfit_mg, aes(x = trt_factor, y = weigh_mean, fill = pop_factor)) +
   theme_classic() +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(name = "Population",
