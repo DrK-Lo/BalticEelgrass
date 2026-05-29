@@ -30,8 +30,6 @@ This script is intended to calculate "fitness offsets" (sensu [Lotterhos 2024](h
 
 I will do this by using the "current" treatment for each respective coast as the home and local environment for current-future and common garden fitness offsets, respectively. 
 
-I NEED TO CALCULATE RELATIVE FITNESS STILL.
-
 ## Data Prep
 
 ```{r}
@@ -39,7 +37,7 @@ I NEED TO CALCULATE RELATIVE FITNESS STILL.
 #############
 # trts and pops
 trts <- data.frame(trt = c("TempControl_21psu", "TempControl_7psu", "TempWarm_16psu", "TempWarm_5psu"), trt_name = c("Current West Coast", "Current East Coast", "Future West Coast", "Future East Coast"), trt_coast = c("West", "East", "West", "East"), heat = c("Current", "Current", "Future", "Future"))
-pops <- poptrts_df %>% filter(!(poptrt %in% trts$trt)) %>% select(poptrt, order, coast) %>% rename(pop = poptrt, pop_coast = coast)
+pops <- poptrts_df %>% filter(!(poptrt %in% trts$trt)) %>% dplyr::select(poptrt, order, coast) %>% rename(pop = poptrt, pop_coast = coast)
 
 # combine
 trt_pop <- data.frame(trt = rep(levels(as.factor(fit_surv$trt)), 8), pop = (rep(levels(as.factor(fit_surv$pop)), each = 4)))
@@ -63,11 +61,12 @@ summary(fit_growth)
 summary(expfit_poptrt)
 
 # trim
-fit_surv_trim <- fit_surv %>% select(pop, trt, pop_trt, bagnum, isAlive)
-fit_growth_trim <- fit_growth %>% select(pop, trt, pop_trt, length_std_change, weight_std_change)
+fit_surv_trim <- fit_surv %>% dplyr::select(pop, trt, pop_trt, bagnum, isAlive)
+fit_growth_trim <- fit_growth %>% dplyr::select(pop, trt, pop_trt, length_std_change, weight_std_change)
 
 # combo trtpop with fitness
-fit_trtpop <- merge(trt_pop3, expfit_poptrt, by = c("pop", "trt", "order"))
+expfit_poptrt$trt <- gsub("-", "_", expfit_poptrt$trt)
+fit_trtpop <- merge(trt_pop3, expfit_poptrt, by = c("pop", "trt"))
 surv_trtpop <- merge(trt_pop3, fit_surv_trim, by = c("pop", "trt"))
 grow_trtpop <- merge(trt_pop3, fit_growth_trim, by = c("pop", "trt"))
 
@@ -141,12 +140,12 @@ ha_rel_weigh <- rel_ha_neg(weigh_fit_trtpop)
 # by coasts
 ###########
 # abs fit
-surv_w <- surv_fit_trtpop %>% filter(trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% select(trt, VIK, VAT, HOG, BAR)
-surv_e <- surv_fit_trtpop %>% filter(trt %in% c("TempControl_7psu", "TempWarm_5psu")) %>% select(trt, KUR, KAL, HOR, BJO)
-len_w <- len_fit_trtpop %>% filter(trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% select(trt, VIK, VAT, HOG, BAR)
-len_e <- len_fit_trtpop %>% filter(trt %in% c("TempControl_7psu", "TempWarm_5psu")) %>% select(trt, KUR, KAL, HOR, BJO)
-weigh_w <- weigh_fit_trtpop %>% filter(trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% select(trt, VIK, VAT, HOG, BAR)
-weigh_e <- weigh_fit_trtpop %>% filter(trt %in% c("TempControl_7psu", "TempWarm_5psu")) %>% select(trt, KUR, KAL, HOR, BJO)
+surv_w <- surv_fit_trtpop %>% filter(trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% dplyr::select(trt, VIK, VAT, HOG, BAR)
+surv_e <- surv_fit_trtpop %>% filter(trt %in% c("TempControl_7psu", "TempWarm_5psu")) %>% dplyr::select(trt, KUR, KAL, HOR, BJO)
+len_w <- len_fit_trtpop %>% filter(trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% dplyr::select(trt, VIK, VAT, HOG, BAR)
+len_e <- len_fit_trtpop %>% filter(trt %in% c("TempControl_7psu", "TempWarm_5psu")) %>% dplyr::select(trt, KUR, KAL, HOR, BJO)
+weigh_w <- weigh_fit_trtpop %>% filter(trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% dplyr::select(trt, VIK, VAT, HOG, BAR)
+weigh_e <- weigh_fit_trtpop %>% filter(trt %in% c("TempControl_7psu", "TempWarm_5psu")) %>% dplyr::select(trt, KUR, KAL, HOR, BJO)
 
 # rel ha
 surv_w_ha_rel <- rel_ha(surv_w)
@@ -181,37 +180,12 @@ curr_fut <- function(df) {
   long$method <- "cf"
   long$fit <- "abs"
   return(long)
-}
+} # just use each population and calc on each one
 
 curr_fut_rel <- function(df) {
   trt <- df$trt
   df <- as.matrix(df[,-1])
   home <- (c(unlist(df[1, 1:4]), unlist(df[2, 5:8])))
-  cf <- sweep(df, 2, home, function(w, d) ifelse(is.na(w) | is.na(d), NA, (w - d) / (d)))
-  cf_df <- cbind(trt, as.data.frame(cf))
-  long <- melt(cf_df, id.vars = "trt", variable.name = "pop", value.name = "fit_off")
-  long$method <- "cf"
-  long$fit <- "rel"
-  return(long)
-}
-
-# function
-curr_fut1 <- function(df) {
-  trt <- df$trt
-  df <- as.matrix(df[,-1])
-  home <- unlist(df[1, 1:4])
-  cf <- sweep(df, 2, home, function(w, d) ifelse(is.na(w) | is.na(d), NA, w - d))
-  cf_df <- cbind(trt, as.data.frame(cf))
-  long <- melt(cf_df, id.vars = "trt", variable.name = "pop", value.name = "fit_off")
-  long$method <- "cf"
-  long$fit <- "rel"
-  return(long)
-}
-
-curr_fut_rel1 <- function(df) {
-  trt <- df$trt
-  df <- as.matrix(df[,-1])
-  home <- unlist(df[1, 1:4])
   cf <- sweep(df, 2, home, function(w, d) ifelse(is.na(w) | is.na(d), NA, (w - d) / (d)))
   cf_df <- cbind(trt, as.data.frame(cf))
   long <- melt(cf_df, id.vars = "trt", variable.name = "pop", value.name = "fit_off")
@@ -226,34 +200,13 @@ curr_fut_rel1 <- function(df) {
 # absolute
 # surv
 surv_cf_off <- curr_fut(surv_fit_trtpop)
-surv_cf_w_off <- curr_fut1(surv_w)
-surv_cf_e_off <- curr_fut1(surv_e)
-
-# len
 len_cf_off <- curr_fut(len_fit_trtpop)
-len_cf_w_off <- curr_fut1(len_w)
-len_cf_e_off <- curr_fut1(len_e)
-
-# weigh
 weigh_cf_off <- curr_fut(weigh_fit_trtpop)
-weigh_cf_w_off <- curr_fut1(weigh_w)
-weigh_cf_e_off <- curr_fut1(weigh_e)
 
 # relative
-# surv - check on NAs vs true zeros
 surv_rel_cf_off <- curr_fut_rel(surv_fit_trtpop)
-surv_rel_cf_w_off <- curr_fut_rel1(surv_w)
-surv_rel_cf_e_off <- curr_fut_rel1(surv_e)
-
-# len
 len_rel_cf_off <- curr_fut_rel(len_fit_trtpop)
-len_rel_cf_w_off <- curr_fut_rel1(len_w)
-len_rel_cf_e_off <- curr_fut_rel1(len_w)
-
-# weigh -- 
 weigh_rel_cf_off <- curr_fut_rel(weigh_fit_trtpop)
-weigh_rel_cf_w_off <- curr_fut_rel1(weigh_w)
-weigh_rel_cf_e_off <- curr_fut_rel1(weigh_e)
 #####################
 ```
 
@@ -316,34 +269,22 @@ comm_gard_rel1 <- function(df) {
 # absolute
 # surv
 surv_cg_off <- comm_gard(surv_fit_trtpop)
-surv_cg_w_off <- comm_gard1(surv_w)
-surv_cg_e_off <- comm_gard1(surv_e)
 
 # len
 len_cg_off <- comm_gard(len_fit_trtpop)
-len_cg_w_off <- comm_gard1(len_w)
-len_cg_e_off <- comm_gard1(len_e)
 
 # weigh
 weigh_cg_off <- comm_gard1(weigh_fit_trtpop)
-weigh_cg_w_off <- comm_gard1(weigh_w)
-weigh_cg_e_off <- comm_gard1(weigh_e)
 
 # relative
 # surv - check on NAs vs true zeros
 surv_rel_cg_off <- comm_gard_rel(surv_fit_trtpop)
-surv_rel_cg_w_off <- comm_gard_rel1(surv_w)
-surv_rel_cg_e_off <- comm_gard_rel1(surv_e)
 
 # len
 len_rel_cg_off <- comm_gard_rel(len_fit_trtpop)
-len_rel_cg_w_off <- comm_gard_rel1(len_w)
-len_rel_cg_e_off <- comm_gard_rel1(len_w)
 
 # weigh
 weigh_rel_cg_off <- comm_gard_rel(weigh_fit_trtpop)
-weigh_rel_cg_w_off <- comm_gard_rel1(weigh_w)
-weigh_rel_cg_e_off <- comm_gard_rel1(weigh_e)
 #####################
 ```
 
@@ -356,30 +297,69 @@ weigh_rel_cg_e_off <- comm_gard_rel1(weigh_e)
 cf_offsets <- rbind(surv_cf_off, len_cf_off, weigh_cf_off, surv_rel_cf_off, len_rel_cf_off, weigh_rel_cf_off) 
 cg_offsets <- rbind(surv_cg_off, len_cg_off, weigh_cg_off, surv_rel_cg_off, len_rel_cg_off, weigh_rel_cg_off)
 
-cf_offsets$metric <- rep(c("surv","len","weigh"), each = 32)
-cg_offsets$metric <- rep(c("surv","len","weigh"), each = 32)
+cg_offsets$metric <- cf_offsets$metric <- rep(rep(c("surv","len","weigh"), each = 2), 32)
 
 # all together
 fit_offsets <- rbind(cf_offsets, cg_offsets)
 #########################
+```
 
-# clim only
-###########
-cf_offsets_e <- rbind(surv_cf_e_off, len_cf_e_off, weigh_cf_e_off, surv_rel_cf_e_off, len_rel_cf_e_off, weigh_rel_cf_e_off)
-cf_offsets_e$coast <- "East"
-cf_offsets_w <- rbind(surv_cf_w_off, len_cf_w_off, weigh_cf_w_off, surv_rel_cf_w_off, len_rel_cf_w_off, weigh_rel_cf_w_off)
-cf_offsets_w$coast <- "West"
+## Current Future - Climate Change
 
-cg_offsets_e <- rbind(surv_cg_e_off, len_cg_e_off, weigh_cg_e_off, surv_rel_cg_e_off, len_rel_cg_e_off, weigh_rel_cg_e_off)
-cg_offsets_e$coast <- "East"
-cg_offsets_w <- rbind(surv_cg_w_off, len_cg_w_off, weigh_cg_w_off, surv_rel_cg_w_off, len_rel_cg_w_off, weigh_rel_cg_w_off)
-cg_offsets_w$coast <- "West"
+```{r}
+# absolute fitness
+surv_fit_trtpop
+len_fit_trtpop
+weigh_fit_trtpop
 
-fit_offsets_clim <- rbind(cf_offsets_w, cf_offsets_e, cg_offsets_w, cg_offsets_e)
-fit_offsets_clim$metric <- rep(rep(c("surv","len","weigh"), each = 32), 2)
+# survival
+##########
+surv_w_mat <- surv_fit_trtpop %>% filter(trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% dplyr::select(VAT, VIK, HOG, BAR) %>% as.matrix()
+surv_e_mat <- surv_fit_trtpop %>% filter(trt %in% c("TempControl_7psu", "TempWarm_5psu")) %>% dplyr::select(KUR, KAL, HOR, BJO) %>% as.matrix()
+surv_cf_off_w <- surv_w_mat[2,] - surv_w_mat[1,]
+surv_cf_off_e <- surv_e_mat[2,] - surv_e_mat[1,]
+surv_cf_rel_w <- surv_w_mat[2,]/surv_w_mat[1,]
+surv_cf_rel_e <- surv_e_mat[2,]/surv_e_mat[1,]
+surv_cf_rel_off_w <- (surv_w_mat[2,] - surv_w_mat[1,])/surv_w_mat[1,]
+surv_cf_rel_off_e <- (surv_e_mat[2,] - surv_e_mat[1,])/surv_e_mat[1,]
+surv_cf <- data.frame(coast = c(rep("West", 4), rep("East", 4)), metric = rep("surv", 8), abs_current = c(surv_w_mat[1,], surv_e_mat[1,]), abs_future = c(surv_w_mat[2,], surv_e_mat[2,]), CF_abs_offset = c(surv_cf_off_w, surv_cf_off_e), CF_relative = c(surv_cf_rel_w, surv_cf_rel_e), CF_rel_offset = c(surv_cf_rel_off_w, surv_cf_rel_off_e))
+surv_cf$pop <- rownames(surv_cf)
+##########
 
-head(fit_offsets_clim)
-###########
+# length
+########
+len_w_mat <- len_fit_trtpop %>% filter(trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% dplyr::select(VAT, VIK, HOG, BAR) %>% as.matrix()
+len_e_mat <- len_fit_trtpop %>% filter(trt %in% c("TempControl_7psu", "TempWarm_5psu")) %>% dplyr::select(KUR, KAL, HOR, BJO) %>% as.matrix()
+len_cf_off_w <- len_w_mat[2,] - len_w_mat[1,]
+len_cf_off_e <- len_e_mat[2,] - len_e_mat[1,]
+len_cf_rel_w <- len_w_mat[2,]/len_w_mat[1,]
+len_cf_rel_e <- len_e_mat[2,]/len_e_mat[1,]
+len_cf_rel_off_w <- (len_w_mat[2,] - len_w_mat[1,])/len_w_mat[1,]
+len_cf_rel_off_e <- (len_e_mat[2,] - len_e_mat[1,])/len_e_mat[1,]
+len_cf <- data.frame(coast = c(rep("West", 4), rep("East", 4)), metric = rep("len", 8), abs_current = c(len_w_mat[1,], len_e_mat[1,]), abs_future = c(len_w_mat[2,], len_e_mat[2,]), CF_abs_offset = c(len_cf_off_w, len_cf_off_e), CF_relative = c(len_cf_rel_w, len_cf_rel_e), CF_rel_offset = c(len_cf_rel_off_w, len_cf_rel_off_e))
+len_cf$pop <- rownames(len_cf)
+########
+
+# weight
+########
+weigh_w_mat <- weigh_fit_trtpop %>% filter(trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% dplyr::select(VAT, VIK, HOG, BAR) %>% as.matrix()
+weigh_e_mat <- weigh_fit_trtpop %>% filter(trt %in% c("TempControl_7psu", "TempWarm_5psu")) %>% dplyr::select(KUR, KAL, HOR, BJO) %>% as.matrix()
+weigh_cf_off_w <- weigh_w_mat[2,] - weigh_w_mat[1,]
+weigh_cf_off_e <- weigh_e_mat[2,] - weigh_e_mat[1,]
+weigh_cf_rel_w <- weigh_w_mat[2,]/weigh_w_mat[1,]
+weigh_cf_rel_e <- weigh_e_mat[2,]/weigh_e_mat[1,]
+weigh_cf_rel_off_w <- (weigh_w_mat[2,] - weigh_w_mat[1,])/weigh_w_mat[1,]
+weigh_cf_rel_off_e <- (weigh_e_mat[2,] - weigh_e_mat[1,])/weigh_e_mat[1,]
+weigh_cf <- data.frame(coast = c(rep("West", 4), rep("East", 4)), metric = rep("weigh", 8), abs_current = c(weigh_w_mat[1,], weigh_e_mat[1,]), abs_future = c(weigh_w_mat[2,], weigh_e_mat[2,]), CF_abs_offset = c(weigh_cf_off_w, weigh_cf_off_e), CF_relative = c(weigh_cf_rel_w, weigh_cf_rel_e), CF_rel_offset = c(weigh_cf_rel_off_w, weigh_cf_rel_off_e))
+weigh_cf$pop <- rownames(weigh_cf)
+########
+
+# combine
+#########
+cf_df_clim <- rbind(surv_cf, len_cf, weigh_cf)
+rownames(cf_df_clim) <- NULL
+cf_df_clim_reord <- cf_df_clim[,c("pop", "coast", "metric", "abs_current", "abs_future", "CF_abs_offset", "CF_relative", "CF_rel_offset")]
+#########
 ```
 
 ## Plotting Fitness Offsets
@@ -389,11 +369,11 @@ head(fit_offsets_clim)
 poptrts_df <- read.csv("data/experiment/poptrts_df.csv")
 pop_ord <- poptrts_df %>% 
   filter(coast != "trt") %>% 
-  select(poptrt, order) %>% 
+  dplyr::select(poptrt, order) %>% 
   rename(pop = poptrt, pop_ord = order)
 trt_ord <- poptrts_df %>% 
   filter(coast == "trt") %>% 
-  select(poptrt) %>% 
+  dplyr::select(poptrt) %>% 
   rename(trt = poptrt) %>% 
   mutate(trt = gsub("-", "_", trt)) %>% 
   mutate(trt_ord = 1:4)
@@ -402,8 +382,11 @@ trt_ord <- poptrts_df %>%
 fit_offsets_plot <- merge(fit_offsets, pop_ord, by = c("pop"))
 fit_offsets_plot <- merge(fit_offsets_plot, trt_ord, by = c("trt"))
 
-fit_offsets_clim_plot <- merge(fit_offsets_clim, pop_ord, by = c("pop"))
-fit_offsets_clim_plot <- merge(fit_offsets_clim_plot, trt_ord, by = c("trt"))
+fit_offsets_clim_plot <- merge(pop_ord, cf_df_clim_reord, by = c("pop"))
+fit_offsets_clim_plot_ord <- fit_offsets_clim_plot[order(fit_offsets_clim_plot$pop_ord),]
+
+# save results
+write.csv(fit_offsets_clim_plot_ord, paste0("results/fit_results/climate_change_fitness_offsets_", Sys.Date(), ".csv"))
 ```
 
 
@@ -626,6 +609,7 @@ weigh_cf_heatmap_rel <- weigh_cf_rel_log %>%
   labs(title = "Current-Future Fitness Offset,\nRelative Weight Change (Log)", x = "Population", y = "Treatment", fill = "Fitness Offset")
 weigh_cf_heatmap_rel
 ```
+
 Export 
 
 ```{r}

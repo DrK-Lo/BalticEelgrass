@@ -1,0 +1,383 @@
+---
+title: "eelgrass_fitness_offsets_clim"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Documents/Github/BalticEelgrass")
+
+# setwd
+setwd("/Users/camillerumberger/Documents/GitHub/BalticEelgrass")
+
+# libraries
+library(tidyverse) # for data cleaning
+library(stringr) # for data cleaning
+library(dplyr) # for data cleaning
+library(ggplot2) # for plotting
+library(raster) # for environmental pixels
+library(viridis) # plotting
+library(sf) # mapping
+library(s2) # mapping
+library(rnaturalearth) # mapping
+library(maps) # mapping
+library(ggspatial) # mapping
+library(ggrepel) # mapping
+library(stars) # mapping
+library(ggpubr) # plotting
+
+# data
+cf_off <- read.csv("results/fit_results/climate_change_fitness_offsets_2026-05-28.csv")[,-1]
+sites <- read.csv("data/experiment/eelgrass_exp_sites.csv")
+poptrts_df <- read.csv("data/experiment/poptrts_df.csv")
+```
+
+# Plotting Fitness Offsets
+
+This script plots current-future fitness offsets from W & E coast conditions to future W & E coast conditions, respectively. Fitness offsets are calculated in the script "eelgrass_fitness_offsets.Rmd"
+
+## Data Prep
+
+Combine data
+
+```{r}
+# check data
+head(cf_off)
+head(sites)
+
+# rename
+sites$pop <- sites$site_abbrev
+
+# combine
+clim_offs <- merge(sites, cf_off, by = "pop")
+```
+
+## Plotting
+
+### Maps
+
+Start by visualizing these fitness offsets as maps
+
+I'm going to start off making "climate change" maps, which visualize the offset between current/future W and current/future E on the same plot.
+
+First prep the plotting range.
+
+```{r}
+# set spherical geometry
+sf::sf_use_s2(FALSE)
+
+# set object
+world <- ne_countries(scale = "medium", returnclass = "sf")
+world_crop <- sf::st_crop(world, c(xmin = 10, xmax = 20, ymin = 54, ymax = 61))
+```
+
+#### Survival Maps
+
+```{r}
+# relevant data
+surv_cf <- clim_offs %>% filter(metric == "surv")
+
+# mapping
+# absolute survival
+###################
+surv_abs_map <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = surv_cf, aes(x = long, y = lat, 
+                                 fill = abs_future), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
+  geom_label_repel(data = surv_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(A) Survival in Future Treatments")), x = "Longitude", y = "Latitude", fill = "Survival")
+surv_abs_map
+###################
+
+# relative survival
+###################
+surv_rel_map <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = surv_cf, aes(x = long, y = lat, 
+                                 fill = CF_relative), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
+  geom_label_repel(data = surv_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(B) Common Future Relative Survival \nin Future Treatments")), x = "Longitude", y = "Latitude", fill = "Relative \nSurvival")
+surv_rel_map
+###################
+
+# abs surv offset
+#################
+surv_abs_off_map <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = surv_cf, aes(x = long, y = lat, 
+                                 fill = CF_abs_offset), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+  geom_label_repel(data = surv_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(C) Common Future Survival Offset \nin Future Treatments")), x = "Longitude", y = "Latitude", fill = "Fitness Offset")
+surv_abs_off_map
+#################
+
+# abs surv offset
+#################
+surv_rel_off_map <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = surv_cf, aes(x = long, y = lat, 
+                                 fill = CF_rel_offset), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+  geom_label_repel(data = surv_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(D) Common Future Relative Survival \nOffset in Future Treatments")), x = "Longitude", y = "Latitude", fill = "Relative \nFitness Offset")
+surv_rel_off_map
+#################
+
+# combine plots
+###############
+surv_cf_maps <- ggarrange(plotlist = c(surv_abs_map, surv_rel_map, surv_abs_off_map, surv_rel_off_map))
+###############
+```
+
+#### Length Plots
+
+```{r}
+# relevant data
+len_cf <- clim_offs %>% filter(metric == "len")
+
+# mapping
+# absolute length
+#################
+len_abs_map <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = len_cf, aes(x = long, y = lat, 
+                                 fill = abs_future), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(0,2)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(0,2)) +
+  geom_label_repel(data = len_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(A) Length Change in Future Treatments")), x = "Longitude", y = "Latitude", fill = "Length Change")
+len_abs_map
+###################
+
+# relative length
+#################
+len_rel_map <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = len_cf, aes(x = long, y = lat, 
+                                 fill = CF_relative), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
+  geom_label_repel(data = len_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(B) Common Future Relative Length Change \nin Future Treatments")), x = "Longitude", y = "Latitude", fill = "Relative \nLength Change")
+len_rel_map
+#################
+
+# abs len offset
+################
+len_abs_off_map <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = len_cf, aes(x = long, y = lat, 
+                                 fill = CF_abs_offset), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(-2,0)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(-2,0)) +
+  geom_label_repel(data = len_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(C) Common Future Length Offset \nin Future Treatments")), x = "Longitude", y = "Latitude", fill = "Fitness Offset")
+len_abs_off_map
+################
+
+# rel len offset
+################
+len_rel_off_map <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = len_cf, aes(x = long, y = lat, 
+                                 fill = CF_rel_offset), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+  geom_label_repel(data = len_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(D) Common Future Relative Length \nOffset in Future Treatments")), x = "Longitude", y = "Latitude", fill = "Relative \nFitness Offset")
+len_rel_off_map
+################
+
+# combine plots
+###############
+len_cf_maps <- ggarrange(plotlist = c(len_abs_map, len_rel_map, len_abs_off_map, len_rel_off_map))
+###############
+```
+
+#### Weight Plots
+
+```{r}
+# relevant data
+weigh_cf <- clim_offs %>% filter(metric == "weigh")
+
+# mapping
+# absolute weight chg
+###################
+weigh_abs_map <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = weigh_cf, aes(x = long, y = lat, 
+                                 fill = abs_future), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+  geom_label_repel(data = weigh_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(A) Weight Change in Future Treatments")), x = "Longitude", y = "Latitude", fill = "Weight Change")
+weigh_abs_map
+###################
+
+# relative weight chg
+###################
+weigh_rel_map <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = weigh_cf, aes(x = long, y = lat, 
+                                 fill = CF_relative), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(-12,6)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(-12,6)) +
+  geom_label_repel(data = weigh_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(B) Common Future Relative Weight Change \nin Future Treatments")), x = "Longitude", y = "Latitude", fill = "Relative \nWeight Change")
+weigh_rel_map
+###################
+
+# abs weigh offset
+#################
+weigh_abs_off_map <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = weigh_cf, aes(x = long, y = lat, 
+                                 fill = CF_abs_offset), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+  geom_label_repel(data = weigh_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(C) Common Future Weight Change Offset \nin Future Treatments")), x = "Longitude", y = "Latitude", fill = "Fitness Offset")
+weigh_abs_off_map
+#################
+
+# abs weigh offset
+#################
+weigh_rel_off_map <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = weigh_cf, aes(x = long, y = lat, 
+                                 fill = CF_rel_offset), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(-13,5)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(-13,5)) +
+  geom_label_repel(data = weigh_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(D) Common Future Relative Weight Change \nOffset in Future Treatments")), x = "Longitude", y = "Latitude", fill = "Relative \nFitness Offset")
+weigh_rel_off_map
+#################
+
+# combine plots
+###############
+weigh_cf_maps <- ggarrange(plotlist = c(weigh_abs_map, weigh_rel_map, weigh_abs_off_map, weigh_rel_off_map))
+###############
+```
+
+#### Export
+
+```{r}
+doc <- read_pptx() %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_abs_map), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_rel_map), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_abs_off_map), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_rel_off_map), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = len_abs_map), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = len_rel_map), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = len_abs_off_map), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = len_rel_off_map), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = weigh_abs_map), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = weigh_rel_map), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = weigh_abs_off_map), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = weigh_rel_off_map), location = ph_location(left = 1, top = 1, width = 6.5, height = 4))
+
+print(doc, target = "results/figures/climchg_fit_offset_maps.pptx")
+
+doc2 <- read_pptx() %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_cf_maps), location = ph_location(left = 1, top = 1, width = 13, height = 8)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = len_cf_maps), location = ph_location(left = 1, top = 1, width = 13, height = 8)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = weigh_cf_maps), location = ph_location(left = 1, top = 1, width = 13, height = 8)) 
+
+print(doc2, target = "results/figures/climchg_fit_offset_maps_combined.pptx")
+```

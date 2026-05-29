@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = "/Users/camillerumberger/Documents/GitHub/BalticEelgrass")
+setwd("/Users/camillerumberger/Documents/GitHub/BalticEelgrass")
 
 # packages
 library(car)
@@ -28,8 +29,7 @@ surv <- read.csv("data/experiment/survival_dat_trt_pop.csv")[,-1]
 grow <- read.csv("data/experiment/fit_growth_dat.csv")[,-1]
 
 # fit offsets
-fit_off <- read.csv("results/fit_results/fit_offsets_2026-04-30.csv")
-fit_off_log <- read.csv("results/fit_results/fit_offsets_log_2026-04-30.csv")
+fit_off_clim <- read.csv("results/fit_results/fit_offsets_clim_2026-05-21.csv")
 
 # go
 lea <- read.csv("results/GO_results/LEA_offsets_exptrt_wide_2025-12-03.csv")[,-1]
@@ -154,12 +154,24 @@ grow_go_long$method <- str_split_fixed(grow_go_long$method, "_", 2)[,1]
 trts <- levels(as.factor(surv_go$trt))
 pops <- levels(as.factor(surv_go$pop))
 
-# add fitness offsets
-surv_go_long_off <- fit_off %>% filter(metric == "surv") %>% rename(method_fit = method) %>% pivot_wider(id_cols = c(trt, pop, trt_ord, pop_ord, metric), names_from = c(method_fit, fit), names_sep = "_", values_from = fit_off) %>% mutate(trt = gsub("_", "-", trt))
-surv_go_long_offset <- merge(surv_go_long, surv_go_long_off, by = c("trt", "pop"))
+# some checks
+levels(as.factor(fit_off_clim$fit)) # only relative fitness here, no abs
 
-grow_go_long_off <- fit_off %>% filter(metric %in% c("len", "weigh")) %>% rename(method_fit = method) %>% pivot_wider(id_cols = c(trt, pop, trt_ord, pop_ord, metric), names_from = c(method_fit, fit), names_sep = "_", values_from = fit_off) %>% mutate(trt = gsub("_", "-", trt), metric = metric)
-grow_go_long_offset <- merge(grow_go_long, grow_go_long_off, by = c("trt", "pop"))
+# add fitness offsets
+surv_go_long_off_clim <- fit_off_clim %>%
+  filter(metric == "surv" & method == "cf") %>%
+  rename(method_fit = method) %>%
+  pivot_wider(id_cols = c(trt, pop, trt_ord, pop_ord, metric, coast),
+              names_from = c(method_fit, fit),
+              names_sep = "_",
+              values_from = fit_off,
+              values_fn = first) %>%
+  mutate(trt = gsub("_", "-", trt))
+surv_go_long_offset <- merge(surv_go_long, surv_go_long_off_clim, by = c("trt", "pop"))
+
+grow_go_long_off_clim <- fit_off_clim_un %>% 
+  filter(metric %in% c("len", "weigh")) %>% rename(method_fit = method) %>% pivot_wider(id_cols = c(trt, pop, trt_ord, pop_ord, metric), names_from = c(method_fit, fit), names_sep = "_", values_from = fit_off) %>% mutate(trt = gsub("_", "-", trt), metric = metric)
+grow_go_long_offset <- merge(grow_go_long, grow_go_long_off_clim, by = c("trt", "pop"))
 
 # save combined dfs
 #write.csv(surv_go, "results/GO_compare/survival_offset_avgs.csv", row.names = F)
@@ -171,201 +183,82 @@ grow_go_long_offset <- merge(grow_go_long, grow_go_long_off, by = c("trt", "pop"
 
 #### Correlations
 
-##### Correlations CG & CF framework
+##### Correlations CF Offsets
 
 ```{r}
-## SURVIVAL
-###########
-# function for correlations both common garden/current future offset
-surv_corr <- function(df, go_method, gen_clone, fit_method) { # df is dataframe, method is GO method, gen_clone is mll/full, fit_method is fitness cg or cf comparison method
+# function for correlations current future offset
+ # df is dataframe, go is lea/rda/gf/env, clone is mll/full, coast is W/E, fit_met is surv/len/weigh, type is abs/rel
+fitcorrCF <- function(df, go, clone, coast, fit_met, type) {
   # subset data
-  df_subset <- df[df$go_method == go_method & df$cc == gen_clone,]
+  df_subset <- df[df$method == go & df$cc == clone & df$coast == coast & df$metric == fit_met,]
   
-  if(fit_method == "cg") {
-    # make df
-    corrs_cg <- data.frame(go_method = NA, trt = NA, cc = NA, kendall_surv = NA, pval_surv = NA)
+  # set up df
+  corrs_cf <- data.frame(fit_metric = NA, go_method = NA, coast = NA, pop = NA, cc = NA, kendall = NA, pval = NA, signif = NA)
+
+    # calc fit offset
+  for (i in 1:length(pops)){
+    # subset
+    pop_temp <- pops[i]
+    temp <- df_subset[df_subset$pop == pop_temp,]
     
-    # common garden
-    for (i in 1:length(trts)){
-      # subset
-      trt_temp <- trts[i]
-      temp <- df_subset[df_subset$trt == trt_temp,]
+    # metadata
+    corrs_cf[i,]$fit_metric <- fit_met
+    corrs_cf[i,]$go_method <- go
+    corrs_cf[i,]$cc <- clone
+    corrs_cf[i,]$coast <- coast
+    corrs_cf[i,]$pop <- pop_temp  
     
-      # metadata
-      corrs_cg[i,]$go_method <- go_method
-      corrs_cg[i,]$cc <- gen_clone
-      corrs_cg[i,]$trt <- trt_temp  
+    # na
+    prep <- temp[complete.cases(temp[, as.character(paste0("cf_", type))], temp$offset),]
+
+    # extract data
+    fit_offset <- as.numeric(prep[,paste0("cf_", type)])
+    gen_offset <- as.numeric(prep$offset)
       
-      # correlation
-      test <- cor.test(temp$surv, temp$offset, method = "kendall")
-      corrs_cg[i,]$kendall_surv <- test$estimate
-      corrs_cg[i,]$pval_surv <- test$p.value
+    # correlation
+    if (nrow(temp) > 0){
+      test <- cor.test(gen_offset, fit_offset, method = "kendall", )
+      corrs_cf[i,]$kendall <- test$estimate
+      corrs_cf[i,]$pval <- test$p.value
+      corrs_cf[i,]$signif <- ifelse(test$p.value < 0.05, T, F)
+    }elseif (nrow(temp) == 0){
+      test <- NA
+      corrs_cf[i,]$kendall_surv <- NA
+      corrs_cf[i,]$pval_surv <- NA
+      corrs_cf[i,]$signif <- NA
     }
-    return(corrs_cg)
-  } else if (fit_method == "cf") {
-    # make df
-    corrs_cf <- data.frame(method = NA, pop = NA, cc = NA, kendall_surv = NA, pval_surv = NA)
-    
-    # current future
-    for (i in 1:length(pops)){
-      # subset
-      pop_temp <- pops[i]
-      temp <- df_subset[df_subset$pop == pop_temp,]
-    
-      # metadata
-      corrs_cf[i,]$go_method <- go_method
-      corrs_cf[i,]$cc <- gen_clone
-      corrs_cf[i,]$pop <- pop_temp  
-      
-      # correlation
-      test <- cor.test(temp$surv, temp$offset, method = "kendall")
-      corrs_cf[i,]$kendall_surv <- test$estimate
-      corrs_cf[i,]$pval_surv <- test$p.value
-    }
-    return(corrs_cf)
-  } else {
-    print("Please choose cg for common garden or cf for current-future")
   }
+  return(corrs_cf)
 }
 
-surv_corr_cg <- rbind(surv_corr(surv_go_long, "lea", "full", "cg"),
-                      surv_corr(surv_go_long, "rda", "full", "cg"),
-                      surv_corr(surv_go_long, "gf", "full", "cg"),
-                      surv_corr(surv_go_long, "env", "full", "cg"),
-                      surv_corr(surv_go_long, "lea", "mll", "cg"),
-                      surv_corr(surv_go_long, "rda", "mll", "cg"),
-                      surv_corr(surv_go_long, "gf", "mll", "cg"),
-                      surv_corr(surv_go_long, "env", "mll", "cg"))
+# I get a ton of NAs here in kendall testing surv from populations with no individuals in the final treatment (i.e. full mortality) - trying where I set 0 values to 1e-10
+surv_go_long_offset$surv_adj <- ifelse(surv_go_long_offset$surv == 0, 1e-10, surv_go_long_offset$surv)
 
-surv_corr_all_cg <- rbind(surv_corr(surv_all_go, "lea", "full", "cg"),
-                      surv_corr(surv_all_go, "rda", "full", "cg"),
-                      surv_corr(surv_all_go, "gf", "full", "cg"),
-                      surv_corr(surv_all_go, "env", "full", "cg"),
-                      surv_corr(surv_all_go, "lea", "mll", "cg"),
-                      surv_corr(surv_all_go, "rda", "mll", "cg"),
-                      surv_corr(surv_all_go, "gf", "mll", "cg"),
-                      surv_corr(surv_all_go, "env", "mll", "cg"))
+# and calc
+combos_surv_clim <- expand.grid(go = c("lea", "rda", "gf", "env"),
+                      clone = c("mll", "full"),
+                      fit_type = c("abs", "rel"),
+                      fit_met = "surv_adj",
+                      coast = c("West", "East"),
+                      stringsAsFactors = F)
+combos_grow_clim <- expand.grid(go = c("lea", "rda", "gf", "env"),
+                      clone = c("mll", "full"),
+                      fit_type = c("abs", "rel"),
+                      fit_met = c("len", "weigh"),
+                      coast = c("West", "East"),
+                      stringsAsFactors = F)
 
-surv_corr_cf <- rbind(surv_corr(surv_go_long, "lea", "full", "cf"),
-                      surv_corr(surv_go_long, "rda", "full", "cf"),
-                      surv_corr(surv_go_long, "gf", "full", "cf"),
-                      surv_corr(surv_go_long, "env", "full", "cf"),
-                      surv_corr(surv_go_long, "lea", "mll", "cf"),
-                      surv_corr(surv_go_long, "rda", "mll", "cf"),
-                      surv_corr(surv_go_long, "gf", "mll", "cf"),
-                      surv_corr(surv_go_long, "env", "mll", "cf"))
-
-surv_corr_all_cf <- rbind(surv_corr(surv_all_go, "lea", "full", "cf"),
-                      surv_corr(surv_all_go, "rda", "full", "cf"),
-                      surv_corr(surv_all_go, "gf", "full", "cf"),
-                      surv_corr(surv_all_go, "env", "full", "cf"),
-                      surv_corr(surv_all_go, "lea", "mll", "cf"),
-                      surv_corr(surv_all_go, "rda", "mll", "cf"),
-                      surv_corr(surv_all_go, "gf", "mll", "cf"),
-                      surv_corr(surv_all_go, "env", "mll", "cf"))
-
-# add info about surv
-surv_corr_cg$type_surv <- rep("proportion", nrow(surv_corr_cg))
-surv_corr_cf$type_surv <- rep("proportion", nrow(surv_corr_cf))
-surv_corr_all_cg$type_surv <- rep("binary", nrow(surv_corr_all_cg))
-surv_corr_all_cf$type_surv <- rep("binary", nrow(surv_corr_all_cf))
-
-# combine into single df
-surv_corrs_cf <- rbind(surv_corr_cf, surv_corr_all_cf)
-surv_corrs_cg <- rbind(surv_corr_cg, surv_corr_all_cg)
+surv_corrs_clim <- do.call(rbind, mapply(fitcorrCF, go = combos_surv_clim$go, clone = combos_surv_clim$clone, fit_met = combos_surv_clim$fit_met, type = combos_surv_clim$fit_type, coast = combos_surv_clim$coast,
+                              MoreArgs = list(df = surv_go_long_offset), 
+                              SIMPLIFY = F)) 
+grow_corrs_clim <- do.call(rbind, mapply(fitcorrCF, go = combos_grow_clim$go, clone = combos_grow_clim$clone, fit_met = combos_grow_clim$fit_met, type = combos_grow_clim$fit_type, coast = combos_grow_clim$coast,
+                              MoreArgs = list(df = grow_go_long_offset), 
+                              SIMPLIFY = F))
 
 # signif T/F
-surv_corrs_cf$signif <- ifelse(surv_corrs_cf$pval_surv < 0.05, T, F)
-surv_corrs_cg$signif <- ifelse(surv_corrs_cg$pval_surv < 0.05, T, F)
+surv_corrs_clim$pval_adj <- p.adjust(surv_corrs_clim$pval)
+surv_corrs_clim$signif_adj <- ifelse(surv_corrs_cg$pval_surv < 0.05, T, F)
 ###########
-
-## GROWTH
-#########
-grow_corr <- function(df, go_method, gen_clone, fit_method) {
-  # subset data
-  df_subset <- df[df$go_method == go_method & df$cc == gen_clone,]
-  
-  if(fit_method == "cg") {
-    # make df
-    corrs_cg <- data.frame(go_method = NA, trt = NA, cc = NA, kendall_len = NA, pval_len = NA, kendall_weigh = NA, pval_weigh = NA)
-    
-    # common garden
-    for (i in 1:length(trts)){
-      # subset
-      trt_temp <- trts[i]
-      temp <- df_subset[df_subset$trt == trt_temp,]
-    
-      # metadata
-      corrs_cg[i,]$go_method <- go_method
-      corrs_cg[i,]$cc <- gen_clone
-      corrs_cg[i,]$trt <- trt_temp  
-      
-      # correlation
-      test_len <- cor.test(temp$length_std_change, temp$offset, method = "kendall")
-      corrs_cg[i,]$kendall_len <- test_len$estimate
-      corrs_cg[i,]$pval_len <- test_len$p.value
-      
-      test_weigh <- cor.test(temp$weight_std_change, temp$offset, method = "kendall")
-      corrs_cg[i,]$kendall_weigh <- test_weigh$estimate
-      corrs_cg[i,]$pval_weigh <- test_weigh$p.value
-    }
-    return(corrs_cg)
-    
-  } else if (fit_method == "cf") {
-    # make df
-    corrs_cf <- data.frame(go_method = NA, pop = NA, cc = NA, kendall_len = NA, pval_len = NA, kendall_weigh = NA, pval_weigh = NA)
-    
-    # current future
-    for (i in 1:length(pops)){
-      # subset
-      pop_temp <- pops[i]
-      temp <- df_subset[df_subset$pop == pop_temp,]
-    
-      # metadata
-      corrs_cf[i,]$go_method <- go_method
-      corrs_cf[i,]$cc <- gen_clone
-      corrs_cf[i,]$pop <- pop_temp  
-      
-      # correlation
-      test_len <- cor.test(temp$length_std_change, temp$offset, method = "kendall")
-      corrs_cf[i,]$kendall_len <- test_len$estimate
-      corrs_cf[i,]$pval_len <- test_len$p.value
-      
-      test_weigh <- cor.test(temp$weight_std_change, temp$offset, method = "kendall")
-      corrs_cf[i,]$kendall_weigh <- test_weigh$estimate
-      corrs_cf[i,]$pval_weigh <- test_weigh$p.value
-    }
-    return(corrs_cf)
-    
-  } else {
-    print("Please choose cg for common garden or cf for current-future")
-  }
-}
-
-grow_corr_cg <- rbind(grow_corr(grow_go_long, "lea", "full", "cg"),
-                      grow_corr(grow_go_long, "rda", "full", "cg"),
-                      grow_corr(grow_go_long, "gf", "full", "cg"),
-                      grow_corr(grow_go_long, "env", "full", "cg"),
-                      grow_corr(grow_go_long, "lea", "mll", "cg"),
-                      grow_corr(grow_go_long, "rda", "mll", "cg"),
-                      grow_corr(grow_go_long, "gf", "mll", "cg"),
-                      grow_corr(grow_go_long, "env", "mll", "cg"))
-
-grow_corr_cf <- rbind(grow_corr(grow_go_long, "lea", "full", "cf"),
-                      grow_corr(grow_go_long, "rda", "full", "cf"),
-                      grow_corr(grow_go_long, "gf", "full", "cf"),
-                      grow_corr(grow_go_long, "env", "full", "cf"),
-                      grow_corr(grow_go_long, "lea", "mll", "cf"),
-                      grow_corr(grow_go_long, "rda", "mll", "cf"),
-                      grow_corr(grow_go_long, "gf", "mll", "cf"),
-                      grow_corr(grow_go_long, "env", "mll", "cf"))
-
-# signif T/F
-grow_corr_cf$signif_len <- ifelse(grow_corr_cf$pval_len < 0.05, T, F)
-grow_corr_cg$signif_len <- ifelse(grow_corr_cg$pval_len < 0.05, T, F)
-grow_corr_cf$signif_weigh <- ifelse(grow_corr_cf$pval_weigh < 0.05, T, F)
-grow_corr_cg$signif_weigh <- ifelse(grow_corr_cg$pval_weigh < 0.05, T, F)
-#########
 
 # save outputs
 ##############
@@ -386,7 +279,7 @@ head(surv_go_long_offset)
 head(grow_go_long_offset)
 
 # function for correlations both common garden/current future abs/rel fitness offsets
-fit_corr <- function(df, go, clone, fit_off, fit_typ, fit_met) { # go can be lea, rda, gf, or env; clone can be mll or full; fit_off can be cf or cg, fit_typ can be abs or rel; fit_met can be surv, weigh, or len
+fit_corr_clim <- function(df, go, clone, coast, fit_typ, fit_met) { # go can be lea, rda, gf, or env; clone can be mll or full; fit_off can be cf or cg, fit_typ can be abs or rel; fit_met can be surv, weigh, or len
   # setup empty df to populate
   cor_df <- data.frame(go_method = NA, fit_metric, fit_method = NA, fit_type = NA, cc = NA, pearson = NA, pearson_pval = NA, spearman = NA, spearman_pval = NA, kendall = NA, kendall_pval = NA, r2 = NA, signif = NA)
   
@@ -423,22 +316,22 @@ fit_corr <- function(df, go, clone, fit_off, fit_typ, fit_met) { # go can be lea
 
 combos_surv <- expand.grid(go = c("lea", "rda", "gf", "env"),
                       clone = c("mll", "full"),
-                      fit_off = c("cf", "cg"),
-                      fit_typ = c("abs", "rel"),
+                      fit_type = c("abs", "rel"),
                       fit_met = "surv",
+                      coast = c("West", "East"),
                       stringsAsFactors = F)
 
 combos_grow <- expand.grid(go = c("lea", "rda", "gf", "env"),
                       clone = c("mll", "full"),
-                      fit_off = c("cf", "cg"),
-                      fit_typ = c("abs", "rel"),
+                      fit_type = c("abs", "rel"),
                       fit_met = c("len", "weigh"),
+                      coast = c("West", "East"),
                       stringsAsFactors = F)
 
-surv_corrs <- do.call(rbind, mapply(fit_corr, go = combos_surv$go, clone = combos_surv$clone, fit_off = combos_surv$fit_off, fit_met = combos_surv$fit_met, fit_typ = combos_surv$fit_typ, 
+surv_corrs <- do.call(rbind, mapply(fit_corr_clim, go = combos_surv$go, clone = combos_surv$clone, fit_met = combos_surv$fit_met, fit_type = combos_surv$fit_type, 
                               MoreArgs = list(df = surv_go_long_offset), 
                               SIMPLIFY = F))
-grow_corrs <- do.call(rbind, mapply(fit_corr, go = combos_grow$go, clone = combos_grow$clone, fit_off = combos_grow$fit_off, fit_met = combos_grow$fit_met, fit_typ = combos_grow$fit_typ, 
+grow_corrs <- do.call(rbind, mapply(fit_corr_clim, go = combos_grow$go, clone = combos_grow$clone, fit_met = combos_grow$fit_met, fit_type = combos_grow$fit_typ, 
                               MoreArgs = list(df = grow_go_long_offset), 
                               SIMPLIFY = F))
 

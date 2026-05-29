@@ -24,10 +24,14 @@ library(forcats)
 surv_go <- read.csv("results/GO_compare/survival_offset_avgs.csv")
 surv_all_go <- read.csv("results/GO_compare/survival_offset_binary.csv")
 grow_go <- read.csv("results/GO_compare/grow_offset.csv")
+
+# correlations abs fit
 surv_corrs_cf <- read.csv("results/GO_compare/surv_corrs_cf.csv")[,-1]
 surv_corrs_cg <- read.csv("results/GO_compare/surv_corrs_cg.csv")[,-1]
 grow_corrs_cf <- read.csv("results/GO_compare/grow_corr_cf.csv")[,-1]
 grow_corrs_cg <- read.csv("results/GO_compare/grow_corr_cg.csv")[,-1]
+
+# fitess offsets
 ```
 
 ## Data Cleaning & Setup
@@ -335,7 +339,7 @@ surv_full_cg_rda <- surv_go_full %>%
                     labels = trt_labels) +
   scale_colour_manual(name = "Treatment",
                     values = trt_colors,
-                    labels = ctrt_labels) +
+                    labels = trt_labels) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
                     labels = c("West Coast", "East Coast")) +
