@@ -144,34 +144,6 @@ fitcorrCF <- function(df, go, clone, fit_met) {
   test_cf_rel = cor.test(df_subset$CF_rel_offset, df_subset$offset, method = "kendall", na.action = "na.exclude")
   corrs_cf$cf_rel_corr = test_cf_rel$estimate
   corrs_cf$cf_rel_pval = test_cf_rel$p.value
-
-  # for (i in 1:length(pops$pop)) {
-  #   pop_temp = pops[i,]$pop
-  #   temp = df_subset[df_subset$pop == pop_temp,]
-  #   
-  #   # metadata
-  #   corrs_cf[i,]$fit_metric <- fit_met
-  #   corrs_cf[i,]$method <- go
-  #   corrs_cf[i,]$cc <- clone
-  #   
-  #   # correlation analysis
-  #   test_abs = cor.test(temp$abs_future, temp$offset, method = "kendall", na.action = "na.exclude")
-  #   corrs_cf[i,]$abs_corr = test_abs$estimate
-  #   corrs_cf[i,]$abs_pval = test_abs$p.value
-  #   
-  #   test_rel = cor.test(temp$CF_relative, temp$offset, method = "kendall", na.action = "na.exclude")
-  #   corrs_cf[i,]$rel_corr = test_rel$estimate
-  #   corrs_cf[i,]$rel_corr_pval = test_rel$p.value
-  #   
-  #   test_cf_abs = cor.test(temp$CF_abs_offset, temp$offset, method = "kendall", na.action = "na.exclude")
-  #   corrs_cf[i,]$cf_abs_corr = test_cf_abs$estimate
-  #   corrs_cf[i,]$cf_abs_pval = test_cf_abs$p.value
-  #   
-  #   test_cf_rel = cor.test(temp$CF_rel_offset, temp$offset, method = "kendall", na.action = "na.exclude")
-  #   corrs_cf[i,]$cf_rel_corr = test_cf_rel$estimate
-  #   corrs_cf[i,]$cf_rel_pval = test_cf_rel$p.value
-  # }
-  
   return(corrs_cf)
 }
 #################################################
@@ -318,9 +290,10 @@ cf_clim_e_long$signif <- ifelse(cf_clim_e_long$pval < 0.05, T, F)
 
 # save outputs
 ##############
-write.csv(cf_clim_long, paste0("climchg_gofit_corrs_", Sys.Date(), ".csv"))
-write.csv(cf_clim_w_long, paste0("climchg_gofit_corrs_west_", Sys.Date(), ".csv"))
-write.csv(cf_clim_e_long, paste0("climchg_gofit_corrs_east_", Sys.Date(), ".csv"))
+write.csv(fit_go, paste0("results/GO_compare/climchg_gofit_df_", Sys.Date(), ".csv"))
+write.csv(cf_clim_long, paste0("results/GO_compare/climchg_gofit_corrs_", Sys.Date(), ".csv"))
+write.csv(cf_clim_w_long, paste0("results/GO_compare/climchg_gofit_corrs_west_", Sys.Date(), ".csv"))
+write.csv(cf_clim_e_long, paste0("results/GO_compare/climchg_gofit_corrs_east_", Sys.Date(), ".csv"))
 ##############
 ```
 
@@ -328,4 +301,61 @@ write.csv(cf_clim_e_long, paste0("climchg_gofit_corrs_east_", Sys.Date(), ".csv"
 
 Visualize strength of correlations. Try a heatmap with genomic offset as columns and fitness/fitness offset as rows
 
+```{r}
+# quick checks
+head(cf_clim_long)
+
+# ordering for plotting
+fit_ord <- c("abs", "rel", "cf_abs", "cf_rel")
+method_ord <- c("lea_offset", "rda_offset", "gf_offset", "env_dist")
+
+# surv
+surv_corplot_full <- cf_clim_long %>% 
+  filter(cc == "full" & fit_metric == "surv") %>% 
+  mutate(fit_type = factor(fit_type, levels = rev(fit_ord)), method = factor(method, levels = method_ord), corr = round(corr, 3)) %>%
+  ggplot(aes(x = method, y = (fit_type), fill = corr)) +
+  geom_tile() +
+  geom_text(aes(label = corr), color = "black", size = 4) +
+  scale_fill_gradient2(low = "#4c9220", mid = "white", high = "#c5247d", midpoint = 0, limits = c(-1, 1), na.value = "lightgray", guide = guide_colourbar(reverse = TRUE)) +
+  scale_x_discrete(labels = c("lea_offset" = "LEA", "rda_offset" = "RDA", "gf_offset" = "GF", "env_dist" = "Environmental \nDistance")) +
+  scale_y_discrete(labels = c("abs" = "Absolute\nFitness", "rel" = "Relative\nFitness", "cf_abs" = "Absolute Current\nFuture Offset", "cf_rel" = "Relative Current\nFuture Offset")) +
+  labs(title = "Survival", subtitle = "Correlation between Fitness and Genomic Offsets", x = "Genomic Offset", y = "Fitness") +
+  theme_classic()
+surv_corplot_full
+
+# length
+len_corplot_full <- cf_clim_long %>% 
+  filter(cc == "full" & fit_metric == "len") %>% 
+  mutate(fit_type = factor(fit_type, levels = rev(fit_ord)), method = factor(method, levels = method_ord), corr = round(corr, 3)) %>%
+  ggplot(aes(x = method, y = (fit_type), fill = corr)) +
+  geom_tile() +
+  geom_text(aes(label = corr), color = "black", size = 4) +
+  scale_fill_gradient2(low = "#4c9220", mid = "white", high = "#c5247d", midpoint = 0, limits = c(-1, 1), na.value = "lightgray", guide = guide_colourbar(reverse = TRUE)) +
+  scale_x_discrete(labels = c("lea_offset" = "LEA", "rda_offset" = "RDA", "gf_offset" = "GF", "env_dist" = "Environmental \nDistance")) +
+  scale_y_discrete(labels = c("abs" = "Absolute\nFitness", "rel" = "Relative\nFitness", "cf_abs" = "Absolute Current\nFuture Offset", "cf_rel" = "Relative Current\nFuture Offset")) +
+  labs(title = "Standardized Length Change", subtitle = "Correlation between Fitness and Genomic Offsets", x = "Genomic Offset", y = "Fitness") +
+  theme_classic()
+len_corplot_full
+
+# weight
+weigh_corplot_full <- cf_clim_long %>% 
+  filter(cc == "full" & fit_metric == "weigh") %>% 
+  mutate(fit_type = factor(fit_type, levels = rev(fit_ord)), method = factor(method, levels = method_ord), corr = round(corr, 3)) %>%
+  ggplot(aes(x = method, y = (fit_type), fill = corr)) +
+  geom_tile() +
+  geom_text(aes(label = corr), color = "black", size = 4) +
+  scale_fill_gradient2(low = "#4c9220", mid = "white", high = "#c5247d", midpoint = 0, limits = c(-1, 1), na.value = "lightgray", guide = guide_colourbar(reverse = TRUE)) +
+  scale_x_discrete(labels = c("lea_offset" = "LEA", "rda_offset" = "RDA", "gf_offset" = "GF", "env_dist" = "Environmental \nDistance")) +
+  scale_y_discrete(labels = c("abs" = "Absolute\nFitness", "rel" = "Relative\nFitness", "cf_abs" = "Absolute Current\nFuture Offset", "cf_rel" = "Relative Current\nFuture Offset")) +
+  labs(title = "Standardized Weight Change", subtitle = "Correlation between Fitness and Genomic Offsets", x = "Genomic Offset", y = "Fitness") +
+  theme_classic()
+weigh_corplot_full
+```
+
+
+Also try plotting genomic offset against different fitness offsets.
+
+```{r}
+
+```
 
