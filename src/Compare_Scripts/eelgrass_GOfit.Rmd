@@ -13,7 +13,6 @@ knitr::opts_knit$set(root.dir = "/Users/camillerumberger/Documents/GitHub/Baltic
 library(car)
 library(tidyverse)
 library(dplyr)
-library(ggplot2)
 library(stringr)
 library(knitr)
 library(kableExtra)

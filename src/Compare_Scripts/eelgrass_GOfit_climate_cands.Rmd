@@ -27,7 +27,6 @@ library(multcompView)
 fit_full <- read.csv("data/experiment/eelgrass_mesocosm_start_end_complete.csv")[,-1]
 surv <- read.csv("data/experiment/survival_dat_trt_pop.csv")[,-1]
 grow <- read.csv("data/experiment/fit_growth_dat.csv")[,-1]
-fit_tank <- read.csv("data/experiment/expfit_tank_poptrt.csv")
 
 # fit offsets
 fit_off_clim <- read.csv("results/fit_results/climate_change_fitness_offsets_2026-05-28.csv")[,-1]
@@ -58,6 +57,11 @@ head(gf)
 # long versions
 # lea
 lea_long <- lea %>% pivot_longer(
+  cols = c(BAR, BJO, HOG, HOR, KAL, KUR, VAT, VIK),
+  names_to = "pop",
+  values_to = "lea_offset")
+
+lea_cand_long <- lea_cand %>% pivot_longer(
   cols = c(BAR, BJO, HOG, HOR, KAL, KUR, VAT, VIK),
   names_to = "pop",
   values_to = "lea_offset")
@@ -104,7 +108,6 @@ surv_all$trt <- gsub("_", "-", surv_all$trt)
   
 # also a format with survival in each tank/pop/trt
 surv_tanks <- fit_full %>% 
-  mutate(trt = gsub("_", "-", trt)) %>%
   dplyr::select(pop, trt, tank_ID, isAlive) %>%
   group_by(pop, tank_ID, trt) %>%
   summarize(surv = mean(isAlive),
@@ -138,9 +141,14 @@ go_clim_w <- go_long %>% filter(pop %in% c("VAT", "VIK", "HOG", "BAR") & trt %in
 go_clim_e <- go_long %>% filter(pop %in% c("KUR", "KAL", "HOR", "BJO") & trt %in% c("TempControl-7psu", "TempWarm-5psu")) %>% mutate(coast = "East", cf_trt = ifelse(grepl("TempWarm", trt), "future", "current"))
 go_clim <- rbind(go_clim_w, go_clim_e)
 
+# and for just the candidate lea stuff
+go_clim_w1 <- lea_cand_long %>% filter(pop %in% c("VAT", "VIK", "HOG", "BAR") & trt %in% c("TempControl-21psu", "TempWarm-16psu")) %>% mutate(coast = "West", cf_trt = ifelse(grepl("TempWarm", trt), "future", "current"))
+go_clim_e1 <- lea_cand_long %>% filter(pop %in% c("KUR", "KAL", "HOR", "BJO") & trt %in% c("TempControl-7psu", "TempWarm-5psu")) %>% mutate(coast = "East", cf_trt = ifelse(grepl("TempWarm", trt), "future", "current"))
+go_clim1 <- rbind(go_clim_w1, go_clim_e1)
+
 # combine fitness and offset data
 fit_go <- merge(go_clim, fit_off_clim, by = c("pop", "coast"))
-fit_tank_go <- merge(surv_tanks, go_clim, by = c("pop", "trt"))
+fit_go1 <- merge(go_clim1, fit_off_clim, by = c("pop", "coast"))
 
 # ordered list of pops
 pops <- unique(fit_go[,c("pop", "pop_ord")]) %>% arrange(pop_ord)
@@ -150,10 +158,14 @@ pops <- unique(fit_go[,c("pop", "pop_ord")]) %>% arrange(pop_ord)
 surv_all_go <- merge(go_clim, surv_all, by = c("pop", "trt"))
 grow_go <- merge(go_clim, grow_trim, by = c("pop", "trt"))
 
+surv_all_go1 <- merge(go_clim1, surv_all, by = c("pop", "trt"))
+grow_go1 <- merge(go_clim1, grow_trim, by = c("pop", "trt"))
+
 surv_w <- surv %>% filter(pop %in% c("VIK", "VAT", "HOG", "BAR") & trt %in% c("TempControl-21psu", "TempWarm-16psu"))
 surv_e <- surv %>% filter(pop %in% c("KUR", "KAL", "HOR", "BJO") & trt %in% c("TempControl-7psu", "TempWarm-5psu"))
 surv_prop_clim <- rbind(surv_w, surv_e)
 surv_prop_go <- merge(surv_prop_clim[,-6], go_clim[,-6], by = c("pop", "trt"))
+surv_prop_go1 <- merge(surv_prop_clim[,-6], go_clim1[,-6], by = c("pop", "trt"))
 ```
 
 #### Correlations
@@ -203,6 +215,11 @@ fitcorrCF(fit_go, go = "lea_offset", clone = "full", fit_met = "weigh"),
 fitcorrCF(fit_go, go = "lea_offset", clone = "mll", fit_met = "surv"),
 fitcorrCF(fit_go, go = "lea_offset", clone = "mll", fit_met = "len"),
 fitcorrCF(fit_go, go = "lea_offset", clone = "mll", fit_met = "weigh"))
+
+fitcorrCF(fit_go1, go = "lea_offset", clone = "full", fit_met = "surv")
+fitcorrCF(fit_go1, go = "lea_offset", clone = "mll", fit_met = "surv")
+fitcorrCF(fit_go1, go = "lea_offset", clone = "full", fit_met = "weigh")
+fitcorrCF(fit_go1, go = "lea_offset", clone = "mll", fit_met = "weigh")
 
 # rda
 rda_cf <- rbind(fitcorrCF(fit_go, go = "rda_offset", clone = "full", fit_met = "surv"),
@@ -334,10 +351,6 @@ cf_clim_e_long <- cf_clim_e %>% pivot_longer(cols = c(abs_corr, rel_corr, cf_abs
 cf_clim_e_long$signif <- ifelse(cf_clim_e_long$pval < 0.05, T, F)
 ##############
 
-# using tank level data - surv only
-###################################
-###################################
-
 # save outputs
 ##############
 write.csv(fit_go, paste0("results/GO_compare/climchg_gofit_df_", Sys.Date(), ".csv"))
@@ -436,15 +449,7 @@ surv_prop_go1 <- surv_prop_go %>% mutate(trt_name = case_match(trt,
 surv_prop_go2 <- merge(surv_prop_go1, pop_order, by = "pop")
 surv_prop_go3 <- merge(surv_prop_go2, trt_order, by = "trt_name")
 
-# tank
-surv_tank_go1 <- fit_tank_go %>% mutate(trt_name = case_match(trt,
-    "TempControl-21psu" ~ "Current W Coast",
-    "TempControl-7psu" ~ "Current E Coast",
-    "TempWarm-16psu" ~ "Future W Coast",
-    "TempWarm-5psu" ~ "Future E Coast",
-    .default = NA))
-surv_tank_go2 <- merge(surv_tank_go1, pop_order, by = "pop")
-surv_tank_go3 <- merge(surv_tank_go2, trt_order, by = "trt_name")
+# growth
 ```
 
 #### Survival 
@@ -474,39 +479,6 @@ surv_full_binlog_lea <- surv_all_go2 %>%
   theme_minimal()
 surv_full_binlog_lea
 
-# full, single coast line
-coast_cols <- c("East" = "#2b991f", "West" = "#1f4699")
-
-surv_full_coast_binlog_lea <- surv_all_go2 %>%
-  filter(method == "lea_offset" & cc == "full") %>%
-  ggplot(aes(x = offset, y = isAlive, fill = coast)) + 
-  geom_point(size = 4, shape = 21) + 
-  geom_smooth(aes(col = coast), method = "glm", method.args = list(family = "binomial"), se = T) + 
-  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): \nBinary Survival, Logistic Regression", 
-       x = "LEA offset", y = "Survival") +
-  scale_fill_manual(name = "Coast",
-                    values = coast_cols) +
-  scale_colour_manual(name = "Coast",
-                    values = coast_cols) +
-  guides(fill = guide_legend(override.aes = list(shape = 21))) +
-  theme_minimal()
-surv_full_coast_binlog_lea
-
-surv_full_coast_lm_lea <- surv_all_go2 %>%
-  filter(method == "lea_offset" & cc == "full") %>%
-  ggplot(aes(x = offset, y = isAlive, fill = coast)) + 
-  geom_point(size = 4, shape = 21) + 
-  geom_smooth(aes(col = coast), method = "lm", se = T) + 
-  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): \nBinary Survival, Linear Regression", 
-       x = "LEA offset", y = "Survival") +
-  scale_fill_manual(name = "Coast",
-                    values = coast_cols) +
-  scale_colour_manual(name = "Coast",
-                    values = coast_cols) +
-  guides(fill = guide_legend(override.aes = list(shape = 21))) +
-  theme_minimal()
-surv_full_coast_lm_lea
-
 # mll
 surv_mll_binlog_lea <- surv_all_go2 %>%
   filter(method == "lea_offset" & cc == "mll") %>%
@@ -530,6 +502,7 @@ surv_mll_binlog_lea
 # just future
 #############
 surv_prop_go3$coast <- ifelse(grepl("E Coast", surv_prop_go3$trt_name), "East", "West")
+coast_cols <- c("East" = "#2b991f", "West" = "#1f4699")
 we_cols_fill <- c(pop_colors, coast_cols)
 surv_full_fut_lea <- surv_prop_go3 %>%
   filter(method == "lea_offset" & cc == "full" & cf_trt == "future") %>%
@@ -577,46 +550,6 @@ surv_full_fut_all_lea <- surv_prop_go3 %>%
   theme_minimal()
 surv_full_fut_all_lea
 #############
-
-## lea tanks
-############
-surv_full_tank_lea <- surv_tank_go3 %>%
-  filter(method == "lea_offset" & cc == "full") %>%
-  ggplot(aes(x = offset, y = surv, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
-  geom_point(size = 4, shape = 21) + 
-  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "loess", se = T) + 
-  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): \nTank Level Survival", 
-       x = "LEA offset", y = "Survival") +
-  scale_fill_manual(name = "Population",
-                    values = pop_colors) +
-  scale_colour_manual(name = "Population",
-                    values = pop_colors) +
-  scale_shape_manual(name = "Coast",
-                    values = c(21, 24),
-                    labels = c("West Coast", "East Coast")) +
-  guides(fill = guide_legend(override.aes = list(shape = 21))) +
-  theme_minimal()
-surv_full_tank_lea
-
-# mll
-surv_mll_tank_lea <- surv_tank_go3 %>%
-  filter(method == "lea_offset" & cc == "mll") %>%
-  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
-  geom_point(size = 4, shape = 21) + 
-  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
-  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival, Logistic Regression", 
-       x = "LEA offset", y = "Survival") +
-  scale_fill_manual(name = "Population",
-                    values = pop_colors) +
-  scale_colour_manual(name = "Population",
-                    values = pop_colors) +
-  scale_shape_manual(name = "Coast",
-                    values = c(21, 24),
-                    labels = c("West Coast", "East Coast")) +
-  guides(fill = guide_legend(override.aes = list(shape = 21))) +
-  theme_minimal()
-surv_mll_binlog_lea
-############
 
 ## rda
 ######

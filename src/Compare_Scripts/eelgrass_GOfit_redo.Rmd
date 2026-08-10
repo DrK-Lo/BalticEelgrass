@@ -1,0 +1,846 @@
+---
+title: "Eelgrass GO Fitness Comparisons"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/camillerumberger/Documents/GitHub/BalticEelgrass")
+setwd("/Users/camillerumberger/Documents/GitHub/BalticEelgrass")
+
+# packages
+library(car)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(knitr)
+library(kableExtra)
+library(emmeans)
+library(multcomp)
+library(multcompView)
+
+# data
+# exp fit
+fit_full <- read.csv("data/experiment/eelgrass_mesocosm_start_end_complete.csv")[,-1]
+surv <- read.csv("data/experiment/survival_dat_trt_pop.csv")[,-1]
+grow <- read.csv("data/experiment/fit_growth_dat.csv")[,-1]
+
+# fit offsets
+fit_off_clim <- read.csv("results/fit_results/climate_change_fitness_offsets_2026-05-28.csv")[,-1]
+fit_off_clim_ind <- read.csv("results/fit_results/climate_change_fitness_offsets_ind_2026-07-10.csv")[,-1]
+
+# go
+lea <- read.csv("results/GO_results/LEA_offsets_exptrt_wide_2025-12-03.csv")[,-1]
+lea_cand <- read.csv("results/GO_results/LEA_offsets_exptrt_wide_gea_2026-06-30.csv")[,-1]
+rda <- read.csv("results/GO_results/RDA_offsets_exptrt_wide_2026-01-02.csv")[,-1]
+gf <- read.csv("results/GO_results/GF_offsets_exptrt_wide_2025-12-03.csv")[,-1]
+env_dist <- read.csv("results/GO_results/euclidean_long_trt_exp.csv")[,-1]
+```
+
+## Genomic Offset - Fitness Offset Comparisons
+
+This script compares genomic offset against fitness metrics in a "common garden" (across genotypes) and "current future" (across environments) comparison. 
+
+### Data Prep
+
+#### GO Data Processing
+
+These data are already in a matrix format, but I will still make a long form combined df for plotting. 
+
+```{r}
+head(lea)
+head(rda)
+head(gf)
+
+# long versions
+# lea
+lea_long <- lea %>% pivot_longer(
+  cols = c(BAR, BJO, HOG, HOR, KAL, KUR, VAT, VIK),
+  names_to = "pop",
+  values_to = "lea_offset")
+
+lea_cand_long <- lea_cand %>% pivot_longer(
+  cols = c(BAR, BJO, HOG, HOR, KAL, KUR, VAT, VIK),
+  names_to = "pop",
+  values_to = "lea_offset")
+
+# rda
+rda_long <- rda %>% pivot_longer(
+  cols = c(BAR, BJO, HOG, HOR, KAL, KUR, VAT, VIK),
+  names_to = "pop",
+  values_to = "rda_offset")
+
+# gf
+gf_long <- gf %>% pivot_longer(
+  cols = c(BAR, BJO, HOG, HOR, KAL, KUR, VAT, VIK),
+  names_to = "pop",
+  values_to = "gf_offset")
+
+# env dist
+env_dist_trt <- env_dist %>% filter(pops1 %in% c("TempWarm-5psu", "TempWarm-16psu", "TempControl-7psu", "TempControl-21psu") & !(pops2 %in% c("TempWarm-5psu", "TempWarm-16psu", "TempControl-7psu", "TempControl-21psu"))) %>% dplyr::select(pops1, pops2, distances) %>% rename(pop = pops2, trt = pops1, env_dist = distances)
+
+# put everything together
+go1 <- merge(lea_long, rda_long, by = c("trt", "cc", "pop"))
+go2 <- merge(go1, gf_long[gf_long$mod == "geno", c("trt","pop","cc","gf_offset")], by = c("trt", "cc", "pop"))
+go_wide <- merge(go2, env_dist_trt, by = c("pop", "trt"))
+
+# long version of all
+go_long <- go_wide %>% pivot_longer(
+  cols = c("lea_offset","rda_offset","gf_offset", "env_dist"),
+  names_to = "method",
+  values_to = "offset")
+```
+
+#### Experimental Data
+
+```{r}
+# survival
+head(surv)
+dim(surv)
+surv$trt <- gsub("_", "-", surv$trt)
+fit_full$isAlive <- ifelse(fit_full$isAlive == TRUE, 1, 0)
+
+# surv only fitness, all plants
+surv_all <- fit_full[,c("pop", "trt", "tank_ID", "isAlive")]
+surv_all$trt <- gsub("_", "-", surv_all$trt)
+  
+# also a format with survival in each tank/pop/trt
+surv_tanks <- fit_full %>% 
+  dplyr::select(pop, trt, tank_ID, isAlive) %>%
+  group_by(pop, tank_ID, trt) %>%
+  summarize(surv = mean(isAlive),
+            surv_se = sd(isAlive)/length(isAlive))
+
+# growth
+head(grow)
+grow_trim <- grow[,c("trt", "pop", "pop_trt", "tank_ID", "length_growth", "length_std_change", "weight_change", "weight_std_change", "above_below_weight_ratio")]
+grow_trim$trt <- gsub("_","-",grow_trim$trt)
+
+# some pop/trt level data
+grow_pop_trt <- grow_trim %>% 
+  group_by(pop, trt) %>% 
+  summarize(avg_length_growth = mean(length_growth, na.rm = T),
+    avg_length_std_change = mean(length_std_change, na.rm = T),
+    avg_weight_change = mean(weight_change, na.rm = T),
+    avg_weight_std_change = mean(weight_std_change, na.rm = T),
+    avg_above_below_weight_ratio = mean(above_below_weight_ratio, na.rm = T))
+
+# fitness offsets
+head(fit_off_clim) # only goes with the future climate stuff
+```
+
+
+### GO v Fitness
+
+To assess whether genomic offset predictions align with experimental outcomes, I conduct a correlation analysis between genomic offset and different fitness and fitness offset metrics, namely absolute and relative fitness, as well as both absolute and relative current-future fitness offsets.
+
+#### Data Merge
+
+```{r}
+# isolate relevant trt/pop combos
+go_clim_w <- go_long %>% filter(pop %in% c("VAT", "VIK", "HOG", "BAR") & trt %in% c("TempControl-21psu", "TempWarm-16psu")) %>% mutate(coast = "West", cf_trt = ifelse(grepl("TempWarm", trt), "future", "current"))
+go_clim_e <- go_long %>% filter(pop %in% c("KUR", "KAL", "HOR", "BJO") & trt %in% c("TempControl-7psu", "TempWarm-5psu")) %>% mutate(coast = "East", cf_trt = ifelse(grepl("TempWarm", trt), "future", "current"))
+go_clim <- rbind(go_clim_w, go_clim_e)
+go_clim_fut <- rbind(go_clim_w[go_clim_w$cf_trt == "future",], go_clim_e[go_clim_e$cf_trt == "future",])
+
+# combine fitness and offset data
+fit_go <- merge(go_clim_fut, fit_off_clim, by = c("pop", "coast"))
+
+# ordered list of pops
+pops <- unique(fit_go[,c("pop", "pop_ord")]) %>% arrange(pop_ord)
+
+# also for the raw fitness data
+# combine fitness and offset data
+surv_all_go <- merge(go_clim, surv_all, by = c("pop", "trt"))
+grow_go <- merge(go_clim, grow_trim, by = c("pop", "trt"))
+
+surv_w <- surv %>% filter(pop %in% c("VIK", "VAT", "HOG", "BAR") & trt %in% c("TempControl-21psu", "TempWarm-16psu"))
+surv_e <- surv %>% filter(pop %in% c("KUR", "KAL", "HOR", "BJO") & trt %in% c("TempControl-7psu", "TempWarm-5psu"))
+surv_prop_clim <- rbind(surv_w, surv_e)
+surv_prop_go <- merge(surv_prop_clim[,-6], go_clim[,-6], by = c("pop", "trt"))
+```
+
+#### Correlations
+
+```{r}
+# function for correlations current future offset
+#################################################
+# df is dataframe, go is lea_offset/rda_offset/gf_offset/env_dist, clone is mll/full, fit_met is surv/len/weigh
+fitcorrCF <- function(df, go, clone, fit_met) {
+  # subset data
+  df_subset <- df[df$method == go & df$cc == clone & df$metric == fit_met & df$cf_trt == "future",]
+  
+  # set up df
+  corrs_cf <- data.frame(fit_metric = NA, method = NA, cc = NA, abs_corr = NA, abs_pval = NA, rel_corr = NA, rel_pval = NA, cf_abs_corr = NA, cf_abs_pval = NA, cf_rel_corr = NA, cf_rel_pval = NA)
+  
+  # metadata
+  corrs_cf$fit_metric <- fit_met
+  corrs_cf$method <- go
+  corrs_cf$cc <- clone
+  
+  # correlation testing
+  test_abs = cor.test(df_subset$abs_future, df_subset$offset, method = "kendall", na.action = "na.omit")
+  corrs_cf$abs_corr = test_abs$estimate
+  corrs_cf$abs_pval = test_abs$p.value
+
+  test_rel = cor.test(df_subset$CF_relative, df_subset$offset, method = "kendall", na.action = "na.omit")
+  corrs_cf$rel_corr = test_rel$estimate
+  corrs_cf$rel_pval = test_rel$p.value
+
+  test_cf_abs = cor.test(df_subset$CF_abs_offset, df_subset$offset, method = "kendall", na.action = "na.omit")
+  corrs_cf$cf_abs_corr = test_cf_abs$estimate
+  corrs_cf$cf_abs_pval = test_cf_abs$p.value
+
+  test_cf_rel = cor.test(df_subset$CF_rel_offset, df_subset$offset, method = "kendall", na.action = "na.omit")
+  corrs_cf$cf_rel_corr = test_cf_rel$estimate
+  corrs_cf$cf_rel_pval = test_cf_rel$p.value
+  return(corrs_cf)
+}
+
+# function for survival proportions
+fitcorrSurv <- function(df, go, clone) {
+  # subset data
+  df_subset <- df[df$method == go & df$cc == clone,]
+  
+  # set up df
+  corrs_cf <- data.frame(fit_metric = NA, method = NA, cc = NA, surv_corr = NA, surv_pval = NA)
+  
+  # metadata
+  corrs_cf$fit_metric <- "surv"
+  corrs_cf$method <- go
+  corrs_cf$cc <- clone
+  
+  # correlation testing
+  test_surv = cor.test(df_subset$surv, df_subset$offset, method = "kendall", na.action = "na.exclude")
+  corrs_cf$surv_corr = test_surv$estimate
+  corrs_cf$surv_pval = test_surv$p.value
+  return(corrs_cf)
+}
+#################################################
+
+# test correlations
+###################
+# lea
+lea_cf <- rbind(fitcorrCF(fit_go, go = "lea_offset", clone = "full", fit_met = "surv"),
+fitcorrCF(fit_go, go = "lea_offset", clone = "full", fit_met = "len"),
+fitcorrCF(fit_go, go = "lea_offset", clone = "full", fit_met = "weigh"),
+fitcorrCF(fit_go, go = "lea_offset", clone = "mll", fit_met = "surv"),
+fitcorrCF(fit_go, go = "lea_offset", clone = "mll", fit_met = "len"),
+fitcorrCF(fit_go, go = "lea_offset", clone = "mll", fit_met = "weigh"))
+
+lea_cf_ew <- rbind(cbind(fitcorrCF(fit_go[fit_go$coast == "West",], go = "lea_offset", clone = "full", fit_met = "surv"), coast = "West"),
+cbind(fitcorrCF(fit_go[fit_go$coast == "West",], go = "lea_offset", clone = "mll", fit_met = "surv"), coast = "West"),
+cbind(fitcorrCF(fit_go[fit_go$coast == "East",], go = "lea_offset", clone = "full", fit_met = "surv"), coast = "East"),
+cbind(fitcorrCF(fit_go[fit_go$coast == "East",], go = "lea_offset", clone = "mll", fit_met = "surv"), coast = "East"))
+
+# rda
+rda_cf <- rbind(fitcorrCF(fit_go, go = "rda_offset", clone = "full", fit_met = "surv"),
+fitcorrCF(fit_go, go = "rda_offset", clone = "full", fit_met = "len"),
+fitcorrCF(fit_go, go = "rda_offset", clone = "full", fit_met = "weigh"),
+fitcorrCF(fit_go, go = "rda_offset", clone = "mll", fit_met = "surv"),
+fitcorrCF(fit_go, go = "rda_offset", clone = "mll", fit_met = "len"),
+fitcorrCF(fit_go, go = "rda_offset", clone = "mll", fit_met = "weigh"))
+
+rda_cf_ew <- rbind(cbind(fitcorrCF(fit_go[fit_go$coast == "West",], go = "rda_offset", clone = "full", fit_met = "surv"), coast = "West"),
+cbind(fitcorrCF(fit_go[fit_go$coast == "West",], go = "rda_offset", clone = "mll", fit_met = "surv"), coast = "West"),
+cbind(fitcorrCF(fit_go[fit_go$coast == "East",], go = "rda_offset", clone = "full", fit_met = "surv"), coast = "East"),
+cbind(fitcorrCF(fit_go[fit_go$coast == "East",], go = "rda_offset", clone = "mll", fit_met = "surv"), coast = "East"))
+
+# gf
+gf_cf <- rbind(fitcorrCF(fit_go, go = "gf_offset", clone = "full", fit_met = "surv"),
+fitcorrCF(fit_go, go = "gf_offset", clone = "full", fit_met = "len"),
+fitcorrCF(fit_go, go = "gf_offset", clone = "full", fit_met = "weigh"),
+fitcorrCF(fit_go, go = "gf_offset", clone = "mll", fit_met = "surv"),
+fitcorrCF(fit_go, go = "gf_offset", clone = "mll", fit_met = "len"),
+fitcorrCF(fit_go, go = "gf_offset", clone = "mll", fit_met = "weigh"))
+
+gf_cf_ew <- rbind(cbind(fitcorrCF(fit_go[fit_go$coast == "West",], go = "gf_offset", clone = "full", fit_met = "surv"), coast = "West"),
+cbind(fitcorrCF(fit_go[fit_go$coast == "West",], go = "gf_offset", clone = "mll", fit_met = "surv"), coast = "West"),
+cbind(fitcorrCF(fit_go[fit_go$coast == "East",], go = "gf_offset", clone = "full", fit_met = "surv"), coast = "East"),
+cbind(fitcorrCF(fit_go[fit_go$coast == "East",], go = "gf_offset", clone = "mll", fit_met = "surv"), coast = "East"))
+
+# env dist - note we use both full and mll to match with other methods when subsetting
+envdist_cf <- rbind(fitcorrCF(fit_go, go = "env_dist", clone = "full", fit_met = "surv"),
+fitcorrCF(fit_go, go = "env_dist", clone = "full", fit_met = "len"),
+fitcorrCF(fit_go, go = "env_dist", clone = "full", fit_met = "weigh"),
+fitcorrCF(fit_go, go = "env_dist", clone = "mll", fit_met = "surv"),
+fitcorrCF(fit_go, go = "env_dist", clone = "mll", fit_met = "len"),
+fitcorrCF(fit_go, go = "env_dist", clone = "mll", fit_met = "weigh"))
+
+envdist_cf_ew <- rbind(cbind(fitcorrCF(fit_go[fit_go$coast == "West",], go = "env_dist", clone = "full", fit_met = "surv"), coast = "West"),
+cbind(fitcorrCF(fit_go[fit_go$coast == "West",], go = "env_dist", clone = "mll", fit_met = "surv"), coast = "West"),
+cbind(fitcorrCF(fit_go[fit_go$coast == "East",], go = "env_dist", clone = "full", fit_met = "surv"), coast = "East"),
+cbind(fitcorrCF(fit_go[fit_go$coast == "East",], go = "env_dist", clone = "mll", fit_met = "surv"), coast = "East"))
+
+# combine
+cf_clim_summary <- rbind(lea_cf, rda_cf, gf_cf, envdist_cf)
+cf_clim_coast_summary <- rbind(lea_cf_ew, rda_cf_ew, gf_cf_ew, envdist_cf_ew)
+
+# pivot correlations and pvals to long format
+cf_clim_long <- cf_clim_summary %>% pivot_longer(cols = c(abs_corr, rel_corr, cf_abs_corr, cf_rel_corr, abs_pval, rel_pval, cf_abs_pval, cf_rel_pval),
+    names_to = c("fit_type", ".value"),
+    names_pattern = "(abs|rel|cf_abs|cf_rel)_(corr|pval)")
+
+cf_clim_coast_long <- cf_clim_coast_summary %>% pivot_longer(cols = c(abs_corr, rel_corr, cf_abs_corr, cf_rel_corr, abs_pval, rel_pval, cf_abs_pval, cf_rel_pval),
+    names_to = c("fit_type", ".value"),
+    names_pattern = "(abs|rel|cf_abs|cf_rel)_(corr|pval)")
+
+# signif & adjustments - keep in mind these correlations are between literally four data points total for the coast and eight for the overall, so significance is largely meaningless here - should I try per tank averages instead of per population? Then I can't report a single value though
+cf_clim_long$signif <- ifelse(cf_clim_long$pval < 0.05, T, F)
+cf_clim_coast_long$signif <- ifelse(cf_clim_coast_long$pval < 0.05, T, F)
+###################
+
+# save outputs
+##############
+write.csv(fit_go, paste0("results/GO_compare/climchg_gofit_df_", Sys.Date(), ".csv"))
+write.csv(cf_clim_long, paste0("results/GO_compare/climchg_gofit_corrs_", Sys.Date(), ".csv"))
+write.csv(cf_clim_coast_long, paste0("results/GO_compare/climchg_gofit_corrs_coast_", Sys.Date(), ".csv"))
+##############
+```
+
+
+Katie's chunk
+```{r}
+fit_goMini <- fit_go[fit_go$cc == "mll" & fit_go$method == "lea_offset" & fit_go$metric == "surv",]
+dim(fit_goMini)
+cor.plot(fit_goMini[,11:14])
+cor(fit_goMini[,11:14])
+fit_goMini
+fit_goMini$abs_future-fit_goMini$abs_current
+fit_goMini$abs_future/fit_goMini$abs_current
+(fit_goMini$abs_future-fit_goMini$abs_current)/fit_goMini$abs_current
+```
+
+### Visualization
+
+Visualize strength of correlations. Try a heatmap with genomic offset as columns and fitness/fitness offset as rows
+
+```{r}
+# quick checks
+head(cf_clim_long)
+
+# ordering for plotting
+fit_ord <- c("abs", "rel", "cf_abs", "cf_rel")
+method_ord <- c("lea_offset", "rda_offset", "gf_offset", "env_dist")
+
+# surv
+surv_corplot_full <- cf_clim_long %>% 
+  filter(cc == "full" & fit_metric == "surv") %>% 
+  mutate(fit_type = factor(fit_type, levels = rev(fit_ord)), method = factor(method, levels = method_ord), corr = round(corr, 3)) %>%
+  ggplot(aes(x = method, y = (fit_type), fill = corr)) +
+  geom_tile() +
+  geom_text(aes(label = corr), color = "black", size = 4) +
+  scale_fill_gradient2(low = "#4c9220", mid = "white", high = "#c5247d", midpoint = 0, limits = c(-1, 1), na.value = "lightgray", guide = guide_colourbar(reverse = TRUE)) +
+  scale_x_discrete(labels = c("lea_offset" = "LEA", "rda_offset" = "RDA", "gf_offset" = "GF", "env_dist" = "Environmental \nDistance")) +
+  scale_y_discrete(labels = c("abs" = "Absolute\nFitness", "rel" = "Relative\nFitness", "cf_abs" = "Absolute Current\nFuture Offset", "cf_rel" = "Relative Current\nFuture Offset")) +
+  labs(title = "Survival", subtitle = "Correlation between Fitness and Genomic Offsets", x = "Genomic Offset", y = "Fitness") +
+  theme_classic()
+surv_corplot_full
+
+# length
+len_corplot_full <- cf_clim_long %>% 
+  filter(cc == "full" & fit_metric == "len") %>% 
+  mutate(fit_type = factor(fit_type, levels = rev(fit_ord)), method = factor(method, levels = method_ord), corr = round(corr, 3)) %>%
+  ggplot(aes(x = method, y = (fit_type), fill = corr)) +
+  geom_tile() +
+  geom_text(aes(label = corr), color = "black", size = 4) +
+  scale_fill_gradient2(low = "#4c9220", mid = "white", high = "#c5247d", midpoint = 0, limits = c(-1, 1), na.value = "lightgray", guide = guide_colourbar(reverse = TRUE)) +
+  scale_x_discrete(labels = c("lea_offset" = "LEA", "rda_offset" = "RDA", "gf_offset" = "GF", "env_dist" = "Environmental \nDistance")) +
+  scale_y_discrete(labels = c("abs" = "Absolute\nFitness", "rel" = "Relative\nFitness", "cf_abs" = "Absolute Current\nFuture Offset", "cf_rel" = "Relative Current\nFuture Offset")) +
+  labs(title = "Standardized Length Change", subtitle = "Correlation between Fitness and Genomic Offsets", x = "Genomic Offset", y = "Fitness") +
+  theme_classic()
+len_corplot_full
+
+# weight
+weigh_corplot_full <- cf_clim_long %>% 
+  filter(cc == "full" & fit_metric == "weigh") %>% 
+  mutate(fit_type = factor(fit_type, levels = rev(fit_ord)), method = factor(method, levels = method_ord), corr = round(corr, 3)) %>%
+  ggplot(aes(x = method, y = (fit_type), fill = corr)) +
+  geom_tile() +
+  geom_text(aes(label = corr), color = "black", size = 4) +
+  scale_fill_gradient2(low = "#4c9220", mid = "white", high = "#c5247d", midpoint = 0, limits = c(-1, 1), na.value = "lightgray", guide = guide_colourbar(reverse = TRUE)) +
+  scale_x_discrete(labels = c("lea_offset" = "LEA", "rda_offset" = "RDA", "gf_offset" = "GF", "env_dist" = "Environmental \nDistance")) +
+  scale_y_discrete(labels = c("abs" = "Absolute\nFitness", "rel" = "Relative\nFitness", "cf_abs" = "Absolute Current\nFuture Offset", "cf_rel" = "Relative Current\nFuture Offset")) +
+  labs(title = "Standardized Weight Change", subtitle = "Correlation between Fitness and Genomic Offsets", x = "Genomic Offset", y = "Fitness") +
+  theme_classic()
+weigh_corplot_full
+
+## coast
+########
+surv_corplot_w <- cf_clim_coast_long %>% 
+  filter(cc == "mll" & coast == "West") %>% 
+  mutate(fit_type = factor(fit_type, levels = rev(fit_ord)), method = factor(method, levels = method_ord), corr = round(corr, 3)) %>%
+  ggplot(aes(x = method, y = (fit_type), fill = corr)) +
+  geom_tile() +
+  geom_text(aes(label = corr), color = "black", size = 4) +
+  scale_fill_gradient2(low = "#4c9220", mid = "white", high = "#c5247d", midpoint = 0, limits = c(-1, 1), na.value = "lightgray", guide = guide_colourbar(reverse = TRUE)) +
+  scale_x_discrete(labels = c("lea_offset" = "LEA", "rda_offset" = "RDA", "gf_offset" = "GF", "env_dist" = "Environmental \nDistance")) +
+  scale_y_discrete(labels = c("abs" = "Absolute\nFitness", "rel" = "Relative\nFitness", "cf_abs" = "Absolute Current\nFuture Offset", "cf_rel" = "Relative Current\nFuture Offset")) +
+  labs(title = "Survival", subtitle = "Correlation between Fitness and Genomic Offsets, \nWest Coast", x = "Genomic Offset", y = "Fitness") +
+  theme_classic()
+surv_corplot_w
+
+surv_corplot_e <- cf_clim_coast_long %>% 
+  filter(cc == "mll" & coast == "East") %>% 
+  mutate(fit_type = factor(fit_type, levels = rev(fit_ord)), method = factor(method, levels = method_ord), corr = round(corr, 3)) %>%
+  ggplot(aes(x = method, y = (fit_type), fill = corr)) +
+  geom_tile() +
+  geom_text(aes(label = corr), color = "black", size = 4) +
+  scale_fill_gradient2(low = "#4c9220", mid = "white", high = "#c5247d", midpoint = 0, limits = c(-1, 1), na.value = "lightgray", guide = guide_colourbar(reverse = TRUE)) +
+  scale_x_discrete(labels = c("lea_offset" = "LEA", "rda_offset" = "RDA", "gf_offset" = "GF", "env_dist" = "Environmental \nDistance")) +
+  scale_y_discrete(labels = c("abs" = "Absolute\nFitness", "rel" = "Relative\nFitness", "cf_abs" = "Absolute Current\nFuture Offset", "cf_rel" = "Relative Current\nFuture Offset")) +
+  labs(title = "Survival", subtitle = "Correlation between Fitness and Genomic Offsets, \nEast Coast", x = "Genomic Offset", y = "Fitness") +
+  theme_classic()
+surv_corplot_e
+```
+
+
+Also try plotting genomic offset against different fitness offsets.
+
+#### Prep plotting data
+
+```{r}
+# plotting info
+trt_labels <- c("TempControl-21psu" = "Current W Coast", "TempControl-7psu" = "Current E Coast",  "TempWarm-16psu" = "Future W Coast", "TempWarm-5psu" = "Future E Coast")
+pop_colors <- c("VIK" = "#002e5a", "VAT" = "#0130b9", "HOG" = "#0078cf", "BAR" = "#82daff", "KUR" = "#d9ed92", "KAL" = "#4ad66d", "HOR" = "#25a244", "BJO" = "#155d27")
+pop_order <- data.frame(pop = c("VIK", "VAT", "HOG", "BAR", "KUR", "KAL", "HOR", "BJO"), pop_order = 1:8)
+trt_colors <- c("Current W Coast" = "#FFA203", "Current E Coast" = "#FE691E",  "Future W Coast" = "deeppink", "Future E Coast" = "deeppink4")
+trt_order <- data.frame(trt_name = c("Current W Coast", "Current E Coast", "Future W Coast", "Future E Coast"), trt_order = 1:4)
+
+# survival
+# binary
+surv_all_go <- surv_all_go %>% mutate(trt_name = case_match(trt,
+    "TempControl-21psu" ~ "Current W Coast",
+    "TempControl-7psu" ~ "Current E Coast",
+    "TempWarm-16psu" ~ "Future W Coast",
+    "TempWarm-5psu" ~ "Future E Coast",
+    .default = NA))
+surv_all_go1 <- merge(surv_all_go, pop_order, by = "pop")
+surv_all_go2 <- merge(surv_all_go1, trt_order, by = "trt_name")
+
+# proportions
+surv_prop_go1 <- surv_prop_go %>% mutate(trt_name = case_match(trt,
+    "TempControl-21psu" ~ "Current W Coast",
+    "TempControl-7psu" ~ "Current E Coast",
+    "TempWarm-16psu" ~ "Future W Coast",
+    "TempWarm-5psu" ~ "Future E Coast",
+    .default = NA))
+surv_prop_go2 <- merge(surv_prop_go1, pop_order, by = "pop")
+surv_prop_go3 <- merge(surv_prop_go2, trt_order, by = "trt_name")
+```
+
+#### Survival 
+
+Analysis of go/fit relationship
+
+```{r}
+## lea
+######
+# model full log
+surv_lea_full_log <- surv_all_go %>% filter(method == "lea_offset" & cc == "full")
+mod_surv_lea_full_log1 <- glm(isAlive ~ pop * offset, family = binomial(link = "logit"), data = surv_lea_full_log)
+step(mod_surv_lea_full_log1) # remove interaction - slopes are not meaningfully different
+mod_surv_lea_full_log <- glm(isAlive ~ pop + offset, family = binomial(link = "logit"), data = surv_lea_full_log)
+summary(mod_surv_lea_full_log) 
+#plot(mod_surv_lea_full_log)
+Anova(mod_surv_lea_full_log) # both pop and offset signif
+emm_surv_lea_full_log <- emmeans(mod_surv_lea_full_log, "pop")
+letters_surv_lea_full_log <- cld(emm_surv_lea_full_log, Letters = letters)
+letters_surv_lea_full_log_mg <- merge(letters_surv_lea_full_log, pop_order, by = "pop") %>% arrange(pop_order)
+letters_surv_lea_full_log_mg1 <- letters_surv_lea_full_log_mg %>% mutate(group_lea = .group, cc = "full") %>% dplyr::select(pop, group_lea, cc)
+
+# model mll log
+surv_lea_mll_log <- surv_all_go %>% filter(method == "lea_offset" & cc == "mll")
+mod_surv_lea_mll_log <- glm(isAlive ~ pop + offset, family = binomial(link = "logit"), data = surv_lea_mll_log)
+summary(mod_surv_lea_mll_log) 
+#plot(mod_surv_lea_mll_log)
+Anova(mod_surv_lea_mll_log) # both pop and offset signif
+emm_surv_lea_mll_log <- emmeans(mod_surv_lea_mll_log, "pop")
+letters_surv_lea_mll_log <- cld(emm_surv_lea_mll_log, Letters = letters)
+letters_surv_lea_mll_log_mg <- merge(letters_surv_lea_mll_log, pop_order, by = "pop") %>% arrange(pop_order)
+letters_surv_lea_mll_log_mg1 <- letters_surv_lea_mll_log_mg %>% mutate(group_lea = .group, cc = "mll") %>% dplyr::select(pop, group_lea, cc)
+
+# more specific grouping
+# letters_surv_lea_mll_log_mg$group_a <- grepl("a", letters_surv_lea_mll_log_mg$.group)
+# letters_surv_lea_mll_log_mg$group_b <- grepl("b", letters_surv_lea_mll_log_mg$.group)
+# letters_surv_lea_mll_log_mg$group_c <- grepl("c", letters_surv_lea_mll_log_mg$.group)
+######
+
+## rda
+######
+# model full log
+surv_rda_full_log <- surv_all_go %>% filter(method == "rda_offset" & cc == "full")
+mod_surv_rda_full_log <- glm(isAlive ~ pop + offset, family = binomial(link = "logit"), data = surv_rda_full_log)
+summary(mod_surv_rda_full_log) 
+#plot(mod_surv_rda_full_log)
+Anova(mod_surv_rda_full_log) # both pop and offset signif
+emm_surv_rda_full_log <- emmeans(mod_surv_rda_full_log, "pop")
+letters_surv_rda_full_log <- cld(emm_surv_rda_full_log, Letters = letters)
+letters_surv_rda_full_log_mg <- merge(letters_surv_rda_full_log, pop_order, by = "pop") %>% arrange(pop_order)
+letters_surv_rda_full_log_mg1 <- letters_surv_rda_full_log_mg %>% mutate(group_rda = .group, cc = "full") %>% dplyr::select(pop, group_rda, cc)
+
+# model mll log
+surv_rda_mll_log <- surv_all_go %>% filter(method == "rda_offset" & cc == "mll")
+mod_surv_rda_mll_log <- glm(isAlive ~ pop + offset, family = binomial(link = "logit"), data = surv_rda_mll_log)
+summary(mod_surv_rda_mll_log) 
+#plot(mod_surv_rda_mll_log)
+Anova(mod_surv_rda_mll_log) # both pop and offset signif
+emm_surv_rda_mll_log <- emmeans(mod_surv_rda_mll_log, "pop")
+letters_surv_rda_mll_log <- cld(emm_surv_rda_mll_log, Letters = letters)
+letters_surv_rda_mll_log_mg <- merge(letters_surv_rda_mll_log, pop_order, by = "pop") %>% arrange(pop_order)
+letters_surv_rda_mll_log_mg$group_a <- grepl("a", letters_surv_rda_mll_log_mg$.group)
+letters_surv_rda_mll_log_mg$group_b <- grepl("b", letters_surv_rda_mll_log_mg$.group)
+letters_surv_rda_mll_log_mg1 <- letters_surv_rda_mll_log_mg %>% mutate(group_rda = .group, cc = "full") %>% dplyr::select(pop, group_rda, cc)
+######
+
+## gf
+######
+# model full log
+surv_gf_full_log <- surv_all_go %>% filter(method == "gf_offset" & cc == "full")
+mod_surv_gf_full_log <- glm(isAlive ~ pop + offset, family = binomial(link = "logit"), data = surv_gf_full_log)
+summary(mod_surv_gf_full_log) 
+#plot(mod_surv_gf_full_log)
+Anova(mod_surv_gf_full_log) # both pop and offset signif
+emm_surv_gf_full_log <- emmeans(mod_surv_gf_full_log, "pop")
+letters_surv_gf_full_log <- cld(emm_surv_gf_full_log, Letters = letters)
+letters_surv_gf_full_log_mg <- merge(letters_surv_gf_full_log, pop_order, by = "pop") %>% arrange(pop_order)
+letters_surv_gf_full_log_mg1 <- letters_surv_gf_full_log_mg %>% mutate(group_gf = .group, cc = "full") %>% dplyr::select(pop, group_gf, cc)
+
+# model mll log
+surv_gf_mll_log <- surv_all_go %>% filter(method == "gf_offset" & cc == "mll")
+mod_surv_gf_mll_log <- glm(isAlive ~ pop + offset, family = binomial(link = "logit"), data = surv_gf_mll_log)
+summary(mod_surv_gf_mll_log) 
+#plot(mod_surv_gf_mll_log)
+Anova(mod_surv_gf_mll_log) # both pop and offset signif
+emm_surv_gf_mll_log <- emmeans(mod_surv_gf_mll_log, "pop")
+letters_surv_gf_mll_log <- cld(emm_surv_gf_mll_log, Letters = letters)
+letters_surv_gf_mll_log_mg <- merge(letters_surv_gf_mll_log, pop_order, by = "pop") %>% arrange(pop_order)
+letters_surv_gf_mll_log_mg1 <- letters_surv_gf_mll_log_mg %>% mutate(group_gf = .group, cc = "mll") %>% dplyr::select(pop, group_gf, cc)
+
+letters_surv_gf_mll_log_mg$group_a <- grepl("a", letters_surv_gf_mll_log_mg$.group)
+letters_surv_gf_mll_log_mg$group_b <- grepl("b", letters_surv_gf_mll_log_mg$.group)
+letters_surv_gf_mll_log_mg$group_c <- grepl("c", letters_surv_gf_mll_log_mg$.group)
+######
+
+## env dist
+######
+# model full log
+surv_envdist_full_log <- surv_all_go %>% filter(method == "env_dist" & cc == "full")
+mod_surv_envdist_full_log <- glm(isAlive ~ pop + offset, family = binomial(link = "logit"), data = surv_envdist_full_log)
+summary(mod_surv_envdist_full_log) 
+#plot(mod_surv_envdist_full_log)
+Anova(mod_surv_envdist_full_log) # both pop and offset signif
+emm_surv_envdist_full_log <- emmeans(mod_surv_envdist_full_log, "pop")
+letters_surv_envdist_full_log <- cld(emm_surv_envdist_full_log, Letters = letters)
+letters_surv_envdist_full_log_mg <- merge(letters_surv_envdist_full_log, pop_order, by = "pop") %>% arrange(pop_order)
+letters_surv_envdist_mll_log_mg1 <- letters_surv_envdist_full_log_mg %>% mutate(group_envdist = .group, cc = "mll") %>% dplyr::select(pop, group_envdist, cc)
+letters_surv_envdist_full_log_mg1 <- letters_surv_envdist_full_log_mg %>% mutate(group_envdist = .group, cc = "full") %>% dplyr::select(pop, group_envdist, cc) # just incase i want to plot full
+######
+```
+
+
+```{r}
+surv_all_go_test <- merge(go_long, surv_all, by = c("pop", "trt"))
+surv_envdist_full_log_test <- surv_all_go_test %>% filter(method == "env_dist" & cc == "full")
+mod_surv_envdist_full_log_test <- glmer(isAlive ~ offset + pop + (1|tank_ID), family = binomial(link = "logit"), data = surv_envdist_full_log_test)
+summary(mod_surv_envdist_full_log_test) 
+#plot(mod_surv_envdist_full_log_test)
+Anova(mod_surv_envdist_full_log_test) # pop signif, not env dist
+emm_surv_envdist_full_log_test <- emmeans(mod_surv_envdist_full_log_test, "pop")
+letters_surv_envdist_full_log_test <- cld(emm_surv_envdist_full_log_test, Letters = letters)
+letters_surv_envdist_full_log_mg_test <- merge(letters_surv_envdist_full_log_test, pop_order, by = "pop") %>% arrange(pop_order) # all group together except vat (a) with vik/kal (b) - others all (ab)
+```
+
+Plotting
+
+```{r}
+# survival comparison
+# add letters
+letters_surv_bin <- list(rbind(letters_surv_lea_full_log_mg1, letters_surv_lea_mll_log_mg1), rbind(letters_surv_rda_full_log_mg1, letters_surv_rda_mll_log_mg1), rbind(letters_surv_gf_full_log_mg1, letters_surv_gf_mll_log_mg1), rbind(letters_surv_envdist_full_log_mg1, letters_surv_envdist_mll_log_mg1)) %>% reduce(full_join, by = c("pop", "cc"))
+plotting_survgo_all <- merge(surv_all_go2, letters_surv_bin, by = c("pop", "cc"))
+
+## lea
+######
+# full
+surv_full_binlog_lea <- plotting_survgo_all %>%
+  filter(method == "lea_offset" & cc == "full") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
+  geom_point(size = 4, shape = 21) + 
+  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, Full): \nBinary Survival, Logistic Regression", 
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = pop_colors) +
+  scale_colour_manual(name = "Population",
+                    values = pop_colors) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_full_binlog_lea
+
+# mll
+surv_mll_binlog_lea <- plotting_survgo_all %>%
+  filter(method == "lea_offset" & cc == "mll") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
+  geom_point(size = 4, shape = 21) + 
+  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (LEA, MLL): \nBinary Survival, Logistic Regression", 
+       x = "LEA offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = pop_colors) +
+  scale_colour_manual(name = "Population",
+                    values = pop_colors) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_binlog_lea
+
+# correlation
+lea_temp <- plotting_survgo_all %>% filter(cc == "mll", method == "lea_offset")
+lea_temp_w <- lea_temp %>% filter(trt %in% c("TempControl-21psu", "TempWarm-16psu"))
+lea_temp_e <- lea_temp %>% filter(trt %in% c("TempControl-7psu", "TempWarm-5psu"))
+
+cor_lea <- cor.test(lea_temp$offset, lea_temp$surv, method = "kendall") # cor -0.229, p = 0.0001829 < 0.001 ***
+cor_lea_w <- cor.test(lea_temp_w$offset, lea_temp_w$surv, method = "kendall") # cor -0.442, p = 8.647e-07 < 0.001 ***
+cor_lea_e <- cor.test(lea_temp_e$offset, lea_temp_e$surv, method = "kendall") # cor -0.434, p = 1.03e-06 < 0.001 ***
+lea_cor_df <- data.frame(method = "lea_offset", cc = "mll", coast = c("both", "west", "east"), kendall = c(cor_lea$estimate, cor_lea_w$estimate, cor_lea_e$estimate), pval = c(cor_lea$p.value, cor_lea_w$p.value, cor_lea_e$p.value))
+######
+
+## rda
+######
+# full
+surv_full_binlog_rda <- surv_all_go2 %>%
+  filter(method == "rda_offset" & cc == "full") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
+  geom_point(size = 4, shape = 21) + 
+  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, Full): \nBinary Survival, Logistic Regression", 
+       x = "rda offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = pop_colors) +
+  scale_colour_manual(name = "Population",
+                    values = pop_colors) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_full_binlog_rda
+
+# mll
+surv_mll_binlog_rda <- surv_all_go2 %>%
+  filter(method == "rda_offset" & cc == "mll") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
+  geom_point(size = 4, shape = 21) + 
+  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (RDA, MLL): \nBinary Survival, Logistic Regression", 
+       x = "rda offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = pop_colors) +
+  scale_colour_manual(name = "Population",
+                    values = pop_colors) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_binlog_rda
+
+# correlation
+rda_temp <- plotting_survgo_all %>% filter(cc == "mll", method == "rda_offset")
+rda_temp_w <- rda_temp %>% filter(trt %in% c("TempControl-21psu", "TempWarm-16psu"))
+rda_temp_e <- rda_temp %>% filter(trt %in% c("TempControl-7psu", "TempWarm-5psu"))
+
+cor_rda <- cor.test(rda_temp$offset, rda_temp$surv, method = "kendall") # cor 0.174, p = 0.005 < 0.01 **
+cor_rda_w <- cor.test(rda_temp_w$offset, rda_temp_w$surv, method = "kendall") # cor 0.237, p = 0.008 < 0.01 **
+cor_rda_e <- cor.test(rda_temp_e$offset, rda_temp_e$surv, method = "kendall") # cor -0.416, p = 2.78e-06 < 0.001 ***
+
+rda_cor_df <- data.frame(method = "rda_offset", cc = "mll", coast = c("both", "west", "east"), kendall = c(cor_rda$estimate, cor_rda_w$estimate, cor_rda_e$estimate), pval = c(cor_rda$p.value, cor_rda_w$p.value, cor_rda_e$p.value))
+######
+
+## gf
+#####
+# full
+surv_full_binlog_gf <- surv_all_go2 %>%
+  filter(method == "gf_offset" & cc == "full") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
+  geom_point(size = 4, shape = 21) + 
+  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, Full): \nBinary Survival, Logistic Regression", 
+       x = "gf offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = pop_colors) +
+  scale_colour_manual(name = "Population",
+                    values = pop_colors) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_full_binlog_gf
+
+# mll
+surv_mll_binlog_gf <- surv_all_go2 %>%
+  filter(method == "gf_offset" & cc == "mll") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
+  geom_point(size = 4, shape = 21) + 
+  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
+  labs(title = "Current-Future Fitness vs Genomic Offset (GF, MLL): \nBinary Survival, Logistic Regression", 
+       x = "gf offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = pop_colors) +
+  scale_colour_manual(name = "Population",
+                    values = pop_colors) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_binlog_gf
+
+# correlation
+gf_temp <- plotting_survgo_all %>% filter(cc == "mll", method == "gf_offset")
+gf_temp_w <- gf_temp %>% filter(trt %in% c("TempControl-21psu", "TempWarm-16psu"))
+gf_temp_e <- gf_temp %>% filter(trt %in% c("TempControl-7psu", "TempWarm-5psu"))
+
+cor_gf <- cor.test(gf_temp$offset, gf_temp$surv, method = "kendall") # cor -0.183, p = 0.003 < 0.01 **
+cor_gf_w <- cor.test(gf_temp_w$offset, gf_temp_w$surv, method = "kendall") # cor -0.432, p = 1.466e-06 < 0.001 ***
+cor_gf_e <- cor.test(gf_temp_e$offset, gf_temp_e$surv, method = "kendall") # cor -0.452, p = 3.67e-07 < 0.001 ***
+
+gf_cor_df <- data.frame(method = "gf_offset", cc = "mll", coast = c("both", "west", "east"), kendall = c(cor_gf$estimate, cor_gf_w$estimate, cor_gf_e$estimate), pval = c(cor_gf$p.value, cor_gf_w$p.value, cor_gf_e$p.value))
+######
+
+## env_dist
+###########
+# full
+surv_binlog_env_dist <- surv_all_go2 %>%
+  filter(method == "env_dist" & cc == "full") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
+  geom_point(size = 4, shape = 21) + 
+  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
+  labs(title = "Current-Future Fitness vs Environmental Distance: \nBinary Survival, Logistic Regression", 
+       x = "Env. Dist.", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = pop_colors) +
+  scale_colour_manual(name = "Population",
+                    values = pop_colors) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("West Coast", "East Coast")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_binlog_env_dist
+
+# correlation
+envdist_temp <- plotting_survgo_all %>% filter(cc == "mll", method == "env_dist")
+envdist_temp_w <- envdist_temp %>% filter(trt %in% c("TempControl-21psu", "TempWarm-16psu"))
+envdist_temp_e <- envdist_temp %>% filter(trt %in% c("TempControl-7psu", "TempWarm-5psu"))
+
+cor_envdist <- cor.test(envdist_temp$offset, envdist_temp$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+cor_envdist_w <- cor.test(envdist_temp_w$offset, envdist_temp_w$surv, method = "kendall") # cor -0.442, p = 8.647e-07 < 0.001 ***
+cor_envdist_e <- cor.test(envdist_temp_e$offset, envdist_temp_e$surv, method = "kendall") # cor -0.434, p = 1.03e-06 < 0.001 ***
+
+envdist_cor_df <- data.frame(method = "env_dist", cc = "mll", coast = c("both", "west", "east"), kendall = c(cor_gf$estimate, cor_gf_w$estimate, cor_gf_e$estimate), pval = c(cor_gf$p.value, cor_gf_w$p.value, cor_gf_e$p.value))
+###########
+
+# just future
+#############
+lea_temp2 <- plotting_survgo_all %>% filter(cc == "mll", method == "lea_offset" & trt %in% c("TempWarm-16psu", "TempWarm-5psu"))
+lea_temp3 <- lea_temp2 %>% filter(trt == "TempWarm-16psu")
+lea_temp4 <- lea_temp2 %>% filter(trt == "TempWarm-5psu")
+lea_cor_fut <- cor.test(lea_temp2$offset, lea_temp2$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+lea_cor_fut_w <- cor.test(lea_temp3$offset, lea_temp3$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+lea_cor_fut_e <- cor.test(lea_temp4$offset, lea_temp4$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+lea_cor_fut_df <- data.frame(method = "lea_offset", cc = "mll", coast = c("both", "west", "east"), kendall = c(lea_cor_fut$estimate, lea_cor_fut_w$estimate, lea_cor_fut_e$estimate), pval = c(lea_cor_fut$p.value, lea_cor_fut_w$p.value, lea_cor_fut_e$p.value))
+
+rda_temp2 <- plotting_survgo_all %>% filter(cc == "mll", method == "rda_offset" & trt %in% c("TempWarm-16psu", "TempWarm-5psu"))
+rda_temp3 <- rda_temp2 %>% filter(trt == "TempWarm-16psu")
+rda_temp4 <- rda_temp2 %>% filter(trt == "TempWarm-5psu")
+rda_cor_fut <- cor.test(rda_temp2$offset, rda_temp2$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+rda_cor_fut_w <- cor.test(rda_temp3$offset, rda_temp3$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+rda_cor_fut_e <- cor.test(rda_temp4$offset, rda_temp4$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+rda_cor_fut_df <- data.frame(method = "rda_offset", cc = "mll", coast = c("both", "west", "east"), kendall = c(rda_cor_fut$estimate, rda_cor_fut_w$estimate, rda_cor_fut_e$estimate), pval = c(rda_cor_fut$p.value, rda_cor_fut_w$p.value, rda_cor_fut_e$p.value))
+
+gf_temp2 <- plotting_survgo_all %>% filter(cc == "mll", method == "gf_offset" & trt %in% c("TempWarm-16psu", "TempWarm-5psu"))
+gf_temp3 <- gf_temp2 %>% filter(trt == "TempWarm-16psu")
+gf_temp4 <- gf_temp2 %>% filter(trt == "TempWarm-5psu")
+gf_cor_fut <- cor.test(gf_temp2$offset, gf_temp2$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+gf_cor_fut_w <- cor.test(gf_temp3$offset, gf_temp3$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+gf_cor_fut_e <- cor.test(gf_temp4$offset, gf_temp4$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+gf_cor_fut_df <- data.frame(method = "gf_offset", cc = "mll", coast = c("both", "west", "east"), kendall = c(gf_cor_fut$estimate, gf_cor_fut_w$estimate, gf_cor_fut_e$estimate), pval = c(gf_cor_fut$p.value, gf_cor_fut_w$p.value, gf_cor_fut_e$p.value))
+
+envdist_temp2 <- plotting_survgo_all %>% filter(cc == "mll", method == "env_dist" & trt %in% c("TempWarm-16psu", "TempWarm-5psu"))
+envdist_temp3 <- plotting_survgo_all %>% filter(cc == "mll", method == "env_dist" & trt == "TempWarm-16psu")
+envdist_temp4 <- plotting_survgo_all %>% filter(cc == "mll", method == "env_dist" & trt == "TempWarm-5psu")
+envdist_cor_fut <- cor.test(envdist_temp2$offset, envdist_temp2$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+envdist_cor_fut_w <- cor.test(envdist_temp3$offset, envdist_temp3$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+envdist_cor_fut_e <- cor.test(envdist_temp4$offset, envdist_temp4$surv, method = "kendall") # cor -0.216, p = 0.0004079 < 0.001 ***
+envdist_cor_fut_df <- data.frame(method = "env_dist", cc = "mll", coast = c("both", "west", "east"), kendall = c(envdist_cor_fut$estimate, envdist_cor_fut_w$estimate, envdist_cor_fut_e$estimate), pval = c(envdist_cor_fut$p.value, envdist_cor_fut_w$p.value, envdist_cor_fut_e$p.value))
+#############
+
+# corrs
+#######
+corrs_binsurv <- rbind(lea_cor_df, rda_cor_df, gf_cor_df, envdist_cor_df) %>% mutate(surv_coast = ifelse(coast == "both", "Survival", ifelse(coast == "west", "Survival (West)", "Survival (East)"))) # %>% pivot_wider(names_from = coast, values_from = c(kendall, pval))
+
+corrs_binsurv_fut <- rbind(lea_cor_fut_df, rda_cor_fut_df, gf_cor_fut_df, envdist_cor_fut_df) %>% mutate(surv_coast = ifelse(coast == "both", "Survival", ifelse(coast == "west", "Survival (West)", "Survival (East)")))
+
+surv_corplot_bin <- corrs_binsurv %>% 
+  ggplot(aes(x = method, y = surv_coast, fill = kendall)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = round(kendall, 3)), color = "black", size = 4) +
+  scale_fill_gradient2(low = "#4c9220", mid = "white", high = "#c5247d", midpoint = 0, limits = c(-1, 1), na.value = "lightgray", guide = guide_colourbar(reverse = TRUE)) +
+  scale_x_discrete(labels = c("lea_offset" = "LEA", "rda_offset" = "RDA", "gf_offset" = "GF", "env_dist" = "Environmental \nDistance")) +
+  labs(title = "(A) Correlation between Survival and \nGenomic Offsets", x = NULL, y = NULL, fill = "Kendall's\nTau") +
+  theme_classic()
+surv_corplot_bin
+
+surv_corplot_bin_fut <- corrs_binsurv_fut %>% 
+  ggplot(aes(x = method, y = surv_coast, fill = kendall)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = round(kendall, 3)), color = "black", size = 4) +
+  scale_fill_gradient2(low = "#4c9220", mid = "white", high = "#c5247d", midpoint = 0, limits = c(-1, 1), na.value = "lightgray", guide = guide_colourbar(reverse = TRUE)) +
+  scale_x_discrete(labels = c("lea_offset" = "LEA", "rda_offset" = "RDA", "gf_offset" = "GF", "env_dist" = "Environmental \nDistance")) +
+  labs(title = "(B) Correlation between Survival and \nGenomic Offsets (Future Treatments Only)", x = NULL, y = NULL, fill = "Kendall's\nTau") +
+  theme_classic()
+surv_corplot_bin_fut
+#######
+
+# export
+########
+library(officer)
+library(rvg)
+
+# survival regressions
+doc <- read_pptx() %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_binlog_lea), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_binlog_rda), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_binlog_gf), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_binlog_env_dist), location = ph_location(left = 1, top = 1, width = 6.5, height = 4))
+
+print(doc, target = "results/figures/GO_surv_binary_climchg.pptx")
+
+# survival correlations
+doc <- read_pptx() %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_corplot_bin), location = ph_location(left = 1, top = 1, width = 5.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_corplot_bin_fut), location = ph_location(left = 1, top = 1, width = 5.5, height = 4))
+
+print(doc, target = "results/figures/GO_surv_corr_climchg.pptx")
+
+# corrs
+write.csv(corrs_binsurv, paste0("results/GO_compare/corrs_bin_surv_", Sys.Date(), ".csv"))
+write.csv(corrs_binsurv_fut, paste0("results/GO_compare/corrs_bin_surv_fut_", Sys.Date(), ".csv"))
+########
+```
