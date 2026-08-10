@@ -79,10 +79,32 @@ world_crop <- sf::st_crop(world, c(xmin = 10, xmax = 20, ymin = 54, ymax = 61))
 # relevant data
 surv_cf <- clim_offs %>% filter(metric == "surv")
 
+# quick summaries
+mean(surv_cf[surv_cf$coast == "West",]$CF_abs_offset)
+mean(surv_cf[surv_cf$coast == "East",]$CF_abs_offset)
+std.error(surv_cf[surv_cf$coast == "West",]$CF_abs_offset)
+std.error(surv_cf[surv_cf$coast == "East",]$CF_abs_offset)
+
 # mapping
 # absolute survival
 ###################
-surv_abs_map <- ggplot(data = world) +
+surv_abs_map_curr <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = surv_cf, aes(x = long, y = lat, 
+                                 fill = abs_current), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
+  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
+  geom_label_repel(data = surv_cf,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(A) Survival in Current \nTreatment")), x = "Longitude", y = "Latitude", fill = "Survival")
+surv_abs_map_curr
+
+surv_abs_map_fut <- ggplot(data = world) +
   theme_bw()+
   geom_sf(data = world_crop, fill = 'antiquewhite1') +
   geom_point(data = surv_cf, aes(x = long, y = lat, 
@@ -95,27 +117,27 @@ surv_abs_map <- ggplot(data = world) +
                   fill = "white")+
   theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
         panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
-  labs(title = expression(paste("(A) Survival in Future Treatments")), x = "Longitude", y = "Latitude", fill = "Survival")
-surv_abs_map
+  labs(title = expression(paste("(B) Survival in Future \nTreatment")), x = "Longitude", y = "Latitude", fill = "Survival")
+surv_abs_map_fut
 ###################
 
 # relative survival
 ###################
-surv_rel_map <- ggplot(data = world) +
-  theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
-  geom_point(data = surv_cf, aes(x = long, y = lat, 
-                                 fill = CF_relative), 
-             shape = 21, size = 4) +
-  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
-  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
-  geom_label_repel(data = surv_cf,
-                  aes(x=long, y=lat, label = pop),
-                  fill = "white")+
-  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
-        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
-  labs(title = expression(paste("(B) Common Future Relative Survival \nin Future Treatments")), x = "Longitude", y = "Latitude", fill = "Relative \nSurvival")
-surv_rel_map
+# surv_rel_map <- ggplot(data = world) +
+#   theme_bw()+
+#   geom_sf(data = world_crop, fill = 'antiquewhite1') +
+#   geom_point(data = surv_cf, aes(x = long, y = lat, 
+#                                  fill = CF_relative), 
+#              shape = 21, size = 4) +
+#   scale_colour_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
+#   scale_fill_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
+#   geom_label_repel(data = surv_cf,
+#                   aes(x=long, y=lat, label = pop),
+#                   fill = "white")+
+#   theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+#         panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+#   labs(title = expression(paste("(B) Common Future Relative Survival \nin Future Treatments")), x = "Longitude", y = "Latitude", fill = "Relative \nSurvival")
+# surv_rel_map
 ###################
 
 # abs surv offset
@@ -133,32 +155,34 @@ surv_abs_off_map <- ggplot(data = world) +
                   fill = "white")+
   theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
         panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
-  labs(title = expression(paste("(C) Common Future Survival Offset \nin Future Treatments")), x = "Longitude", y = "Latitude", fill = "Fitness Offset")
+  labs(title = expression(paste("(C) Survival Offset in \nFuture Treatment")), x = "Longitude", y = "Latitude", fill = "Fitness \nOffset")
 surv_abs_off_map
 #################
 
 # abs surv offset
 #################
-surv_rel_off_map <- ggplot(data = world) +
-  theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
-  geom_point(data = surv_cf, aes(x = long, y = lat, 
-                                 fill = CF_rel_offset), 
-             shape = 21, size = 4) +
-  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
-  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
-  geom_label_repel(data = surv_cf,
-                  aes(x=long, y=lat, label = pop),
-                  fill = "white")+
-  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
-        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
-  labs(title = expression(paste("(D) Common Future Relative Survival \nOffset in Future Treatments")), x = "Longitude", y = "Latitude", fill = "Relative \nFitness Offset")
-surv_rel_off_map
+# surv_rel_off_map <- ggplot(data = world) +
+#   theme_bw()+
+#   geom_sf(data = world_crop, fill = 'antiquewhite1') +
+#   geom_point(data = surv_cf, aes(x = long, y = lat, 
+#                                  fill = CF_rel_offset), 
+#              shape = 21, size = 4) +
+#   scale_colour_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+#   scale_fill_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+#   geom_label_repel(data = surv_cf,
+#                   aes(x=long, y=lat, label = pop),
+#                   fill = "white")+
+#   theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+#         panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+#   labs(title = expression(paste("(D) Common Future Relative Survival \nOffset in Future Treatments")), x = "Longitude", y = "Latitude", fill = "Relative \nFitness Offset")
+# surv_rel_off_map
 #################
 
 # combine plots
 ###############
-surv_cf_maps <- ggarrange(plotlist = c(surv_abs_map, surv_rel_map, surv_abs_off_map, surv_rel_off_map))
+#surv_cf_maps <- ggarrange(plotlist = c(surv_abs_map, surv_rel_map, surv_abs_off_map, surv_rel_off_map))
+surv_maps <- ggarrange(plotlist = c(surv_abs_map_curr, surv_abs_map_fut, surv_abs_off_map), nrow = 1)
+surv_maps
 ###############
 ```
 
@@ -380,4 +404,17 @@ doc2 <- read_pptx() %>%
   ph_with(value = dml(ggobj = weigh_cf_maps), location = ph_location(left = 1, top = 1, width = 13, height = 8)) 
 
 print(doc2, target = "results/figures/climchg_fit_offset_maps_combined.pptx")
+
+c(surv_abs_map_curr, surv_abs_map_fut, surv_abs_off_map, surv_maps)
+
+doc3 <- read_pptx() %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_abs_map_curr), location = ph_location(left = 1, top = 1, width = 13, height = 8)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_abs_map_fut), location = ph_location(left = 1, top = 1, width = 13, height = 8)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_abs_off_map), location = ph_location(left = 1, top = 1, width = 13, height = 8)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_maps), location = ph_location(left = 1, top = 1, width = 13, height = 8)) 
+print(doc3, target = "results/figures/climchg_fit_offset_maps_surv.pptx")
 ```

@@ -16,6 +16,7 @@ setwd("/Users/camillerumberger/Documents/GitHub/BalticEelgrass")
 library(tidyverse)
 library(stringr)
 library(dplyr)
+library(ggplot2)
 
 # data
 expfit_poptrt <- read.csv("data/experiment/expfit_poptrt.csv")
@@ -29,10 +30,6 @@ poptrts_df <- read.csv("data/experiment/poptrts_df.csv")
 This script is intended to calculate "fitness offsets" (sensu [Lotterhos 2024](https://academic.oup.com/evlett/article/8/3/331/7603943)) for the GO Eelgrass mesocosm experiment. "Local-foreign" (i.e. common garden) and "home-away" (i.e. current future) will be calculated here, using both absolute and relative fitness. 
 
 I will do this by using the "current" treatment for each respective coast as the home and local environment for current-future and common garden fitness offsets, respectively. 
-
-<<<<<<< HEAD
-=======
-I NEED TO CALCULATE RELATIVE FITNESS STILL.
 
 ## Data Prep
 
@@ -77,17 +74,17 @@ grow_trtpop <- merge(trt_pop3, fit_growth_trim, by = c("pop", "trt"))
 # matrix version pop columns trt rows
 surv_fit_trtpop <- fit_trtpop %>%
   group_by(trt, pop) %>%
-  summarize(surv_mean = mean(surv_mean, na.rm = TRUE), .groups = "drop") %>% 
+  summarize(surv_mean = mean(as.numeric(surv_mean), na.rm = TRUE), .groups = "drop") %>% 
   pivot_wider(names_from = pop, 
     values_from = surv_mean)
 len_fit_trtpop <- fit_trtpop %>%
   group_by(trt, pop) %>%
-  summarize(len_mean = mean(len_mean, na.rm = TRUE), .groups = "drop") %>% 
+  summarize(len_mean = mean(as.numeric(len_mean), na.rm = TRUE), .groups = "drop") %>% 
   pivot_wider(names_from = pop, 
     values_from = len_mean)
 weigh_fit_trtpop <- fit_trtpop %>%
   group_by(trt, pop) %>%
-  summarize(weigh_mean = mean(weigh_mean, na.rm = TRUE), .groups = "drop") %>% 
+  summarize(weigh_mean = mean(as.numeric(weigh_mean), na.rm = TRUE), .groups = "drop") %>% 
   pivot_wider(names_from = pop, 
     values_from = weigh_mean)
 ############

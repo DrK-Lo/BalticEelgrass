@@ -79,6 +79,12 @@ surv <- fit_surv %>%
   summarize(surv_mean = mean(isAlive), 
             surv_sd = sd(isAlive))
 
+# calc by tank
+surv_tank <- fit_surv %>% 
+  group_by(pop, trt, tank_ID) %>% 
+  summarize(surv_mean = mean(isAlive), 
+            surv_sd = sd(isAlive))
+
 # calculate growth
 grow <- fit_growth %>% 
   group_by(pop, trt) %>% 
@@ -87,19 +93,28 @@ grow <- fit_growth %>%
             weigh_mean = mean(weight_std_change, na.rm = T), 
             weigh_sd = sd(weight_std_change, na.rm = T))
 
+
+# calc by tank
+grow_tank <- fit_growth %>% 
+  group_by(pop, trt, tank_ID) %>% 
+  summarize(len_mean = mean(length_std_change, na.rm = T), 
+            len_sd = sd(length_std_change, na.rm = T), 
+            weigh_mean = mean(weight_std_change, na.rm = T), 
+            weigh_sd = sd(weight_std_change, na.rm = T))
+
 # put it together
 expfit <- merge(surv, grow, by = c("pop", "trt"), all = T)
+expfit_tank <- merge(surv_tank, grow_tank, by = c("pop", "trt", "tank_ID"), all = T)
 
 # add pop info
 exp_pops$pop_order <- 1:8
 exp_pops$pop <- exp_pops$site_abbrev
 expfit_mg <- merge(exp_pops, expfit, by = "pop")
-<<<<<<< HEAD
 expfit_mg$trt <- gsub("_", "-", expfit_mg$trt)
-#write.csv(expfit_mg, "data/experiment/expfit_poptrt.csv", row.names = F)
-=======
+expfit_tank_mg <- merge(exp_pops, expfit_tank, by = "pop")
+expfit_tank_mg$trt <- gsub("_", "-", expfit_tank_mg$trt)
 write.csv(expfit_mg, "data/experiment/expfit_poptrt.csv", row.names = F)
->>>>>>> 9225e0069012004a2d5081698bd4a0030cbd0911
+write.csv(expfit_tank_mg, "data/experiment/expfit_tank_poptrt.csv", row.names = F)
 ```
 
 ## Plotting
@@ -254,6 +269,79 @@ poptrt_weight_cg <- ggplot(expfit_mg, aes(x = trt_factor, y = weigh_mean, fill =
   ggtitle("Weight Change by Treatment & Population", subtitle = "Common Garden Comparison")
 poptrt_weight_cg
 #############
+```
+
+Plotting climate change comparisons only
+
+```{r}
+## survival
+###########
+# clim chg df
+expfit_mg_w <- expfit_mg %>% filter(pop %in% c("VAT", "VIK", "HOG", "BAR") & trt %in% c("TempControl-21psu", "TempWarm-16psu")) %>% mutate(coast = "West", cf = ifelse(trt == "TempControl-21psu", "Current", "Future"), coast_ord = 1)
+expfit_mg_e <- expfit_mg %>% filter(!(pop %in% c("VAT", "VIK", "HOG", "BAR")) & !(trt %in% c("TempControl-21psu", "TempWarm-16psu"))) %>% mutate(coast = "East", cf = ifelse(trt == "TempControl-7psu", "Current", "Future"), coast_ord = 2)
+expfit_mg_clim <- rbind(expfit_mg_w, expfit_mg_e)
+cf_colors <- c("Current" = "#8C96C6", "Future" = "#4D004B")
+#cf_colors <- c("Current" = "#FFEDA0", "Future" = "#800026")
+
+# pop x trt
+poptrt_surv_cf_clim <- expfit_mg_clim %>% ggplot(aes(x = pop_factor, y = surv_mean, fill = cf)) +
+  theme_classic() +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  scale_fill_manual(name = "Treatment",
+                    values = cf_colors,
+                    labels = names(cf_colors),
+                    breaks = names(cf_colors)) +
+  theme(plot.title = element_text(size = 24), 
+        plot.subtitle = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "right") +
+  labs(title = "Experimental Survival", subtitle = "Current-Future", x = "Population", y = "Survival", fill = "Treatment") 
+poptrt_surv_cf_clim
+
+# pop x trt
+poptrt_surv_cg_clim <- ggplot(expfit_mg_clim, aes(x = cf, y = surv_mean, fill = pop_factor)) +
+  geom_bar(stat = "identity", position = "dodge")+
+  theme_classic() +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  scale_fill_manual(name = "Population",
+                    values = pop_colors,
+                    breaks = names(pop_colors)) +
+  theme(plot.title = element_text(size = 24), 
+        plot.subtitle = element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "right") +
+  labs(title = "Experimental Survival", subtitle = "Common Garden", x = "Treatment", y = "Survival")
+poptrt_surv_cg_clim
+###########
+
+## coastal surv
+###############
+# important note - this uses the mean survival for each population, rather than an averaged binary survival by coast
+cf_surv_coast_clim <- expfit_mg_clim %>% ggplot(aes(x = fct_reorder(coast, coast_ord), y = surv_mean, fill = cf)) +
+  geom_violin(position = position_dodge(0.8)) + 
+  scale_fill_manual(name = "Treatment",
+                    values = cf_colors,
+                    labels = names(cf_colors),
+                    breaks = names(cf_colors)) +
+  labs(title = "Experimental Survival by Coast", x = "Coast", y = "Survival") +
+  theme_minimal()
+cf_surv_coast_clim
+
+# with binary survival
+fitsurv_w <- fit_surv %>% filter(pop %in% c("VAT", "VIK", "HOG", "BAR") & trt %in% c("TempControl_21psu", "TempWarm_16psu")) %>% mutate(coast = "West", cf = ifelse(trt == "TempControl_21psu", "Current", "Future"), coast_ord = 1)
+fitsurv_e <- fit_surv %>% filter(!(pop %in% c("VAT", "VIK", "HOG", "BAR")) & !(trt %in% c("TempControl_21psu", "TempWarm_16psu"))) %>% mutate(coast = "East", cf = ifelse(trt == "TempControl_7psu", "Current", "Future"), coast_ord = 2)
+fitsurv_clim <- rbind(fitsurv_w, fitsurv_e)
+
+cf_binsurv_coast_clim <- fitsurv_clim %>% ggplot(aes(x = fct_reorder(coast, coast_ord), y = isAlive, fill = cf)) +
+  geom_violin(position = position_dodge(0.8)) + 
+  scale_fill_manual(name = "Treatment",
+                    values = cf_colors,
+                    labels = names(cf_colors),
+                    breaks = names(cf_colors)) +
+  labs(title = "Experimental Survival by Coast", x = "Coast", y = "Survival") +
+  theme_minimal()
+cf_binsurv_coast_clim # useless
+###############
 ```
 
 ## Export plots
