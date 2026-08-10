@@ -99,7 +99,6 @@ Environmental Data has been pre-processed using the script "EnvDatProcess.Rmd". 
 # seascape
 curr_full_env
 curr_mll_env
-sea_scaled
 
 # exp sites
 exp_env
@@ -125,6 +124,12 @@ curr_full_env == sea_scaled_full[,15:18]
 rownames(exp_env) <- exp_scaled$pop
 rownames(curr_mll_env) <- sea_scaled_mll$pop
 rownames(curr_full_env) <- sea_scaled_full$pop
+
+# quick add pops as column before remove
+exp_scaled
+
+# ind level data - just needed for exp pops and all future data
+merge(sea_scaled_full, trt_env)
 ```
 
 ### Genomic Data Prep
@@ -182,6 +187,9 @@ gg_full_trts = NULL
 for (i in 1:nrow(exp_expanded)){
 gg_full_trts[i] = mean(((exp_expanded - trt_expanded)[i,]  %*% t(B_full))^2, na.rm = TRUE)
 }
+
+# genetic gaps indiv levels
+offsets_lea_full <- genetic.gap(input = "data/seascape_data/gen_full_rm_imp_mat.lfmm", env = curr_full_env, pred.env = fut_full_env, K = 12)
 
 # check corr
 cor(gg_mll_trts, gg_full_trts) # highly correlated, 0.9774147

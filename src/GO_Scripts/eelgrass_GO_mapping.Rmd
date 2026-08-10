@@ -35,6 +35,7 @@ poptrts_df <- read.csv("data/experiment/poptrts_df.csv")
 lea_go <- read.csv("results/GO_results/LEA_offsets_exptrt_long_2025-12-03.csv")[,-1]
 rda_go <- read.csv("results/GO_results/RDA_offsets_exptrt_long_2025-12-03.csv")[,-1]
 gf_go <- read.csv("results/GO_results/GF_offsets_exptrt_long_2025-12-03.csv")[,-1]
+env_dist <- read.csv("results/GO_results/euclidean_long_trt_exp.csv")[,-1]
 ```
 
 # Eelgrass GO Mapping
@@ -51,8 +52,11 @@ lea_prep <- lea_go %>% pivot_longer(cols = c(gap_mll, gap_full), names_to = "cc"
 rda_prep <- rda_go %>% pivot_longer(cols = c(offset_mll, offset_full), names_to = "cc", values_to = "offset") %>% mutate(cc = str_split_fixed(cc, "_", 2)[,2], method = "rda")
 gf_prep <- gf_go %>% pivot_longer(cols = c(offset_gf_geno_mll, offset_gf_geno_full), names_to = "cc", values_to = "offset") %>% mutate(cc = str_split_fixed(cc, "_", 4)[,4], method = "gf") %>% dplyr::select(-offset_gf_af_mll, -offset_gf_af_full)
 
+# and env dist
+env_prep <- env_dist %>% filter(pops2 %in% c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu") & !(pops1 %in% c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"))) %>% mutate(pop = pops1, trt = pops2, offset = distances, cc = "mll", method = "env") %>% dplyr::select(pop, trt, cc, offset, method)
+
 # combine
-go <- rbind(lea_prep, rda_prep, gf_prep)
+go <- rbind(lea_prep, rda_prep, gf_prep, env_prep)
 
 # add the latlon
 latlons <- latlons %>% rename(pop = site_abbrev)
@@ -88,8 +92,8 @@ world_crop <- sf::st_crop(world, c(xmin = 10, xmax = 20, ymin = 54, ymax = 61))
 
 ```{r}
 # relevant data
-lea_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & cc == "full" & method == "lea")
-lea_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & cc == "full" & method == "lea")
+lea_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & cc == "mll" & method == "lea")
+lea_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & cc == "mll" & method == "lea")
 lea_future_coast_go <- rbind(lea_go_west_fut, lea_go_east_fut)
 
 # map
@@ -99,8 +103,8 @@ lea_fut_coast <- ggplot(data = world) +
   geom_point(data = lea_future_coast_go, aes(x = long, y = lat, 
                                               fill = offset), 
              shape = 21, size = 4) +
-  scale_colour_viridis_c(option = "magma", direction = -1, limits = c(0,0.05)) +
-  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.05)) +
+  scale_colour_viridis_c(option = "rocket", direction = -1, limits = c(0,0.06)) +
+  scale_fill_viridis_c(option = "rocket", direction = -1, limits = c(0,0.06)) +
   geom_label_repel(data = lea_future_coast_go,
                   aes(x=long, y=lat, label = pop),
                #   nudge_x = -3,
@@ -108,7 +112,7 @@ lea_fut_coast <- ggplot(data = world) +
                   fill = "white")+
   theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
         panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
-  labs(title = expression(paste("(A) Predicted ", LEA[offset], " to Future Climate")), x = "Longitude", y = "Latitude", col = "Genomic \nOffset", fill = "Genomic \nOffset")
+  labs(title = expression(paste("(A) Predicted ", LEA[offset], " to Future Climate")), x = "Longitude", y = "Latitude", fill = "Genomic \nOffset")
 lea_fut_coast
 ```
 
@@ -116,8 +120,8 @@ lea_fut_coast
 
 ```{r}
 # relevant data
-rda_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & cc == "full" & method == "rda")
-rda_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & cc == "full" & method == "rda")
+rda_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & cc == "mll" & method == "rda")
+rda_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & cc == "mll" & method == "rda")
 rda_future_coast_go <- rbind(rda_go_west_fut, rda_go_east_fut)
 
 # map
@@ -127,8 +131,8 @@ rda_fut_coast <- ggplot(data = world) +
   geom_point(data = rda_future_coast_go, aes(x = long, y = lat, 
                                               fill = offset), 
              shape = 21, size = 4) +
-  scale_colour_viridis_c(option = "magma", direction = -1, limits = c(0,1.5)) +
-  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,1.5)) +
+  scale_colour_viridis_c(option = "rocket", direction = -1, limits = c(0,1)) +
+  scale_fill_viridis_c(option = "rocket", direction = -1, limits = c(0,1)) +
   geom_label_repel(data = rda_future_coast_go,
                   aes(x=long, y=lat, label = pop),
                #   nudge_x = -3,
@@ -144,8 +148,8 @@ rda_fut_coast
 
 ```{r}
 # relevant data
-gf_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & cc == "full" & method == "gf")
-gf_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & cc == "full" & method == "gf")
+gf_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & cc == "mll" & method == "gf")
+gf_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & cc == "mll" & method == "gf")
 gf_future_coast_go <- rbind(gf_go_west_fut, gf_go_east_fut)
 
 # map
@@ -155,8 +159,8 @@ gf_fut_coast <- ggplot(data = world) +
   geom_point(data = gf_future_coast_go, aes(x = long, y = lat, 
                                               fill = offset), 
              shape = 21, size = 4) +
-  scale_colour_viridis_c(option = "magma", direction = -1, limits = c(0,0.15)) +
-  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.15)) +
+  scale_colour_viridis_c(option = "rocket", direction = -1, limits = c(0,0.1)) +
+  scale_fill_viridis_c(option = "rocket", direction = -1, limits = c(0,0.1)) +
   geom_label_repel(data = gf_future_coast_go,
                   aes(x=long, y=lat, label = pop),
                #   nudge_x = -3,
@@ -167,3 +171,32 @@ gf_fut_coast <- ggplot(data = world) +
   labs(title = expression(paste("(C) Predicted ", GF[offset], " to Future Climate")), x = "Longitude", y = "Latitude", col = "Genomic \nOffset", fill = "Genomic \nOffset")
 gf_fut_coast
 ```
+
+### Env Dist
+
+```{r}
+# relevant data
+env_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & cc == "mll" & method == "env")
+env_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & cc == "mll" & method == "env")
+env_future_coast_go <- rbind(env_go_west_fut, env_go_east_fut)
+
+# map
+env_fut_coast <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_point(data = env_future_coast_go, aes(x = long, y = lat, 
+                                              fill = offset), 
+             shape = 21, size = 4) +
+  scale_colour_viridis_c(option = "rocket", direction = -1, limits = c(0,8)) +
+  scale_fill_viridis_c(option = "rocket", direction = -1, limits = c(0,8)) +
+  geom_label_repel(data = env_future_coast_go,
+                  aes(x=long, y=lat, label = pop),
+               #   nudge_x = -3,
+               #   nudge_y = 1,
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = "(D) Environmental Distance to Future Climate", x = "Longitude", y = "Latitude", col = "Env. Dist.", fill = "Env. Dist.")
+env_fut_coast
+```
+

@@ -647,7 +647,7 @@ print(end-start)
 
 # outlier detection
 ###################
-# run rdadapt with K = 12 - error, not enough RDA axes available, so going back to K = 2 for first 2 axes
+# K = 2 for first 2 axes
 rdadapt_sea_mll <- rdadapt(RDA = rda_mll, K = 2)
 rdadapt_sea_full <- rdadapt(RDA = rda_full, K = 2)
 
