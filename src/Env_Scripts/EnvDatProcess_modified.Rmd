@@ -246,10 +246,56 @@ I also want to make sure all of my experimental data, both home and treatment da
 ```{r}
 # read in individual level treatment data, check the exp site of origin data
 indiv_trt_env_dat <- read.csv("data/EnvDat/indiv_trt_env_dat_2025-12-31.csv")[,-1]
-head(exp_scaled)
 
-# subset just relevant env data
+# subset just relevant env dat from trts, rename to clarify origin
+exp_env_ind <- indiv_trt_env_dat %>% dplyr::select(pop, trt, tank_ID, bagnum_text, median_temp, max_temp, median_sal, min_sal) %>% mutate(df = "treatment")
 
+# use scaling factors for training data to apply to site of origin and treatment data - doing it this way since such huge differences in the scale of data between indiv treat data and pop level sea/exp home dat
+sea_env_scaled <- seascape_dat %>% dplyr::select(median_temp, max_temp, median_sal, min_sal) %>% mutate_all(as.numeric) %>% scale()
+
+# scaling factors
+mu_train <- attr(sea_env_scaled, "scaled:center")
+sd_train <- attr(sea_env_scaled, "scaled:scale")
+
+# apply to other dfs
+# home dat
+home_scaled <- exp_env %>% dplyr::select(median_temp, max_temp, median_sal, min_sal) %>% scale(center = mu_train, scale = sd_train) %>% as.data.frame()
+# mutate all not working so do it piece by piece 
+home_scaled$median_temp <- as.numeric(home_scaled$median_temp)
+home_scaled$max_temp <- as.numeric(home_scaled$max_temp)
+home_scaled$median_sal <- as.numeric(home_scaled$median_sal)
+home_scaled$min_sal <- as.numeric(home_scaled$min_sal)
+
+# treatment dat
+ind_scaled <- exp_env_ind %>% dplyr::select(median_temp, max_temp, median_sal, min_sal) %>% scale(center = mu_train, scale = sd_train) %>% as.data.frame()
+ind_scaled$median_temp <- as.numeric(ind_scaled$median_temp)
+ind_scaled$max_temp <- as.numeric(ind_scaled$max_temp)
+ind_scaled$median_sal <- as.numeric(ind_scaled$median_sal)
+ind_scaled$min_sal <- as.numeric(ind_scaled$min_sal)
+
+# reattach these data to metadata
+sea_env_scaled_df <- cbind(seascape_dat[,c("site_full", "pop")], as.data.frame(sea_env_scaled))
+
+exp_env_scaled_df <- cbind(rownames(home_scaled), home_scaled) %>% rename(pop = `rownames(home_scaled)`)
+
+ind_env_scaled_df <- cbind(exp_env_ind[,c("pop", "trt", "tank_ID", "bagnum_text")], ind_scaled)
+
+# put together seascape data again
+full_sea_scaled1 <- merge(indiv_list_full, sea_env_scaled_df, by = c("pop"))
+mll_sea_scaled1 <- merge(indiv_list_mll, sea_env_scaled_df, by = c("pop"))
+
+# reorder seascape data
+full_sea_scaled_ord <- full_sea_scaled1[order(full_sea_scaled1$mll_no),]
+mll_sea_scaled_ord <- mll_sea_scaled1[order(mll_sea_scaled1$mll_no),]
+
+# expand exp home dat to individual level
+exp_env_scaled_df1 <- merge(exp_env_scaled_df, exp_env_ind[,c("pop", "trt", "tank_ID", "bagnum_text")], by = "pop")
+
+# output these data
+write.csv(full_sea_scaled1, paste0("data/EnvDat/full_seascape_scaled_indiv_", Sys.Date(), ".csv"))
+write.csv(mll_sea_scaled1, paste0("data/EnvDat/mll_seascape_scaled_indiv_", Sys.Date(), ".csv"))
+write.csv(exp_env_scaled_df1, paste0("data/EnvDat/exp_home_scaled_indiv_", Sys.Date(), ".csv"))
+write.csv(ind_env_scaled_df, paste0("data/EnvDat/exp_trt_scaled_indiv_", Sys.Date(), ".csv"))
 ```
 
 
@@ -281,6 +327,17 @@ write.env(mat5, paste0("data/EnvDat/full_seascapeEnv_unscaled_", Sys.Date(), ".e
 write.env(mat6, paste0("data/EnvDat/mll_seascapeEnv_unscaled_", Sys.Date(), ".env"))
 write.env(mat7, paste0("data/EnvDat/expEnv_unscaled_", Sys.Date(), ".env"))
 write.env(mat8, paste0("data/EnvDat/trtEnv_unscaled_", Sys.Date(), ".env"))
+
+# also the individual level data
+mat9 <- as.matrix(full_sea_scaled1[,c("median_temp", "max_temp", "median_sal", "min_sal")])
+mat10 <- as.matrix(mll_sea_scaled1[,c("median_temp", "max_temp", "median_sal", "min_sal")])
+mat11 <- as.matrix(exp_env_scaled_df1[,c("median_temp", "max_temp", "median_sal", "min_sal")])
+mat12 <- as.matrix(ind_env_scaled_df[,c("median_temp", "max_temp", "median_sal", "min_sal")])
+
+write.env(mat9, paste0("data/EnvDat/full_seascapeEnv_indlvl_", Sys.Date(), ".env"))
+write.env(mat10, paste0("data/EnvDat/mll_seascapeEnv_indlvl_", Sys.Date(), ".env"))
+write.env(mat11, paste0("data/EnvDat/expEnv_indlvl_", Sys.Date(), ".env"))
+write.env(mat12, paste0("data/EnvDat/trtEnv_indlvl_", Sys.Date(), ".env"))
 ```
 
 ### Formatting for RDA & GF
