@@ -1,0 +1,281 @@
+---
+title: "eelgrass_LEA_offset"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+# Offset Modeling with LEA
+
+This script is for offset calculation using LEA, specifically for the project "VR_Zostera_genomic_offset." It includes training of the models using seascape genomic data, as well as calculation of genomic offset for experimental populations in each mesocosm treatment. 
+
+## Setup
+
+```{r setup, include = F}
+# markdown options
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/BalticEelgrass/")
+
+# libraries
+library(LEA) # for offsets
+library(BiocManager) # needed to download specific packages
+library(readxl) # reading xlsx files
+library(ggplot2) # for plotting
+library(vegan) # for env dat processing
+library(dplyr) # for data wrangling
+library(stringr) # for data wrangling
+library(s2) # mapping
+library(rnaturalearth) # mapping
+library(rnaturalearthdata) # mapping
+library(maps) # mapping
+library(ggspatial) # mapping
+library(ggrepel) # mapping
+library(terra) # interpolation
+library(stars) # interpolation
+library(gstat) # interpolation
+library(forcats) # data vis
+
+# read in data
+## indiv dat
+indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx")
+sea_pops <- read.csv("data/seascape_data/population_data.csv")[,-1]
+exp_pops <- read.csv("data/experiment/eelgrass_exp_sites.csv")
+inds_exp <- read.csv("data/EnvDat/indiv_trt_env_dat_2025-12-31.csv")[,-1]
+
+## gen dat
+lfmm_mll <- read.lfmm("data/seascape_data/gen_MLL_imp_mat.lfmm")
+geno_mll <- read.geno("data/seascape_data/gen_MLL_imp_mat.geno")
+lfmm_full <- read.lfmm("data/seascape_data/gen_full_rm_imp_mat.lfmm")
+geno_full <- read.geno("data/seascape_data/gen_full_rm_imp_mat.geno")
+lfmm_full_rm <- read.lfmm("data/seascape_data/eel_full_rm.lfmm") # this one has only snps found in both full and mll
+
+## env dat
+curr_full_env <- read.env("data/EnvDat/full_seascapeEnv_indlvl_2026-08-11.env")
+curr_mll_env <- read.env("data/EnvDat/mll_seascapeEnv_indlvl_2026-08-11.env")
+exp_env <- read.env("data/EnvDat/expEnv_indlvl_2026-08-13.env")
+trt_env <- read.env("data/EnvDat/trtEnv_indlvl_2026-08-13.env")
+trt_scaled <- read.csv("data/EnvDat/exp_trt_scaled_indiv_2026-08-13.csv")[,-1]
+exp_scaled <- read.csv("data/EnvDat/exp_home_scaled_indiv_2026-08-13.csv")[,-1]
+sea_scaled_mll <- read.csv("data/EnvDat/mll_seascape_scaled_indiv_2026-08-13.csv")[,-1]
+sea_scaled_full <- read.csv("data/EnvDat/full_seascape_scaled_indiv_2026-08-13.csv")[,-1]
+
+## seascape data
+seascape_sites_trim <- read.csv("data/seascape_data/seascape_sites_forinterpolation.csv")[,-1]
+sea_scaled_full_curr <- read.env("data/EnvDat/fullsea_curr_forint.env")
+sea_scaled_mll_curr <- read.env("data/EnvDat/mllsea_curr_forint.env")
+sea_scaled_full_fut <- read.env("data/EnvDat/fullsea_fut_forint.env")
+sea_scaled_mll_fut <- read.env("data/EnvDat/mllsea_fut_forint.env")
+
+full_sea_dat <- read.csv("data/EnvDat/fullsea_curr_forint.csv")[,c("coast", "cf", "pop", "mll_no", "indv_no", "site_full", "trt")]
+mll_sea_dat <- read.csv("data/EnvDat/mllsea_curr_forint.csv")[,c("coast", "cf", "pop", "mll_no", "indv_no", "site_full", "trt")]
+```
+
+## Data Prep
+
+### Individual Data Prep
+
+I will start by processing the individual data to work with both MLL and full datasets. 
+
+```{r}
+# inspect data
+sea_pops
+indiv_list
+inds_exp
+exp_pops
+
+# rename sea pop columns
+colnames(sea_pops) <- c("region","site_name","pop","long","lat")
+
+# rename exp pop columns
+colnames(exp_pops) <- c("site_name", "pop", "long", "lat")
+
+# add metadata to inds
+indiv_list <- as.data.frame(indiv_list)
+colnames(indiv_list) <- c("mll", "ind")
+indiv_list$pop <- str_split_fixed(indiv_list$ind, "-", 2)[,1]
+inds <- merge(sea_pops, indiv_list, by = c("pop"))
+
+# reorder by mll
+inds_ord <- inds[order(inds$mll),]
+
+# unique mll inds
+inds_mll <- inds_ord[unique(inds_ord$mll),]
+
+# experimental individuals
+inds_exp1 <- inds_exp %>% dplyr::select(pop, trt, tank_ID, new_label, bagnum_text)
+```
+
+### Environmental Data Prep
+
+Environmental Data has been pre-processed using the script "EnvDatProcess.Rmd". This script scales all environmental data together, then splits it into the relevant data sets for seascape, experimental pops, and treatments before outputting the correct formats for each GO method. Here, I just ensure that column names are consistent and that the order of the .env files matches with our other metadata
+
+```{r}
+# inspect data
+# seascape
+curr_full_env
+curr_mll_env
+
+# exp sites
+exp_env
+exp_scaled
+
+# trt
+trt_env
+trt_scaled
+
+# rownames for trt
+rownames(trt_env) <- trt_scaled$trt
+
+# colnames for env files
+colnames(curr_full_env) <- colnames(curr_mll_env) <- colnames(exp_env) <- colnames(trt_env) <- c("median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")
+
+# now check the order of data
+exp_env == exp_scaled[,2:5] 
+trt_env == trt_scaled[,5:8]
+curr_mll_env == sea_scaled_mll[,6:9]
+curr_full_env == sea_scaled_full[,6:9]
+
+# add pop as rownames
+rownames(exp_env) <- exp_scaled$pop
+rownames(curr_mll_env) <- sea_scaled_mll$pop
+rownames(curr_full_env) <- sea_scaled_full$pop
+```
+
+### Genomic Data Prep
+
+Seascape genomic data comes from Steffi Ries and Marlene Jahnke at the University of Gothenburg, who had already processed the genomic dataset (check what part of bioinformatic pipeline had been done already). I further process this data to impute missing genomic data and remove non-variable genomic sites in the script "GenDatProcess.Rmd"
+
+```{r}
+# inspect
+lfmm_mll[1:10,1:10]
+lfmm_full[1:10,1:10]
+
+# add pops as rownames
+rownames(lfmm_mll) <- inds_mll$pop
+rownames(lfmm_full) <- inds_ord$pop
+```
+
+
+## Seascape Model Training
+
+Now that I have prepped and cleaned my data, I will use it to train LFMM models later used to predict genomic offset to some other (in this case experimental) climate. Importantly, I do not need to trim or impute my genomic data - this has been done in the script "GenDatProcess.Rmd". I also do not determine ancestry, Steffi has done this and recovered K = 12. 
+
+```{r}
+# fit model
+mod_mll <- lfmm2(input = lfmm_mll,
+                  env = curr_mll_env,
+                  K = 12,
+                  effect.sizes = T)
+mod_full <- lfmm2(input = lfmm_full,
+                      env = curr_full_env,
+                      K = 12,
+                      effect.sizes = T)
+```
+
+## Offset Prediction
+
+Now I predict offset for all of my experimental populations to each treatment.
+
+```{r}
+# put together dataset for exp pop origin with trt (pred from and pred to)
+exp_mat <- as.matrix(exp_env) 
+trt_mat <- as.matrix(trt_env)
+
+# genetic offset
+gg_full_ind <- genetic.offset(input = lfmm_full,
+                          env = curr_full_env,
+                          new.env = exp_mat,
+                          pred.env = trt_mat, 
+                          K = 12)
+gg_mll_ind <- genetic.offset(input = lfmm_mll,
+                          env = curr_mll_env,
+                          new.env = exp_mat,
+                          pred.env = trt_mat, 
+                          K = 12)
+
+# check corr
+cor(gg_mll_ind$offset, gg_full_ind$offset) # 0.7853203
+
+# associate with metadata
+inds_exp_trim <- inds_exp %>% dplyr::select(pop, trt, bagnum_text, tank_ID)
+gap_df_full <- cbind(inds_exp_trim, gg_full_ind$offset) %>% mutate(cc = "full") %>% rename(offset = `gg_full_ind$offset`)
+gap_df_mll <- cbind(inds_exp_trim, gg_mll_ind$offset) %>% mutate(cc = "mll") %>% rename(offset = `gg_mll_ind$offset`)
+gap_df <- rbind(gap_df_full, gap_df_mll)
+gap_df_wide <- cbind(inds_exp_trim, gg_mll_ind$offset, gg_full_ind$offset) %>% rename(gg_mll_ind = `gg_mll_ind$offset`, gg_full_ind = `gg_full_ind$offset`)
+gap_df$method <- gap_df_wide$method <- "lea_offset"
+
+# save offsets
+write.csv(gap_df, paste0("results/GO_results/LEA_offsets_exptrt_ind_long_",Sys.Date(),".csv"))
+write.csv(gap_df_wide, paste0("results/GO_results/LEA_offsets_exptrt_ind_wide_",Sys.Date(),".csv"))
+```
+
+I will also predict offsets for the seascape populations in order to interpolate across the study range. 
+
+```{r}
+# current
+gg_full_sea_curr <- genetic.offset(input = lfmm_full,
+                          env = curr_full_env,
+                          pred.env = sea_scaled_full_curr, 
+                          K = 12)
+gg_mll_sea_curr <- genetic.offset(input = lfmm_mll,
+                          env = curr_mll_env,
+                          pred.env = sea_scaled_mll_curr, 
+                          K = 12)
+
+# future
+gg_full_sea_fut <- genetic.offset(input = lfmm_full,
+                          env = curr_full_env,
+                          pred.env = sea_scaled_full_fut, 
+                          K = 12)
+gg_mll_sea_fut <- genetic.offset(input = lfmm_mll,
+                          env = curr_mll_env,
+                          pred.env = sea_scaled_mll_fut, 
+                          K = 12)
+
+# df
+sea_full_go_df <- data.frame(pop = names(gg_full_sea_curr$offset), go_current = gg_full_sea_curr$offset, go_future = gg_full_sea_fut$offset, cc = "full")
+sea_mll_go_df <- data.frame(pop = names(gg_mll_sea_curr$offset), go_current = gg_mll_sea_curr$offset, go_future = gg_mll_sea_fut$offset, cc = "mll")
+sea_go_df <- rbind(sea_full_go_df, sea_mll_go_df)
+
+# write this out
+write.csv(sea_go_df, "results/GO_results/seascape_GO_all.csv")
+
+# averages by population
+sea_full_go_avg <- sea_full_go_df %>% 
+  group_by(pop) %>% 
+  summarize(go_current_full = mean(go_current), go_future_full = mean(go_future))
+sea_mll_go_avg <- sea_mll_go_df %>% 
+  group_by(pop) %>% 
+  summarize(go_current_mll = mean(go_current), go_future_mll = mean(go_future))
+sea_go_avg <- merge(sea_full_go_avg, sea_mll_go_avg, by = "pop")
+
+# subset to relevant seascape populations, i.e. coastal swedish populations by merging with trimmed metadata
+sea_go_trim <- merge(seascape_sites_trim, sea_go_avg, by = "pop") %>% arrange(order) %>% mutate(method = "lea_offset")
+
+# write
+write.csv(sea_go_trim, "results/GO_results/lea_offset_seascape_go.csv")
+```
+
+## Offset Plotting
+
+Now that I have my offsets, I want to arrange them nicely by coast and plot. 
+
+```{r}
+# popsdf
+exp_pops$order <- 1:8
+gap_df_plotting <- merge(exp_pops, gap_df_wide, by = "pop")
+
+# plot
+ggplot(gap_df_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (gg_mll_ind))) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.006)) +
+  theme_classic() +
+  labs(title = "Genomic Offsets (LEA, MLL)", x = "Population", y = "Treatment", fill = "Offset")
+
+# and the full offsets
+ggplot(gap_df_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (gg_full_ind))) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.006)) +
+  theme_classic() +
+  labs(title = "Genomic Offsets (LEA, Full)", x = "Population", y = "Treatment", fill = "Offset")
+```

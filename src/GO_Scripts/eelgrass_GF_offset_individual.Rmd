@@ -1,0 +1,359 @@
+---
+title: "eelgrass_GF_offset"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Offset Modeling with Gradient Forest
+
+This script is for offset calculation using gradientForest, specifically for the project "VR_Zostera_genomic_offset." It includes training of the models using seascape genomic data, as well as calculation of genomic offset for experimental populations in each mesocosm treatment. 
+
+## Setup & Formatting
+
+```{r Setup, echo = F}
+# packages
+library(BiocManager) # needed to download specific packages
+library(gradientForest) # for offsets
+library(LEA) # read.geno
+library(readxl) # reading xlsx files
+library(dplyr) # for data wrangling
+library(stringr) # for data wrangling
+library(ggplot2) # for data vis
+library(viridis) # for data vis
+library(forcats) # for data vis
+
+# data
+## indiv dat
+indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx")
+sea_pops <- read.csv("data/seascape_data/population_data.csv")[,-1]
+exp_pops <- read.csv("data/experiment/eelgrass_exp_sites.csv")
+inds_exp <- read.csv("data/EnvDat/indiv_trt_env_dat_2025-12-31.csv")[,-1]
+
+## gen dat
+geno_mll <- read.geno("data/seascape_data/gen_MLL_imp_mat.geno")
+geno_full <- read.geno("data/seascape_data/gen_full_rm_imp_mat.geno")
+
+## env dat
+trt_scaled <- read.csv("data/EnvDat/exp_trt_scaled_indiv_2026-08-13.csv")[,-1]
+exp_scaled <- read.csv("data/EnvDat/exp_home_scaled_indiv_2026-08-13.csv")[,-1]
+sea_scaled_mll <- read.csv("data/EnvDat/mll_seascape_scaled_indiv_2026-08-13.csv")[,-1]
+sea_scaled_full <- read.csv("data/EnvDat/full_seascape_scaled_indiv_2026-08-13.csv")[,-1]
+
+## seascape data
+seascape_sites_trim <- read.csv("data/seascape_data/seascape_sites_forinterpolation.csv")[,-1]
+
+full_sea_dat_curr <- read.csv("data/EnvDat/fullsea_curr_forint.csv")[,-1]
+mll_sea_dat_curr <- read.csv("data/EnvDat/mllsea_curr_forint.csv")[,-1]
+full_sea_dat_fut <- read.csv("data/EnvDat/fullsea_fut_forint.csv")[,-1]
+mll_sea_dat_fut <- read.csv("data/EnvDat/mllsea_fut_forint.csv")[,-1]
+###############
+```
+
+
+## Data Checks
+
+## Data Checks
+
+This data has largely been processed in other scripts, but I still need to double check everything before I can train models and make GO predictions. 
+
+### Individual Data
+
+```{r}
+# inspect data
+indiv_list
+sea_pops
+exp_pops
+
+# indiv list
+colnames(indiv_list) <- c("mll", "indiv")
+indiv_list$pop <- str_split_fixed(indiv_list$indiv, "-", 2)[,1]
+
+# exp inds
+inds_exp1 <- inds_exp %>% mutate(bagnum = as.numeric(bagnum_text)) %>% dplyr::select(pop, trt, bagnum)
+
+# standardize colnames for pop dfs
+colnames(sea_pops) <- c("region", "site_full", "pop", "long", "lat")
+colnames(exp_pops) <- c("site_full", "pop", "long", "lat")
+
+# merge inds with seascape pop metadata
+inds_sea <- merge(sea_pops, indiv_list, by = c("pop"))
+
+# reorder this by mll number
+inds_sea_ord <- inds_sea[order(inds_sea$mll),]
+
+# mll inds
+inds_sea_ord_mll <- inds_sea_ord[!(duplicated(inds_sea_ord$mll)),]
+```
+
+
+### Environmental Data
+
+Environmental data has been pre-processed in the script "EnvDatProcess.Rmd". Here I just double check that everything looks right and is in the correct order to match with genomic data.
+
+```{r}
+# inspect data
+summary(sea_scaled_mll)
+summary(sea_scaled_full)
+summary(trt_scaled)
+summary(exp_scaled)
+
+# check seascape environmental data in same order as individuals
+sea_scaled_mll$pop == inds_sea_ord_mll$pop # needs reorder
+sea_scaled_full$pop == inds_sea_ord$pop # needs reorder
+
+sea_scaled_mll <- sea_scaled_mll %>% arrange(mll_no)
+sea_scaled_full <- sea_scaled_full %>% arrange(mll_no)
+
+# recheck
+sea_scaled_mll$pop == inds_sea_ord_mll$pop # good!
+sea_scaled_full$pop == inds_sea_ord$pop # good!
+
+# pull just relevant columns
+sea_scaled_mll_red <- sea_scaled_mll[,c("median_temp", "max_temp", "median_sal", "min_sal")]
+rownames(sea_scaled_mll_red) <- sea_scaled_mll$indv_no
+sea_scaled_full_red <- sea_scaled_full[,c("median_temp", "max_temp", "median_sal", "min_sal")]
+rownames(sea_scaled_full_red) <- sea_scaled_full$order
+trt_scaled_red <- trt_scaled[,c("median_temp", "max_temp", "median_sal", "min_sal")]
+rownames(trt_scaled_red) <- trt_scaled$bagnum_text
+exp_scaled_red <- exp_scaled[,c("median_temp", "max_temp", "median_sal", "min_sal")]
+rownames(exp_scaled_red) <- exp_scaled$bagnum_text
+```
+
+
+### Genomic Data
+
+Seascape genomic data comes from Steffi Ries and Marlene Jahnke at the University of Gothenburg, who had already processed the genomic dataset (check what part of bioinformatic pipeline had been done already). I further process this data to impute missing genomic data and remove non-variable genomic sites in the script "GenDatProcess.Rmd"
+
+```{r}
+# inspect data
+geno_mll[1:10,1:10]
+geno_full[1:10,1:10]
+
+# set populations as rownames
+rownames(geno_mll) <- inds_sea_ord_mll$pop
+rownames(geno_full) <- inds_sea_ord$pop
+
+# not using allele frequency based models
+
+# check names
+colnames(geno_mll) <- make.names(as.character(1:ncol(geno_mll)))
+colnames(geno_full) <- make.names(as.character(1:ncol(geno_full)))
+```
+
+
+## Seascape Model Training
+
+Now that I know my data is ready to use, I can train my models!
+
+```{r}
+# start by defining a maximum number of splits
+maxLevel_mll <- log2(0.368*nrow(sea_scaled_mll)/2)
+maxLevel_full <- log2(0.368*nrow(sea_scaled_full)/2)
+ 
+# run gradient forest
+
+# geno models
+start_time <- Sys.time() # time start
+gf_geno_mll <- gradientForest(cbind(sea_scaled_mll_red, geno_mll), predictor.vars = colnames(sea_scaled_mll_red), response.vars=colnames(geno_mll), ntree=500, maxLevel=maxLevel_mll, trace=T, corr.threshold=0.50)
+end_time <- Sys.time() # time end
+(end_time - start_time) # about 10 mins
+
+start_time <- Sys.time() # time start
+gf_geno_full <- gradientForest(cbind(sea_scaled_full_red, geno_full), predictor.vars = colnames(sea_scaled_full_red), response.vars=colnames(geno_full), ntree=500, maxLevel=maxLevel_full, trace=T, corr.threshold=0.50)
+end_time <- Sys.time() # time end
+(end_time - start_time) # about 10 mins
+
+saveRDS(gf_geno_mll, paste0("results/GO_results/gf_geno_mll_indiv_",Sys.Date(),".RDS"))
+saveRDS(gf_geno_full, paste0("results/GO_results/gf_geno_full_indiv_",Sys.Date(),".RDS"))
+
+# read in models trained in trainGF.R / trainGF.sh
+gf_geno_mll <- readRDS("results/GO_results/gf_geno_mll_indiv_2026-08-13.RDS")
+gf_geno_full <- readRDS("results/GO_results/gf_geno_full_indiv_2026-08-13.RDS")
+
+# plot bar graphs depicting importance of each spatial and climate variable
+plot(gf_geno_mll)
+plot(gf_geno_full)
+
+sink("results/GO_results/gf_importance_ind.txt")
+importance(gf_geno_mll)
+importance(gf_geno_full)
+sink()
+```
+
+
+## Offset Prediction
+
+Now that we have trained our gradient forest models, we need to use these to predict performance in the mesocosm treatments.
+
+```{r}
+# predictions
+#############
+# predict to home site
+pred_geno_home_mll <- predict(gf_geno_mll, exp_scaled_red)
+pred_geno_home_full <- predict(gf_geno_full, exp_scaled_red)
+
+# predict to treatments
+pred_geno_trt_mll <- predict(gf_geno_mll, trt_scaled_red)
+pred_geno_trt_full <- predict(gf_geno_full, trt_scaled_red)
+#############
+
+# calculate euclidean distance for offset
+#########################################
+# number preds
+nb_pred <- nrow(trt_scaled_red)
+
+# function
+euclidean <- function(a, b) sqrt(sum((a - b)^2)) # Euclidean distance for genetic offset
+
+# calculate offset
+# geno mll
+df_geno_mll <- data.frame() # df
+for (i in 1:nb_pred){ # calc offset
+  ec_dist <- as.data.frame(euclidean(pred_geno_home_mll[i,], pred_geno_trt_mll[i,]))
+  df_geno_mll <- rbind(df_geno_mll, ec_dist)
+}
+geno_offset_mll <- data.frame(pop = trt_scaled$pop, trt = trt_scaled$trt, bagnum = trt_scaled$bagnum_text, offset_gf_geno_mll = df_geno_mll, cc = "mll") # associate metadata with offset calculation
+colnames(geno_offset_mll) <- c("pop", "trt", "bagnum", "offset", "cc")
+
+# geno full
+df_geno_full <- data.frame() # df
+for (i in 1:nb_pred){ # calc offset
+  ec_dist <- as.data.frame(euclidean(pred_geno_home_full[i,], pred_geno_trt_full[i,]))
+  df_geno_full <- rbind(df_geno_full, ec_dist)
+}
+geno_offset_full <- data.frame(pop = trt_scaled$pop, trt = trt_scaled$trt, bagnum = trt_scaled$bagnum_text, offset_gf_geno_full = df_geno_full, cc = "full") # associate metadata with offset calculation
+colnames(geno_offset_full) <- c("pop", "trt", "bagnum", "offset", "cc")
+#########################################
+
+# put it all together
+#####################
+# complete offset df
+gf_offsets <- rbind(geno_offset_mll, geno_offset_full)
+
+# save output
+write.csv(gf_offsets, paste0("results/GO_results/GF_offsets_exptrt_ind_long_",Sys.Date(),".csv"))
+#####################
+```
+
+Also calculate GOs for seascape populations
+
+```{r}
+# seascape env data
+full_sea_dat_curr_red <- full_sea_dat_curr %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
+full_sea_dat_fut_red <- full_sea_dat_fut %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
+mll_sea_dat_curr_red <- mll_sea_dat_curr %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
+mll_sea_dat_fut_red <- mll_sea_dat_fut %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
+
+# predictions
+#############
+# predict to home site
+pred_geno_home_sea_mll <- predict(gf_geno_mll, sea_scaled_mll_red)
+pred_geno_home_sea_full <- predict(gf_geno_full, sea_scaled_full_red)
+
+# predict to current trt
+pred_geno_curr_sea_mll <- predict(gf_geno_mll, mll_sea_dat_curr_red)
+pred_geno_curr_sea_full <- predict(gf_geno_full, full_sea_dat_curr_red)
+
+# predict to future trt
+pred_geno_fut_sea_mll <- predict(gf_geno_mll, mll_sea_dat_fut_red)
+pred_geno_fut_sea_full <- predict(gf_geno_full, full_sea_dat_fut_red)
+#############
+
+# calculate euclidean distance for offset
+#########################################
+# number preds
+nb_pred_sea_mll <- nrow(mll_sea_dat_fut_red)
+nb_pred_sea_full <- nrow(full_sea_dat_fut_red)
+
+# calculate offset
+# mll current
+df_geno_mll_sea_curr <- data.frame() # df
+for (i in 1:nb_pred_sea_mll){ # calc offset
+  ec_dist <- as.data.frame(euclidean(pred_geno_home_sea_mll[i,], pred_geno_curr_sea_mll[i,]))
+  df_geno_mll_sea_curr <- rbind(df_geno_mll_sea_curr, ec_dist)
+}
+geno_offset_mll_sea_curr <- data.frame(pop = mll_sea_dat_curr$pop, offset_gf_geno_mll = df_geno_mll_sea_curr, cc = "mll") # associate metadata with offset calculation
+colnames(geno_offset_mll_sea_curr) <- c("pop", "offset_curr", "cc")
+
+# geno full
+df_geno_full_sea_curr <- data.frame() # df
+for (i in 1:nb_pred_sea_full){ # calc offset
+  ec_dist <- as.data.frame(euclidean(pred_geno_home_sea_full[i,], pred_geno_curr_sea_full[i,]))
+  df_geno_full_sea_curr <- rbind(df_geno_full_sea_curr, ec_dist)
+}
+geno_offset_full_sea_curr <- data.frame(pop = full_sea_dat_curr$pop, offset_gf_geno_full = df_geno_full_sea_curr, cc = "full") # associate metadata with offset calculation
+colnames(geno_offset_full_sea_curr) <- c("pop", "offset_curr", "cc")
+
+# geno mll fut
+df_geno_mll_sea_fut <- data.frame() # df
+for (i in 1:nb_pred_sea_mll){ # calc offset
+  ec_dist <- as.data.frame(euclidean(pred_geno_home_sea_mll[i,], pred_geno_fut_sea_mll[i,]))
+  df_geno_mll_sea_fut <- rbind(df_geno_mll_sea_fut, ec_dist)
+}
+geno_offset_mll_sea_fut <- data.frame(pop = mll_sea_dat_fut$pop, offset_gf_geno_mll = df_geno_mll_sea_fut, cc = "mll") # associate metadata with offset calculation
+colnames(geno_offset_mll_sea_fut) <- c("pop", "offset_fut", "cc")
+
+# geno full fut
+df_geno_full_sea_fut <- data.frame() # df
+for (i in 1:nb_pred_sea_full){ # calc offset
+  ec_dist <- as.data.frame(euclidean(pred_geno_home_sea_full[i,], pred_geno_fut_sea_full[i,]))
+  df_geno_full_sea_fut <- rbind(df_geno_full_sea_fut, ec_dist)
+}
+geno_offset_full_sea_fut <- data.frame(pop = full_sea_dat_fut$pop, offset_gf_geno_full = df_geno_full_sea_fut, cc = "full") # associate metadata with offset calculation
+colnames(geno_offset_full_sea_fut) <- c("pop", "offset_fut", "cc")
+#########################################
+
+# put it all together
+#####################
+# combine & trim to relevant pops
+offsets_mll_sea_go_gf <- merge(geno_offset_mll_sea_curr, geno_offset_mll_sea_fut, by = c("pop", "cc")) %>% filter(pop %in% seascape_sites_trim$pop) %>% as.data.frame()
+offsets_full_sea_go_gf <- merge(geno_offset_full_sea_curr, geno_offset_full_sea_fut, by = c("pop", "cc")) %>% filter(pop %in% seascape_sites_trim$pop) %>% as.data.frame()
+
+# summarize
+offsets_mll_sea_go_gf_summary <- offsets_mll_sea_go_gf %>%
+  group_by(pop) %>% 
+  summarize(go_current_mll = mean(offset_curr), go_future_mll = mean(offset_fut))
+offsets_full_sea_go_gf_summary <- offsets_full_sea_go_gf %>%
+  group_by(pop) %>% 
+  summarize(go_current_full = mean(offset_curr), go_future_full = mean(offset_fut))
+
+# combine averaged info & add metadata
+gf_offsets_sea <- merge(offsets_mll_sea_go_gf_summary, offsets_full_sea_go_gf_summary, by = "pop")
+gf_offsets_sea_mg <- merge(seascape_sites_trim, gf_offsets_sea, by = "pop") %>% mutate(method = "gf_offset")
+
+# save output
+write.csv(gf_offsets_sea_mg, paste0("results/GO_results/gf_offset_seascape_go.csv"))
+#####################
+```
+
+## Plotting
+
+Now that I have my offsets, I want to plot them in a grid where populations are columns and treatments are rows 
+
+```{r}
+# prep for plotting
+exp_pops$order <- 1:8
+gf_offsets_plotting <- merge(exp_pops, gf_offsets, by = "pop")
+
+# plot
+# mll
+ggplot(gf_offsets_plotting[gf_offsets_plotting$cc == "mll",], aes(x = fct_reorder(pop, order), y = trt, fill = (offset))) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.1)) +
+  theme_classic() +
+  labs(title = "Genomic Offsets (GFgeno, MLL)", x = "Population", y = "Treatment", fill = "Offset")
+
+# and the full offsets
+ggplot(gf_offsets_plotting[gf_offsets_plotting$cc == "full",], aes(x = fct_reorder(pop, order), y = trt, fill = (offset))) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.15)) +
+  theme_classic() +
+  labs(title = "Genomic Offsets (GFgeno, Full)", x = "Population", y = "Treatment", fill = "Offset")
+```
+
+

@@ -1,0 +1,325 @@
+---
+title: "eelgrass_LEA_gea"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+# GEA Modeling with LEA
+
+This script is for conducting a GEA study using LEA, specifically for the project "VR_Zostera_genomic_offset." It includes training of the models using seascape genomic data, as well as identification of loci putatively under selection.  
+
+## Setup
+
+```{r setup, include = F}
+# markdown options
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/BalticEelgrass/")
+setwd("~/Documents/Github/BalticEelgrass")
+
+# libraries
+library(LEA) # for LEA gea
+library(qvalue) # for determination of significance
+library(readxl) # reading xlsx files
+library(ggplot2) # for plotting
+library(dplyr) # for data wrangling
+library(stringr) # for data wrangling
+library(forcats) # data vis
+library(vcfR) # for vcf files
+
+# read in data
+## indiv dat
+indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx")
+sea_pops <- read.csv("data/seascape_data/population_data.csv")[,-1]
+exp_pops <- read.csv("data/experiment/eelgrass_exp_sites.csv")
+
+## gen dat
+lfmm_mll <- read.lfmm("data/seascape_data/gen_MLL_imp_mat.lfmm")
+geno_mll <- read.geno("data/seascape_data/gen_MLL_imp_mat.geno")
+lfmm_full <- read.lfmm("data/seascape_data/gen_full_rm_imp_mat.lfmm")
+geno_full <- read.geno("data/seascape_data/gen_full_rm_imp_mat.geno")
+lfmm_full_rm <- read.lfmm("data/seascape_data/eel_full_rm.lfmm") # this one has only snps found in both full and mll
+eelgrass_vcf_MLL <- read.vcfR(
+  "data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf")
+eelgrass_vcf_full <- read.vcfR(
+  "data/seascape_data/zostera_230619_seascape_miss25_sorted_95_no_reps.recode.vcf")
+
+## env dat
+curr_full_env <- read.env("data/EnvDat/full_seascapeEnv_2025-12-03.env")
+curr_mll_env <- read.env("data/EnvDat/mll_seascapeEnv_2025-12-03.env")
+sea_scaled_mll <- read.csv("data/EnvDat/sea_scaled_envdat_mll_2025-12-03.csv")
+sea_scaled_full <- read.csv("data/EnvDat/sea_scaled_envdat_full_2025-12-03.csv")
+```
+
+## Data Prep
+
+### Individual Data Prep
+
+I will start by processing the individual data to work with both MLL and full datasets. 
+
+```{r}
+# inspect data
+sea_pops
+indiv_list
+exp_pops
+
+# rename sea pop columns
+colnames(sea_pops) <- c("region","site_name","pop","long","lat")
+
+# rename exp pop columns
+colnames(exp_pops) <- c("site_name", "pop", "long", "lat")
+
+# add metadata to inds
+indiv_list <- as.data.frame(indiv_list)
+colnames(indiv_list) <- c("mll", "ind")
+indiv_list$pop <- str_split_fixed(indiv_list$ind, "-", 2)[,1]
+inds <- merge(sea_pops, indiv_list, by = c("pop"))
+
+# reorder by mll
+inds_ord <- inds[order(inds$mll),]
+
+# unique mll inds
+inds_mll <- inds_ord[unique(inds_ord$mll),]
+```
+
+### Environmental Data Prep
+
+Environmental Data has been pre-processed using the script "EnvDatProcess.Rmd". This script scales all environmental data together, then splits it into the relevant data sets for seascape, experimental pops, and treatments before outputting the correct formats for each GO method. Here, I just ensure that column names are consistent and that the order of the .env files matches with our other metadata
+
+```{r}
+# inspect data
+# seascape
+curr_full_env
+curr_mll_env
+sea_scaled
+
+# exp sites
+exp_env
+exp_scaled
+
+# trt
+trt_env
+trt_scaled
+
+# rownames for trt
+rownames(trt_env) <- trt_scaled$trt
+
+# colnames for env files
+colnames(curr_full_env) <- colnames(curr_mll_env) <- colnames(exp_env) <- colnames(trt_env) <- c("median_temp_scaled", "max_temp_scaled", "median_sal_scaled", "min_sal_scaled")
+
+# now check the order of data
+exp_env == exp_scaled[,9:12] 
+trt_env == trt_scaled[,6:9]
+curr_mll_env == sea_scaled_mll[,15:18]
+curr_full_env == sea_scaled_full[,15:18]
+
+# add pops as rownames
+rownames(exp_env) <- exp_scaled$pop
+rownames(curr_mll_env) <- sea_scaled_mll$pop
+rownames(curr_full_env) <- sea_scaled_full$pop
+```
+
+### Genomic Data Prep
+
+Seascape genomic data comes from Steffi Ries and Marlene Jahnke at the University of Gothenburg, who had already processed the genomic dataset (check what part of bioinformatic pipeline had been done already). I further process this data to impute missing genomic data and remove non-variable genomic sites in the script "GenDatProcess.Rmd"
+
+```{r}
+# inspect
+lfmm_mll[1:10,1:10]
+lfmm_full[1:10,1:10]
+
+# add pops as rownames
+rownames(lfmm_mll) <- inds_mll$pop
+rownames(lfmm_full) <- inds_ord$pop
+```
+
+
+## GEA Study
+
+Now that I have prepped and cleaned my data, I will use it to train LFMM models used to identify outlier loci. Importantly, I do not need to trim or impute my genomic data - this has been done in the script "GenDatProcess.Rmd". I also do not determine ancestry, Steffi has done this and recovered K = 12. 
+
+```{r}
+# fitting model
+mod_lfmm_full <- lfmm2(input = lfmm_full,
+                       env = curr_full_env, 
+                       K = 12,
+                       effect.sizes = T)
+mod_lfmm_MLL <- lfmm2(input = lfmm_mll,
+                      env = curr_mll_env,
+                      K = 12,
+                      effect.sizes = T)
+
+# perform test
+pv_lfmm_full <- lfmm2.test(object = mod_lfmm_full,
+                       input = lfmm_full,
+                       env = curr_full_env, 
+                       full = TRUE)
+pv_lfmm_MLL <- lfmm2.test(object = mod_lfmm_MLL,
+                          input = lfmm_mll,
+                          env = curr_mll_env, 
+                          full = TRUE)
+
+# pvalues
+pv_full <- pv_lfmm_full$pvalues
+pv_MLL <- pv_lfmm_MLL$pvalues
+
+# qvalues
+qv_full <- qvalue(pv_full, fdr.level = 0.01)
+qv_MLL <- qvalue(pv_MLL, fdr.level = 0.01)
+
+# candidates
+candidates_full <- which(qv_full$significant)
+candidates_pvals_full <- (pv_full)[candidates_full]
+
+candidates_MLL <- which(qv_MLL$significant)
+candidates_pvals_MLL <- (pv_MLL)[candidates_MLL]
+
+# using FDR to filter out false positives
+length(which(qv_full$qvalues < 0.01)) # how many SNPs have an FDR < 1%? 358
+length(which(qv_MLL$qvalues < 0.01)) # how many SNPs have an FDR < 1%? 58
+
+# identify which SNPs have qval less than 1%
+cands_full <- colnames(lfmm_full)[which(qv_full$qvalues < 0.01)]
+cands_index_full <- which(qv_full$qvalues < 0.01)
+
+cands_MLL <- colnames(lfmm_mll)[which(qv_MLL$qvalues < 0.01)]
+cands_index_MLL <- which(qv_MLL$qvalues < 0.01)
+
+# df for candidates
+cand_df_full <- data.frame(index = colnames(lfmm_full),
+                           pvals = pv_full, qvals = qv_full$qvalues)
+cand_df_MLL <- data.frame(index = colnames(lfmm_mll),
+                          pvals = pv_MLL, qvals = qv_MLL$qvalues)
+
+# get the actual position info from vcf
+# first we need chromosome assignments, should be in the vcf
+mll_posinfo <- as.data.frame(eelgrass_vcf_MLL@fix[,1:2])
+full_posinfo <- as.data.frame(eelgrass_vcf_full@fix[,1:2])
+mll_posinfo$POS <- as.numeric(mll_posinfo$POS)
+full_posinfo$POS <- as.numeric(full_posinfo$POS)
+
+mll_gtinfo <- eelgrass_vcf_MLL@gt
+full_gtinfo <- eelgrass_vcf_full@gt
+
+names_mll <- c()
+for (i in 1:nrow(mll_gtinfo)) {
+  name = paste0("V",i)
+  names_mll = c(names_mll, name)
+}
+names_full <- c()
+for (i in 1:nrow(full_gtinfo)) {
+  name = paste0("V",i)
+  names_full = c(names_full, name)
+}
+
+rownames(mll_gtinfo) <- names_mll
+rownames(full_gtinfo) <- names_full
+
+# find the names that are not in the filtered version
+nonvar_mll <- which(!rownames(mll_gtinfo) %in% colnames(gen_MLL_imp_trim))
+nonvar_full <- which(!rownames(full_gtinfo) %in% colnames(gen_full_imp_trim))
+
+# remove from pos df
+mll_posinfo_rm <- mll_posinfo[-(nonvar_mll),]
+full_posinfo_rm <- full_posinfo[-(nonvar_full),]
+
+# now bind with candidate dfs
+mll_poscands <- cbind(mll_posinfo_rm, cand_df_MLL)
+full_poscands <- cbind(full_posinfo_rm, cand_df_full)
+
+# overlap in candidates?
+overlapping_mll_all <- which(mll_poscands$POS %in% full_poscands$POS)
+overlapping_full_all <- which(full_poscands$POS %in% mll_poscands$POS)
+length(overlapping_full_all) # 2395 SNPs in common overall
+overlapping_mll <- which(mll_poscands[mll_poscands$qvals < 0.01,]$POS %in% full_poscands[full_poscands$qvals < 0.01,]$POS)
+overlapping_full <- which(full_poscands[full_poscands$qvals < 0.01,]$POS %in% mll_poscands[mll_poscands$qvals < 0.01,]$POS)
+length(overlapping_mll) # 5 overlapping candidates
+
+overlap_cands_pos <- full_poscands[full_poscands$qvals < 0.01,][overlapping_full, c("CHROM","POS")]
+
+# environmental associations of loci?
+# pull out effect sizes
+mll_effect <- as.data.frame(mod_lfmm_MLL@B)
+full_effect <- as.data.frame(mod_lfmm_full@B)
+
+# identify strongest effect size
+mll_effect$pred <- colnames(mll_effect)[max.col(mll_effect, ties.method = "first")]
+full_effect$pred <- colnames(full_effect)[max.col(full_effect, ties.method = "first")]
+
+# name of locus + add predictor data
+mll_effect$index <- rownames(mll_effect)
+full_effect$index <- rownames(full_effect)
+
+# combine with candidate data
+mll_poscands_df <- merge(mll_poscands, mll_effect, by = "index")
+full_poscands_df <- merge(full_poscands, full_effect, by = "index")
+
+# explicitly designate candidates
+mll_poscands_df$cand <- ifelse(mll_poscands_df$qvals < 0.01, TRUE, FALSE)
+full_poscands_df$cand <- ifelse(full_poscands_df$qvals < 0.01, TRUE, FALSE)
+
+# quick summary
+table(mll_poscands_df[mll_poscands_df$cand == T,]$pred)
+#   max_temp_scaled  median_sal_scaled median_temp_scaled     min_sal_scaled 
+#                23                 17                 10                  8 
+
+table(full_poscands_df[full_poscands_df$cand == T,]$pred)
+#   max_temp_scaled  median_sal_scaled median_temp_scaled     min_sal_scaled 
+#               104                 97                 37                120
+
+# output these outlier loci
+write.csv(full_poscands_df, "results/GO_results/GEA/gea_cands_lea_full.csv", row.names = F)
+write.csv(mll_poscands_df, "results/GO_results/GEA/gea_cands_lea_mll.csv", row.names = F)
+```
+
+## Plotting
+
+Now that I have my outliers, I want to create Manhattan plots. 
+
+```{r}
+# temporary position
+cand_df_full$pos <- 1:length(cand_df_full$index)
+cand_df_MLL$pos <- 1:length(cand_df_MLL$index)
+
+# manhattan plots
+plot(cand_df_full$pos, -log10(cand_df_full$pvals), 
+     pch = 19, col = "darkslategray4",
+     main = "Candidate SNPs Full Dataset",
+     xlab = "Position",
+     ylab = "-log10(Pvals)")
+points(cand_df_full$pos[cand_df_full$qvals < 0.01], 
+       -log10(cand_df_full$pvals[cand_df_full$qvals < 0.01]),
+       pch = 19,
+       col = "magenta4")
+
+plot(cand_df_MLL$pos, -log10(cand_df_MLL$pvals), 
+     pch = 19, col = "darkslategray4",
+     main = "Candidate SNPs MLL Dataset",
+     xlab = "Position",
+     ylab = "-log10(Pvals)")
+points(cand_df_MLL$pos[cand_df_MLL$qvals < 0.01], 
+       -log10(cand_df_MLL$pvals[cand_df_MLL$qvals < 0.01]),
+       pch = 19,
+       col = "magenta4")
+
+# nicer plots
+mll_plot <- ggplot(mll_poscands, aes(x = as.numeric(POS), y = -log10(pvals)))+
+  theme_bw()+
+  geom_point(aes(color=as.factor(CHROM), alpha = 0.8)) +
+  scale_color_manual(values = rep(c("cadetblue", "skyblue"), 68))+
+  geom_point(data = mll_poscands[mll_poscands$qvals < .01,], aes(x = as.numeric(POS), y = -log10(pvals)), color = "magenta4")+
+  theme(axis.text.x=element_text(angle = 90, vjust = 0.5), legend.position = "none")+
+  ggtitle("Candidate Loci (Clone Corrected)") +
+  labs(x = "Position", y = expression(-log[10](p-value)))
+mll_plot
+
+full_plot <- ggplot(full_poscands, aes(x = as.numeric(POS), y = -log10(pvals)))+
+  theme_bw()+
+  geom_point(aes(color=as.factor(CHROM), alpha = 0.8)) +
+  scale_color_manual(values = rep(c("cadetblue", "skyblue"), 68))+
+  geom_point(data = full_poscands[full_poscands$qvals < .01,], aes(x = as.numeric(POS), y = -log10(pvals)), color = "magenta4")+
+  theme(axis.text.x=element_text(angle = 90, vjust = 0.5), legend.position = "none")+
+  ggtitle("Candidate Loci (Uncorrected)") +
+  labs(x = "Position", y = expression(-log[10](p-value)))
+full_plot
+```

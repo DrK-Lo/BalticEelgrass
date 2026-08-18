@@ -241,6 +241,74 @@ write.csv(full_sea_scaled_ord, paste0("data/EnvDat/sea_scaled_envdat_full_", Sys
 write.csv(mll_sea_scaled_ord, paste0("data/EnvDat/sea_scaled_envdat_mll_", Sys.Date(), ".csv"), row.names = F)
 ```
 
+For the purposes of interpolation, I will also prep environmental data for treatments such that it matches up with the seascape sites. I will first determine which sites fall into the relevant plotting area, then match sites with treatment data for the coast that they fall on. 
+
+```{r}
+## id relevant sites
+####################
+# filter site info
+seascape_sites <- seascape_dat %>% dplyr::select(region, site_full, pop, lat, long)
+seascape_sites$order <- 1:nrow(seascape_sites)
+
+# relevant GO region - 10 to 20 E, 54.5 to 61 N
+seascape_sites_trim <- seascape_sites %>% filter(lat > 54.5 & lat < 61 & long > 10 & long < 20) 
+
+# which sites were removed?
+(pops_rm <- seascape_sites[which(!(seascape_sites$pop %in% seascape_sites_trim$pop)), "pop"])
+
+# determine E/W cutoff - KUR is E coast cutoff
+seascape_sites$coast <- ifelse(seascape_sites$order < seascape_sites[seascape_sites$pop == "KUR",]$order, "west", "east")
+w_pops <- seascape_sites[seascape_sites$coast == "west",]$pop
+e_pops <- seascape_sites[seascape_sites$coast == "east",]$pop
+####################
+
+## attach environmental data
+############################
+# home metadata
+full_sea_dat <- full_sea_scaled_ord %>% dplyr::select(pop, mll_no, indv_no, pop_no, site_full) %>% mutate(coast = ifelse(pop %in% w_pops, "west", "east"))
+mll_sea_dat <- mll_sea_scaled_ord %>% dplyr::select(pop, mll_no, indv_no, pop_no, site_full) %>% mutate(coast = ifelse(pop %in% w_pops, "west", "east"))
+
+# trt dat
+trt_env_forsea <- trt_scaled %>% as.data.frame() %>% dplyr::select(trt, median_temp_scaled, max_temp_scaled, median_sal_scaled, min_sal_scaled) %>% rename(median_temp = median_temp_scaled, max_temp = max_temp_scaled, median_sal = median_sal_scaled, min_sal = min_sal_scaled) %>% mutate(coast = ifelse(trt %in% c("TempControl-21psu", "TempWarm-16psu"), "west", "east"), cf = ifelse(trt %in% c("TempWarm-16psu", "TempWarm-5psu"), "future", "current"))
+rownames(trt_env_forsea) <- NULL
+
+# split into current and future dfs
+trt_env_forsea_curr <- trt_env_forsea %>% filter(cf == "current")
+trt_env_forsea_fut <- trt_env_forsea %>% filter(cf == "future")
+
+# expand to full and mll seascape size
+full_sea_curr <- merge(full_sea_dat, trt_env_forsea_curr, by = "coast")
+full_sea_fut <- merge(full_sea_dat, trt_env_forsea_fut, by = "coast")
+
+mll_sea_curr <- merge(mll_sea_dat, trt_env_forsea_curr, by = "coast")
+mll_sea_fut <- merge(mll_sea_dat, trt_env_forsea_fut, by = "coast")
+############################
+
+# write out for later use
+#########################
+# pops for interpolation
+write.csv(seascape_sites_trim, "data/seascape_data/seascape_sites_forinterpolation.csv")
+
+# for lea
+mat_fullsea_curr_int <- as.matrix(full_sea_curr[,c("median_temp","max_temp","median_sal","min_sal")])
+mat_mllsea_curr_int <- as.matrix(mll_sea_curr[,c("median_temp","max_temp","median_sal","min_sal")])
+mat_fullsea_fut_int <- as.matrix(full_sea_fut[,c("median_temp","max_temp","median_sal","min_sal")])
+mat_mllsea_fut_int <- as.matrix(mll_sea_fut[,c("median_temp","max_temp","median_sal","min_sal")])
+
+# write .env files
+write.env(mat_fullsea_curr_int, "data/EnvDat/fullsea_curr_forint.env")
+write.env(mat_mllsea_curr_int, "data/EnvDat/mllsea_curr_forint.env")
+write.env(mat_fullsea_fut_int, "data/EnvDat/fullsea_fut_forint.env")
+write.env(mat_mllsea_fut_int, "data/EnvDat/mllsea_fut_forint.env")
+
+# for rda/gf
+write.csv(full_sea_curr, "data/EnvDat/fullsea_curr_forint.csv")
+write.csv(mll_sea_curr, "data/EnvDat/mllsea_curr_forint.csv")
+write.csv(full_sea_fut, "data/EnvDat/fullsea_fut_forint.csv")
+write.csv(mll_sea_fut, "data/EnvDat/mllsea_fut_forint.csv")
+#########################
+```
+
 I also want to make sure all of my experimental data, both home and treatment data, is assigned at an individual level so that I can get individual level genomic offsets. Importantly, the home environment data is the same for each population, but there is tank level variation in temperature and bag level variation in salinity.
 
 ```{r}
@@ -248,54 +316,67 @@ I also want to make sure all of my experimental data, both home and treatment da
 indiv_trt_env_dat <- read.csv("data/EnvDat/indiv_trt_env_dat_2025-12-31.csv")[,-1]
 
 # subset just relevant env dat from trts, rename to clarify origin
-exp_env_ind <- indiv_trt_env_dat %>% dplyr::select(pop, trt, tank_ID, bagnum_text, median_temp, max_temp, median_sal, min_sal) %>% mutate(df = "treatment")
+trt_env_ind <- indiv_trt_env_dat %>%
+  dplyr::select(pop, trt, tank_ID, bagnum_text, median_temp, max_temp, median_sal, min_sal) %>%
+  mutate(df = "treatment")
 
-# use scaling factors for training data to apply to site of origin and treatment data - doing it this way since such huge differences in the scale of data between indiv treat data and pop level sea/exp home dat
-sea_env_scaled <- seascape_dat %>% dplyr::select(median_temp, max_temp, median_sal, min_sal) %>% mutate_all(as.numeric) %>% scale()
+# expand relevant data to individual level
+seascape_dat_expand <- merge(indiv_list_full, seascape_dat, by = "pop") %>%
+  dplyr::select(pop, mll_no, median_temp, max_temp, median_sal, min_sal) %>%
+  arrange(mll_no)
 
-# scaling factors
-mu_train <- attr(sea_env_scaled, "scaled:center")
-sd_train <- attr(sea_env_scaled, "scaled:scale")
+exp_env$pop <- rownames(exp_env)
+exp_dat_expand <- merge(trt_env_ind[,c("pop","bagnum_text")], exp_env, by = "pop") %>%
+  arrange(bagnum_text)
 
-# apply to other dfs
-# home dat
-home_scaled <- exp_env %>% dplyr::select(median_temp, max_temp, median_sal, min_sal) %>% scale(center = mu_train, scale = sd_train) %>% as.data.frame()
-# mutate all not working so do it piece by piece 
-home_scaled$median_temp <- as.numeric(home_scaled$median_temp)
-home_scaled$max_temp <- as.numeric(home_scaled$max_temp)
-home_scaled$median_sal <- as.numeric(home_scaled$median_sal)
-home_scaled$min_sal <- as.numeric(home_scaled$min_sal)
+# combine
+sea_env_prep <- seascape_dat_expand %>%
+  dplyr::select(median_temp, max_temp, median_sal, min_sal) %>%
+  mutate_all(as.numeric) %>%
+  mutate(df = "seascape", order = 1:nrow(seascape_dat_expand)) %>%
+  as.data.frame()
 
-# treatment dat
-ind_scaled <- exp_env_ind %>% dplyr::select(median_temp, max_temp, median_sal, min_sal) %>% scale(center = mu_train, scale = sd_train) %>% as.data.frame()
-ind_scaled$median_temp <- as.numeric(ind_scaled$median_temp)
-ind_scaled$max_temp <- as.numeric(ind_scaled$max_temp)
-ind_scaled$median_sal <- as.numeric(ind_scaled$median_sal)
-ind_scaled$min_sal <- as.numeric(ind_scaled$min_sal)
+exp_env_prep <- exp_dat_expand %>%
+  as.data.frame() %>%
+  dplyr::select(median_temp, max_temp, median_sal, min_sal, df) %>%
+  mutate(order = exp_dat_expand$bagnum_text) %>%
+  arrange(order) %>%
+  as.data.frame()
+
+trt_env_prep <- trt_env_ind %>%
+  dplyr::select(median_temp, max_temp, median_sal, min_sal, bagnum_text, df) %>%
+  rename(order = bagnum_text) %>%
+  as.data.frame()
+
+env_ind_prep <- rbind(sea_env_prep, exp_env_prep, trt_env_prep)
+
+# use scaling factors from pop/trt level calculations in prev chunks
+centers <- attr(std, "scaled:center")
+scales <- attr(std, "scaled:scale")
+
+# scale
+scaled_env_ind <- scale(env_ind_prep[,1:4], center = centers, scale = scales)
+
+# separate dfs
+env_ind_scale_df <- cbind(as.data.frame(env_ind_prep[,c("df", "order")]), env_ind_scale)
+sea_ind_scaled <- env_ind_scale_df %>% filter(df == "seascape")
+exp_ind_scaled <- env_ind_scale_df %>% filter(df == "experiment")
+trt_ind_scaled <- env_ind_scale_df %>% filter(df == "treatment")
 
 # reattach these data to metadata
-sea_env_scaled_df <- cbind(seascape_dat[,c("site_full", "pop")], as.data.frame(sea_env_scaled))
-
-exp_env_scaled_df <- cbind(rownames(home_scaled), home_scaled) %>% rename(pop = `rownames(home_scaled)`)
-
-ind_env_scaled_df <- cbind(exp_env_ind[,c("pop", "trt", "tank_ID", "bagnum_text")], ind_scaled)
+sea_env_scaled_df <- cbind(as.data.frame(seascape_dat_expand[,c("pop", "mll_no")]), as.data.frame(sea_ind_scaled))
+exp_env_scaled_df <- cbind(exp_dat_expand[,c("pop", "bagnum_text")], exp_ind_scaled) %>% arrange(bagnum_text)
+trt_env_scaled_df <- cbind(trt_env_ind[,c("pop", "trt", "tank_ID", "bagnum_text")], trt_ind_scaled)
 
 # put together seascape data again
-full_sea_scaled1 <- merge(indiv_list_full, sea_env_scaled_df, by = c("pop"))
-mll_sea_scaled1 <- merge(indiv_list_mll, sea_env_scaled_df, by = c("pop"))
-
-# reorder seascape data
-full_sea_scaled_ord <- full_sea_scaled1[order(full_sea_scaled1$mll_no),]
-mll_sea_scaled_ord <- mll_sea_scaled1[order(mll_sea_scaled1$mll_no),]
-
-# expand exp home dat to individual level
-exp_env_scaled_df1 <- merge(exp_env_scaled_df, exp_env_ind[,c("pop", "trt", "tank_ID", "bagnum_text")], by = "pop")
+full_sea_scaled1 <- merge(indiv_list_full, sea_env_scaled_df, by = c("pop", "mll_no")) %>% arrange(mll_no) %>% filter(!duplicated(order))
+mll_sea_scaled1  <- merge(indiv_list_mll, sea_env_scaled_df, by = c("pop", "mll_no")) %>% arrange(mll_no) %>% filter(!duplicated(mll_no))
 
 # output these data
 write.csv(full_sea_scaled1, paste0("data/EnvDat/full_seascape_scaled_indiv_", Sys.Date(), ".csv"))
 write.csv(mll_sea_scaled1, paste0("data/EnvDat/mll_seascape_scaled_indiv_", Sys.Date(), ".csv"))
-write.csv(exp_env_scaled_df1, paste0("data/EnvDat/exp_home_scaled_indiv_", Sys.Date(), ".csv"))
-write.csv(ind_env_scaled_df, paste0("data/EnvDat/exp_trt_scaled_indiv_", Sys.Date(), ".csv"))
+write.csv(exp_env_scaled_df, paste0("data/EnvDat/exp_home_scaled_indiv_", Sys.Date(), ".csv"))
+write.csv(trt_env_scaled_df, paste0("data/EnvDat/exp_trt_scaled_indiv_", Sys.Date(), ".csv"))
 ```
 
 
@@ -331,8 +412,8 @@ write.env(mat8, paste0("data/EnvDat/trtEnv_unscaled_", Sys.Date(), ".env"))
 # also the individual level data
 mat9 <- as.matrix(full_sea_scaled1[,c("median_temp", "max_temp", "median_sal", "min_sal")])
 mat10 <- as.matrix(mll_sea_scaled1[,c("median_temp", "max_temp", "median_sal", "min_sal")])
-mat11 <- as.matrix(exp_env_scaled_df1[,c("median_temp", "max_temp", "median_sal", "min_sal")])
-mat12 <- as.matrix(ind_env_scaled_df[,c("median_temp", "max_temp", "median_sal", "min_sal")])
+mat11 <- as.matrix(exp_env_scaled_df[,c("median_temp", "max_temp", "median_sal", "min_sal")])
+mat12 <- as.matrix(trt_env_scaled_df[,c("median_temp", "max_temp", "median_sal", "min_sal")])
 
 write.env(mat9, paste0("data/EnvDat/full_seascapeEnv_indlvl_", Sys.Date(), ".env"))
 write.env(mat10, paste0("data/EnvDat/mll_seascapeEnv_indlvl_", Sys.Date(), ".env"))
@@ -349,6 +430,8 @@ RDA needs information in the exact format I already had it in, so no need to do 
 I need to calculate environmental distance between the tanks and the site-of-origin for the experimental populations.
 
 ```{r}
+## pop level
+############
 # assign relevant data to new objs
 (trt_scaled_fordist <- trt_scaled)
 (exp_scaled_fordist <- exp_scaled)
@@ -409,8 +492,64 @@ Distance", limits = c(0, 7.5))+
         legend.position = "right", legend.justification = "top",
         axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 euc_dist_trtpop
-```
+############
 
+## ind level
+############
+# assign relevant data to new objs
+trt_scaled_fordist_ind <- trt_env_scaled_df
+exp_scaled_fordist_ind <- exp_env_scaled_df
+
+# rename site pop to avoid name collision, then cross join on nothing
+exp_scaled_fordist_ind_renamed <- exp_scaled_fordist_ind %>%
+  rename(site = pop)
+
+paired <- trt_scaled_fordist_ind %>%
+  mutate(key = 1) %>%
+  full_join(exp_scaled_fordist_ind_renamed %>% mutate(key = 1),
+            by = "key", suffix = c("_trt", "_exp")) %>%
+  dplyr::select(-key)
+
+# distance: square before summing
+paired$dist <- sqrt(rowSums(
+  (paired[, paste0(c("median_temp","max_temp","median_sal","min_sal"), "_trt")] - paired[, paste0(c("median_temp","max_temp","median_sal","min_sal"), "_exp")])^2
+))
+
+# aggregate to one distance per treatment x site (mean across all bags in that treatment)
+dist_summary <- paired %>%
+  group_by(trt, site) %>%
+  summarize(dist = mean(dist, na.rm = TRUE)) %>%
+  ungroup()
+
+# keep this df
+write.csv(dist_summary, "data/EnvDat/euclidian_trt_exp_summary.csv")
+
+# pop and trt orders for plotting
+pops <- c("VAT","VIK","HOG","BAR","KUR","KAL","HOR","BJO")
+trts <- c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu")
+popsdf <- data.frame(site = pops, pop_order = 1:length(pops))
+trtsdf <- data.frame(trt = trts, trt_order = 1:length(trts))
+
+dist_summary1 <- merge(popsdf, dist_summary, by = "site")
+dist_summary2 <- merge(trtsdf, dist_summary1, by = "trt")
+
+# plotting
+euc_dist_ind <- ggplot(dist_summary2, aes(x = fct_reorder(site, pop_order), y = fct_reorder(trt, trt_order), fill = dist)) +
+  theme_classic() +
+  geom_tile(color = "black") +
+  scale_fill_viridis_c(name = "Euclidean \nDistance", limits = c(0, 6)) +
+  theme(plot.title = element_text(size = 20),
+        legend.title = element_text(size = 14),
+        legend.position = "right", legend.justification = "top") +
+  ylab("") + xlab("") +
+  ggtitle("Environmental Distance between \nSites and Treatments") +
+  theme(plot.title = element_text(size = 18),
+        legend.title = element_text(size = 14),
+        legend.position = "right", legend.justification = "top",
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+euc_dist_ind
+############
+```
 
 Also plot treatment data against experimental site of origin data
 

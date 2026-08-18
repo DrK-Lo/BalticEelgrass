@@ -36,6 +36,9 @@ lea_go <- read.csv("results/GO_results/LEA_offsets_exptrt_long_2025-12-03.csv")[
 rda_go <- read.csv("results/GO_results/RDA_offsets_exptrt_long_2025-12-03.csv")[,-1]
 gf_go <- read.csv("results/GO_results/GF_offsets_exptrt_long_2025-12-03.csv")[,-1]
 env_dist <- read.csv("results/GO_results/euclidean_long_trt_exp.csv")[,-1]
+
+# seascape
+
 ```
 
 # Eelgrass GO Mapping
@@ -71,6 +74,12 @@ trtdf <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", "TempWarm-1
 
 # add trt dat
 go_plotting <- merge(trtdf, go_prep1, by = "trt")
+```
+
+Also interpolate the seascape data to prep for plotting
+
+```{r}
+
 ```
 
 ## Mapping
