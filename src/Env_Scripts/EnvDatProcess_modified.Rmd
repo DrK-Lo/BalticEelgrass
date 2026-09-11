@@ -14,6 +14,8 @@ knitr::opts_knit$set(root.dir = "~/Eelgrass/BalticEelgrass/data")
 
 This script is for processing environmental data for genomic offset calculation of the project "VR_Zostera_genomic_offset." It includes processing of the seascape data used to train offset models, as well as processing of the mesocosm environmental data used to make final offset predictions. 
 
+This whole script is going to need some serious cleanup at this point and likely some splitting.
+
 ## Seascape Data
 
 This data was already compiled by Steffi Ries & Marlene Jahnke to run GEAs. I am just processing it to be in formats compatible with LEA, RDA, and GF. More details about how this data was processed to find these averages can be found [here](https://drive.google.com/drive/u/0/folders/1CNLeIIg3IUlEkCgfIC6P8k9tesJ-BNtq).
@@ -43,6 +45,10 @@ library(maps) # mapping
 library(ggspatial) # mapping
 library(ncdf4) # for nc data
 library(raster) # for nc data
+library(pdist) # for env dists
+
+# setwd for data
+setwd("~/Documents/GitHub/BalticEelgrass")
 
 # data
 seascape_dat <- read.csv("data/EnvDat/summary_env_data_meadows_GEA.csv") # seascape env data
@@ -51,6 +57,7 @@ exp_dat <- read_excel("data/EnvDat/Camille_env_data_experiment.xlsx")
 trt_dat <- read.csv("data/EnvDat/trt_env_dat_2025-12-31.csv")
 indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx") # seascape individuals data
 eelgrass_vcf_MLL <- read.vcfR("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf") # read in vcf eelgrass mll
+indiv_trt_env_dat <- read.csv("data/EnvDat/indiv_trt_env_dat_2025-12-31.csv")[,-1]
 ```
 
 
@@ -312,9 +319,6 @@ write.csv(mll_sea_fut, "data/EnvDat/mllsea_fut_forint.csv")
 I also want to make sure all of my experimental data, both home and treatment data, is assigned at an individual level so that I can get individual level genomic offsets. Importantly, the home environment data is the same for each population, but there is tank level variation in temperature and bag level variation in salinity.
 
 ```{r}
-# read in individual level treatment data, check the exp site of origin data
-indiv_trt_env_dat <- read.csv("data/EnvDat/indiv_trt_env_dat_2025-12-31.csv")[,-1]
-
 # subset just relevant env dat from trts, rename to clarify origin
 trt_env_ind <- indiv_trt_env_dat %>%
   dplyr::select(pop, trt, tank_ID, bagnum_text, median_temp, max_temp, median_sal, min_sal) %>%
@@ -379,6 +383,42 @@ write.csv(exp_env_scaled_df, paste0("data/EnvDat/exp_home_scaled_indiv_", Sys.Da
 write.csv(trt_env_scaled_df, paste0("data/EnvDat/exp_trt_scaled_indiv_", Sys.Date(), ".csv"))
 ```
 
+Going to try a new way where I scale just based on the seascape data then apply these scaling factors to the experimental and individual level treatment data. I will use the expanded seascape data for this. 
+
+```{r}
+# use expanded dat
+head(seascape_dat_expand)
+seascape_dat_expand$mll_no <- as.factor(seascape_dat_expand$mll_no)
+seascape_dat_expand[,c("median_temp","max_temp","median_sal","min_sal")] <- apply(seascape_dat_expand[,c("median_temp","max_temp","median_sal","min_sal")], 2, as.numeric)
+summary(seascape_dat_expand)
+
+# scale and save scaling factors
+seascape_scaled_ind <- scale(seascape_dat_expand[,c("median_temp","max_temp","median_sal","min_sal")])
+center_sea <- attr(seascape_scaled_ind,"scaled:center")
+scale_sea <- attr(seascape_scaled_ind,"scaled:scale")
+
+seascape_scaled_ind1 <- cbind(seascape_dat_expand, seascape_scaled_ind)
+
+# apply to ind lvl exp dat and trt dat
+exp_scaled_ind <- scale(exp_dat_expand[,c("median_temp","max_temp","median_sal","min_sal")], center = center_sea, scale = scale_sea)
+trt_scaled_ind <- scale(trt_env_ind[,c("median_temp","max_temp","median_sal","min_sal")], center = center_sea, scale = scale_sea)
+
+# reattach ind dat
+colnames(seascape_scaled_ind) <- colnames(exp_scaled_ind) <- colnames(trt_scaled_ind) <- c("median_temp_std","max_temp_std","median_sal_std","min_sal_std")
+seascape_scaled_ind1 <- cbind(seascape_dat_expand, seascape_scaled_ind)
+seascape_scaled_ind1$df <- "seascape"
+exp_scaled_ind1 <- cbind(exp_dat_expand, exp_scaled_ind)
+trt_scaled_ind1 <- cbind(trt_env_ind, trt_scaled_ind)
+
+# mll data for seascape
+seascape_scaled_ind1_mll <- seascape_scaled_ind1[!duplicated(seascape_scaled_ind1$mll_no),]
+
+# output dat
+write.csv(seascape_scaled_ind1, paste0("data/EnvDat/full_seascape_scaled_ind_only", Sys.Date(), ".csv"))
+write.csv(seascape_scaled_ind1_mll, paste0("data/EnvDat/mll_seascape_scaled_ind_only", Sys.Date(), ".csv"))
+write.csv(exp_scaled_ind1, paste0("data/EnvDat/exp_scaled_ind_only", Sys.Date(), ".csv"))
+write.csv(trt_scaled_ind1, paste0("data/EnvDat/trt_scaled_ind_only", Sys.Date(), ".csv"))
+```
 
 ### Formatting for LEA
 
@@ -419,6 +459,18 @@ write.env(mat9, paste0("data/EnvDat/full_seascapeEnv_indlvl_", Sys.Date(), ".env
 write.env(mat10, paste0("data/EnvDat/mll_seascapeEnv_indlvl_", Sys.Date(), ".env"))
 write.env(mat11, paste0("data/EnvDat/expEnv_indlvl_", Sys.Date(), ".env"))
 write.env(mat12, paste0("data/EnvDat/trtEnv_indlvl_", Sys.Date(), ".env"))
+
+mat13 <- as.matrix(seascape_scaled_ind1[,c("median_temp_std", "max_temp_std", "median_sal_std", "min_sal_std")])
+mat14 <- as.matrix(seascape_scaled_ind1_mll[,c("median_temp_std", "max_temp_std", "median_sal_std", "min_sal_std")])
+mat15 <- as.matrix(exp_scaled_ind1[,c("median_temp_std", "max_temp_std", "median_sal_std", "min_sal_std")])
+mat16 <- as.matrix(trt_scaled_ind1[,c("median_temp_std", "max_temp_std", "median_sal_std", "min_sal_std")])
+
+colnames(mat13) <- colnames(mat14) <- colnames(mat15) <- colnames(mat16) <- c("median_temp", "max_temp", "median_sal", "min_sal")
+
+write.env(mat13, paste0("data/EnvDat/full_seascapeEnv_indlvl_only_", Sys.Date(), ".env"))
+write.env(mat14, paste0("data/EnvDat/mll_seascapeEnv_indlvl_only_", Sys.Date(), ".env"))
+write.env(mat15, paste0("data/EnvDat/full_expEnv_indlvl_only_", Sys.Date(), ".env"))
+write.env(mat16, paste0("data/EnvDat/full_trtEnv_indlvl_only_", Sys.Date(), ".env"))
 ```
 
 ### Formatting for RDA & GF
@@ -433,18 +485,31 @@ I need to calculate environmental distance between the tanks and the site-of-ori
 ## pop level
 ############
 # assign relevant data to new objs
-(trt_scaled_fordist <- trt_scaled)
-(exp_scaled_fordist <- exp_scaled)
+(trt_scaled_fordist <- trt_scaled_ind1)
+(exp_scaled_fordist <- exp_scaled_ind1)
+
+# averages for some env dist calculations
+trt_scaled_fordist_avg <- trt_scaled_fordist %>% 
+  rename(poptrt = trt) %>%
+  group_by(poptrt) %>% 
+  summarize(median_temp = mean(median_temp_std), 
+            max_temp = mean(max_temp_std),
+            median_sal = mean(median_sal_std),
+            min_sal = mean(min_sal_std))
+
+exp_scaled_fordist_avg <- exp_scaled_fordist %>% 
+  rename(poptrt = pop) %>%
+  group_by(poptrt) %>% 
+  summarize(median_temp = mean(median_temp_std), 
+            max_temp = mean(max_temp_std),
+            median_sal = mean(median_sal_std),
+            min_sal = mean(min_sal_std))
 
 # reorder populations by coast
-exp_scaled_fordist <- exp_scaled_fordist[order(match(exp_scaled_fordist$pop, c("VAT", "VIK", "HOG", "BAR", "KUR", "KAL", "HOR", "BJO"))),]
-
-# change column names for compatibility 
-names(trt_scaled_fordist)[names(trt_scaled_fordist) == "trt"] <- "trtpop"
-names(exp_scaled_fordist)[names(exp_scaled_fordist) == "pop"] <- "trtpop"
+exp_scaled_fordist_avg <- exp_scaled_fordist_avg[order(match(exp_scaled_fordist_avg$poptrt, c("VIK", "VAT", "HOG", "BAR", "KUR", "KAL", "HOR", "BJO"))),]
 
 # put together the data
-fordist <- rbind(trt_scaled_fordist[,c("trtpop","median_temp_scaled","max_temp_scaled","median_sal_scaled","min_sal_scaled")], exp_scaled_fordist[,c("trtpop","median_temp_scaled","max_temp_scaled","median_sal_scaled","min_sal_scaled")])
+fordist <- rbind(trt_scaled_fordist_avg[,c("poptrt","median_temp","max_temp","median_sal","min_sal")], exp_scaled_fordist_avg[,c("poptrt","median_temp","max_temp","median_sal","min_sal")])
 
 # calc dists
 euc_dists <- round(vegdist(fordist[,-1], method = "euclidian",
@@ -452,10 +517,10 @@ euc_dists <- round(vegdist(fordist[,-1], method = "euclidian",
 euc_dists_df <- as.data.frame(as.matrix(euc_dists))
 
 # add pops back as colnames & rownames
-rownames(euc_dists_df) <- colnames(euc_dists_df) <- fordist[,1]
+rownames(euc_dists_df) <- colnames(euc_dists_df) <- as.data.frame(fordist)$poptrt
 
 # keep this df
-write.csv(euc_dists_df, "data/EnvDat/euclidian_trt_exp.csv")
+write.csv(euc_dists_df, "data/EnvDat/euclidian_trt_exp_ind_wide.csv")
 
 # distances df for plotting
 euc_dists_df2 <- euc_dists_df
@@ -465,13 +530,13 @@ euc_dists_long <- euc_dists_df2 %>%
   as.data.frame()
 euc_dists_long
 
-popsdf1 <- data.frame(pops = fordist$trtpop, order = 1:length(fordist$trtpop))
-popsdf2 <- data.frame(pops = fordist$trtpop, order = 1:length(fordist$trtpop))
+popsdf1 <- data.frame(pops = fordist$poptrt, order = 1:length(fordist$poptrt))
+popsdf2 <- data.frame(pops = fordist$poptrt, order = 1:length(fordist$poptrt))
 colnames(popsdf1) <- c("pops1","order1")
 colnames(popsdf2) <- c("pops2","order2")
 euc_dists_long_mg <- merge(popsdf1[,c("pops1","order1")], euc_dists_long, by = "pops1")
 euc_dists_long_mg2 <- merge(popsdf2[,c("pops2","order2")], euc_dists_long_mg, by = "pops2")
-write.csv(euc_dists_long_mg2, "results/GO_results/euclidean_long_trt_exp.csv")
+write.csv(euc_dists_long_mg2, "results/GO_results/euclidean_long_trt_exp_ind.csv")
 
 euc_dist_trtpop <- ggplot(euc_dists_long_mg2, aes(x = fct_reorder(pops1, order1), 
                               y = fct_reorder(pops2, order2), 
@@ -480,7 +545,7 @@ euc_dist_trtpop <- ggplot(euc_dists_long_mg2, aes(x = fct_reorder(pops1, order1)
   geom_tile(color = "black") +
 #  geom_text(aes(label = distances), color = "white", size = 4)+
   scale_fill_viridis_c(name = "Euclidean 
-Distance", limits = c(0, 7.5))+
+Distance", limits = c(0, max(euc_dists_long_mg2$distances)))+
   theme(plot.title = element_text(size = 20), 
         legend.title = element_text(size = 14),
         legend.position = "right", legend.justification = "top") +
@@ -492,52 +557,65 @@ Distance", limits = c(0, 7.5))+
         legend.position = "right", legend.justification = "top",
         axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 euc_dist_trtpop
+
+# subset to just trts vs exp pops
+euc_dists_long_mg3 <- euc_dists_long_mg2 %>% filter(pops1 %in% c("VIK", "VAT", "HOG", "BAR", "KUR", "KAL", "HOR", "BJO") & pops2 %in% c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"))
+
+euc_dist_trtpop1 <- ggplot(euc_dists_long_mg3, aes(x = fct_reorder(pops1, order1), 
+                              y = fct_reorder(pops2, order2), 
+                              fill = distances))+
+  theme_classic()+
+  geom_tile(color = "black") +
+  scale_fill_viridis_c(name = "Euclidean 
+Distance", limits = c(0, max(euc_dists_long_mg3$distances)))+
+  theme(plot.title = element_text(size = 20), 
+        legend.title = element_text(size = 14),
+        legend.position = "right", legend.justification = "top") +
+  ylab("")+
+  xlab("")+
+  ggtitle("Environmental Distance between \nSites and Treatments") +
+  theme(plot.title = element_text(size = 18), 
+        legend.title = element_text(size = 14),
+        legend.position = "right", legend.justification = "top",
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+euc_dist_trtpop1
 ############
 
 ## ind level
 ############
 # assign relevant data to new objs
-trt_scaled_fordist_ind <- trt_env_scaled_df
-exp_scaled_fordist_ind <- exp_env_scaled_df
+trt_scaled_fordist_ind <- trt_scaled_ind1
+exp_scaled_fordist_ind <- exp_scaled_ind1
 
-# rename site pop to avoid name collision, then cross join on nothing
-exp_scaled_fordist_ind_renamed <- exp_scaled_fordist_ind %>%
-  rename(site = pop)
+# calc euclidean distance between matched row/trt vals
+ind_dists <- sqrt(rowSums((exp_scaled_fordist_ind[,c("median_temp_std", "max_temp_std", "median_sal_std", "min_sal_std")] - trt_scaled_fordist_ind[,c("median_temp_std", "max_temp_std", "median_sal_std", "min_sal_std")])^2))
 
-paired <- trt_scaled_fordist_ind %>%
-  mutate(key = 1) %>%
-  full_join(exp_scaled_fordist_ind_renamed %>% mutate(key = 1),
-            by = "key", suffix = c("_trt", "_exp")) %>%
-  dplyr::select(-key)
+# add metadata
+ind_dists_df <- cbind(trt_scaled_fordist_ind[,c("pop", "trt", "bagnum_text")], ind_dists)
 
-# distance: square before summing
-paired$dist <- sqrt(rowSums(
-  (paired[, paste0(c("median_temp","max_temp","median_sal","min_sal"), "_trt")] - paired[, paste0(c("median_temp","max_temp","median_sal","min_sal"), "_exp")])^2
-))
+# aggregate to one distance per trt x site (mean across all bags in that trt)
+dist_summary <- ind_dists_df %>%
+  group_by(trt, pop) %>%
+  summarize(dist = mean(ind_dists, na.rm = TRUE))
 
-# aggregate to one distance per treatment x site (mean across all bags in that treatment)
-dist_summary <- paired %>%
-  group_by(trt, site) %>%
-  summarize(dist = mean(dist, na.rm = TRUE)) %>%
-  ungroup()
-
-# keep this df
+# keep these dfs
 write.csv(dist_summary, "data/EnvDat/euclidian_trt_exp_summary.csv")
+write.csv(ind_dists_df, "data/EnvDat/euclidean_trt_exp_indiv.csv")
 
 # pop and trt orders for plotting
-pops <- c("VAT","VIK","HOG","BAR","KUR","KAL","HOR","BJO")
+pops <- c("VIK","VAT","HOG","BAR","KUR","KAL","HOR","BJO")
 trts <- c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu")
-popsdf <- data.frame(site = pops, pop_order = 1:length(pops))
+popsdf <- data.frame(pop = pops, pop_order = 1:length(pops))
 trtsdf <- data.frame(trt = trts, trt_order = 1:length(trts))
 
-dist_summary1 <- merge(popsdf, dist_summary, by = "site")
+dist_summary1 <- merge(popsdf, dist_summary, by = "pop")
 dist_summary2 <- merge(trtsdf, dist_summary1, by = "trt")
 
 # plotting
-euc_dist_ind <- ggplot(dist_summary2, aes(x = fct_reorder(site, pop_order), y = fct_reorder(trt, trt_order), fill = dist)) +
+euc_dist_ind <- ggplot(dist_summary2, aes(x = fct_reorder(pop, pop_order), y = fct_reorder(trt, trt_order), fill = dist)) +
   theme_classic() +
   geom_tile(color = "black") +
-  scale_fill_viridis_c(name = "Euclidean \nDistance", limits = c(0, 6)) +
+  scale_fill_viridis_c(name = "Euclidean \nDistance", limits = c(0, max(dist_summary2$dist))) +
   theme(plot.title = element_text(size = 20),
         legend.title = element_text(size = 14),
         legend.position = "right", legend.justification = "top") +
@@ -558,9 +636,7 @@ Also plot treatment data against experimental site of origin data
 order_pops <- c("VAT","VIK","HOG","BAR","KUR","KAL","HOR","BJO","TempControl-21psu","TempControl-7psu","TempWarm-16psu","TempWarm-5psu")
 
 # order pops_in_exp & set explicit colors
-pops_in_df <- data.frame(poptrt = order_pops, order = 1:12, cols = c("#155d27","#25a244","#4ad66d","#b7efc5","#caf0f8","#90e0ef","#0096c7","#023e8a","#FFA203","#FE691E","deeppink","deeppink4"), coast = c(rep("West",4), rep("East",4), rep("trt",4)))
-
-pops_in_df1 <- data.frame(poptrt = order_pops, order = 1:12, cols = c("#002800","#155d27","#25a244","#6ede8a","#90e0ef","#00b4d8","#0077b6","#03045e","#FFA203","#FE691E","deeppink","deeppink4"), coast = c(rep("West",4), rep("East",4), rep("trt",4)))
+pops_in_df <- data.frame(poptrt = order_pops, order = 1:12, cols = c("#03045e","#0077b6","#00b4d8","#90e0ef","#6ede8a","#25a244","#155d27","#002800","#FFA203","#FE691E","deeppink","deeppink4"), coast = c(rep("West",4), rep("East",4), rep("trt",4))) %>% mutate(poptrt2 = poptrt) %>% mutate(poptrt2 = ifelse(poptrt2 == "TempControl-21psu", "Current North Sea", ifelse(poptrt2 == "TempControl-7psu", "Current Baltic Sea", ifelse(poptrt2 == "TempWarm-16psu", "Future North Sea", ifelse(poptrt2 == "TempWarm-5psu", "Future Baltic Sea", poptrt2)))))
 
 # keep this order df for other purposes
 write.csv(pops_in_df, "data/experiment/poptrts_df.csv", row.names = F)
@@ -568,6 +644,8 @@ write.csv(pops_in_df, "data/experiment/poptrts_df.csv", row.names = F)
 # read in copernicus time series data
 copernicus_plot <- read.csv("data/EnvDat/copernicus_plotting_data.csv")
 copernicus_plot$date <- as.Date(copernicus_plot$date)
+copernicus_plot[copernicus_plot$site_name == "VAT",]$order <- 2
+copernicus_plot[copernicus_plot$site_name == "VIK",]$order <- 1
 
 copernicus_plot$temp_adjust <- copernicus_plot$temp + 4
 copernicus_plot$sal_adjust <- ifelse(copernicus_plot$coast == "West", copernicus_plot$sal - 5, copernicus_plot$sal)
@@ -579,11 +657,11 @@ ggplot(copernicus_plot, aes(x = date, y = temp_adjust,
 #  geom_line(na.rm = T, aes(group = time_block)) +
   facet_grid(~ year, scales = "free_x") +
   scale_fill_manual(name = "Site",
-                    values = pops_in_df1$cols,
-                    labels = pops_in_df1$poptrt) +
+                    values = pops_in_df$cols,
+                    labels = pops_in_df$poptrt2) +
   scale_color_manual(name = "Site",
-                     values = pops_in_df1$cols,
-                     labels = pops_in_df1$poptrt) +
+                     values = pops_in_df$cols,
+                     labels = pops_in_df$poptrt2) +
   geom_hline(yintercept = 20.07134, col = "#FFA202", linewidth = 1) +
   geom_hline(yintercept = 25.80038, col = "#FF1393", linewidth = 1) +
   labs(title = "Temperature at Experimental Sites 2011-2021",
@@ -597,11 +675,11 @@ ggplot(copernicus_plot, aes(x = date, y = sal,
 #  geom_line(na.rm = T, aes(group = time_block)) +
   facet_grid(~ year, scales = "free_x") +
   scale_fill_manual(name = "Site",
-                    values = pops_in_df1$cols,
-                    labels = pops_in_df1$poptrt) +
+                    values = pops_in_df$cols,
+                    labels = pops_in_df$poptrt2) +
   scale_color_manual(name = "Site",
-                     values = pops_in_df1$cols,
-                     labels = pops_in_df1$poptrt) +
+                     values = pops_in_df$cols,
+                     labels = pops_in_df$poptrt2) +
   geom_hline(yintercept = 21, col = "#FFA202", linewidth = 1) +
   geom_hline(yintercept = 7, col = "#FF1393", linewidth = 1) +
   geom_hline(yintercept = 16, col = "#FE691F", linewidth = 1) +
@@ -617,11 +695,11 @@ ggplot(copernicus_plot,
            col = fct_reorder(site_name, order))) +
   geom_smooth() +
   scale_fill_manual(name = "Site",
-                    values = pops_in_df1$cols,
-                    labels = pops_in_df1$poptrt) +
+                    values = pops_in_df$cols,
+                    labels = pops_in_df$poptrt2) +
   scale_color_manual(name = "Site",
-                     values = pops_in_df1$cols,
-                     labels = pops_in_df1$poptrt) +
+                     values = pops_in_df$cols,
+                     labels = pops_in_df$poptrt2) +
   geom_hline(yintercept = 21, col = "#FFA202", linewidth = 1) +
   geom_hline(yintercept = 7, col = "#FF1393", linewidth = 1) +
   geom_hline(yintercept = 16, col = "#FE691F", linewidth = 1) +
@@ -643,14 +721,15 @@ tanks_dat$date <- str_split_fixed(tanks_dat$datetime, " ", 2)[,1]
 tanks_dat$date <- as.Date(tanks_dat$date)
 tanks_dat$time <- str_split_fixed(tanks_dat$datetime, " ", 2)[,2]
 tanks_dat$poptrt <- tanks_dat$trt
+tanks_dat <- tanks_dat %>% mutate(poptrt = ifelse(poptrt == "ctrl", "Current", "Future"))
 
 # look at just these data
 ggplot(tanks_dat) +
-  geom_violin(aes(x = trt, y = temp, fill = trt)) +
+  geom_violin(aes(x = poptrt, y = temp, fill = poptrt)) +
 #  geom_boxplot(aes(x = trt, y = temp, fill = trt), width = 0.1) +
   scale_fill_manual(name = "Treatment",
                     values = c("#FFA202","#FF1393"),
-                    labels = c("Control", "Heated")) +
+                    labels = c("Current", "Future")) +
   theme_bw()
 
 # also plot by tank
@@ -667,7 +746,7 @@ ggplot(tanks_plotting, aes(x = datetime, y = temp,
   theme_classic()
 
 # now put it with the other sites temp data
-pops_in_df2 <- data.frame(poptrt = c("VAT","VIK","HOG","BAR","KUR","KAL","HOR","BJO","ctrl","heat"), order = 1:10, cols = c("#10451d","#155d27","#25a244","#6ede8a","#90e0ef","#00b4d8","#0077b6","#03045e","#FFA203","#FF1393"), coast = c(rep("West",4), rep("East",4), rep("trt", 2)))
+pops_in_df2 <- data.frame(poptrt = c("VAT","VIK","HOG","BAR","KUR","KAL","HOR","BJO","Current","Future"), order = 1:10, cols = c("#03045e","#0077b6","#00b4d8","#90e0ef","#6ede8a","#25a244","#155d27","#002800","#FFA203","#FF1393"), coast = c(rep("West",4), rep("East",4), rep("trt", 2)))
 
 cop_temps <- copernicus_plot[,c("date","poptrt","temp_adjust")]
 colnames(cop_temps) <- c("date","poptrt","temp")
@@ -675,11 +754,11 @@ colnames(cop_temps) <- c("date","poptrt","temp")
 temps_all <- rbind(tanks_dat[,c("date","poptrt","temp")], 
                    cop_temps)
 
-temps_plotting <- merge(temps_all, pops_in_df2, by = c("poptrt"))
+temps_plotting <- merge(temps_all, pops_in_df1, by = c("poptrt"))
 
 # plot
 ggplot(temps_plotting) +
-  geom_violin(aes(x = as.factor(fct_reorder(poptrt, order)), y = temp, fill = fct_reorder(poptrt, order))) +
+  geom_violin(aes(x = as.factor(fct_reorder(poptrt2, order)), y = temp, fill = fct_reorder(poptrt, order))) +
 #  geom_boxplot(aes(x = trt, y = temp, fill = trt), width = 0.1) +
   scale_fill_manual(name = "Site",
                     values = pops_in_df2$cols,
@@ -715,7 +794,7 @@ ggplot(sal_dat) +
   scale_fill_manual(name = "Site",
                     values = pops_in_df[9:12,]$cols,
                     labels = pops_in_df[9:12,]$poptrt) +
-  labs(title = "Temperature in Mesocosm Treatments",
+  labs(title = "Salinity in Mesocosm Treatments",
        x = "Site", y = "Salinity (PSU)", color = "Treatment", fill = "Treatment") +
   theme_bw()
 
@@ -729,18 +808,19 @@ ggplot(sal_dat_clean) +
   scale_fill_manual(name = "Site",
                     values = pops_in_df[9:12,]$cols,
                     labels = pops_in_df[9:12,]$poptrt) +
-  labs(title = "Temperature in Mesocosm Treatments",
-       x = "Site", y = "Salinity (PSU)", color = "Treatment", fill = "Treatment") +
+  labs(title = "Salinity in Mesocosm Treatments",
+       x = "Treatment", y = "Salinity (PSU)", color = "Treatment", fill = "Treatment") +
   theme_bw()
 
 # df for all salinity now
-cop_sals <- copernicus_plot[,c("date","poptrt","sal_adjust")]
+cop_sals <- copernicus_plot[,c("date","poptrt","sal")]
 colnames(cop_sals) <- c("date","poptrt","dailySalinity")
+cop_sals$poptrt2 <- cop_sals$poptrt
 
-sal_all <- rbind(sal_dat_clean[,c("date","poptrt","dailySalinity")], 
-                   cop_sals)
+sal_all <- rbind(sal_dat_clean[,c("date","poptrt","dailySalinity")],
+                 cop_sals)
 
-sal_plotting <- merge(sal_all, pops_in_df1, by = c("poptrt"))
+sal_plotting <- merge(sal_all, pops_in_df, by = c("poptrt"))
 
 # plot
 ggplot(sal_plotting) +
@@ -760,6 +840,21 @@ ggplot(copernicus_plot) +
                     values = pops_in_df2$cols,
                     labels = pops_in_df2$poptrt) +
   labs(title = "Salinity at Experimental Sites 2011-2021",
-       x = "Date", y = "Salinity (PSU)", color = "Site", fill = "Site") +
-  theme_bw()
+       x = "Date", y = "Salinity (PSU)", fill = "Site") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45))
+
+# as box plot to deal with lower variance in treatments
+ggplot(sal_plotting) +
+  geom_boxplot(aes(x = as.factor(fct_reorder(poptrt, order)), y = (dailySalinity), fill = fct_reorder(poptrt, order))) +
+  scale_fill_manual(name = "Site",
+                    values = pops_in_df$cols,
+                    labels = pops_in_df$poptrt) +
+  labs(title = "Salinity at Experimental Sites 2011-2021",
+       x = NULL, y = "Salinity (PSU)", color = "Site", fill = "Site") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+# put together the salinity plots for sites vs trts
+
 ```

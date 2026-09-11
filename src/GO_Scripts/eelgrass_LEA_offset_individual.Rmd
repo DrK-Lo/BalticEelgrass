@@ -50,24 +50,24 @@ geno_full <- read.geno("data/seascape_data/gen_full_rm_imp_mat.geno")
 lfmm_full_rm <- read.lfmm("data/seascape_data/eel_full_rm.lfmm") # this one has only snps found in both full and mll
 
 ## env dat
-curr_full_env <- read.env("data/EnvDat/full_seascapeEnv_indlvl_2026-08-11.env")
-curr_mll_env <- read.env("data/EnvDat/mll_seascapeEnv_indlvl_2026-08-11.env")
-exp_env <- read.env("data/EnvDat/expEnv_indlvl_2026-08-13.env")
-trt_env <- read.env("data/EnvDat/trtEnv_indlvl_2026-08-13.env")
-trt_scaled <- read.csv("data/EnvDat/exp_trt_scaled_indiv_2026-08-13.csv")[,-1]
-exp_scaled <- read.csv("data/EnvDat/exp_home_scaled_indiv_2026-08-13.csv")[,-1]
-sea_scaled_mll <- read.csv("data/EnvDat/mll_seascape_scaled_indiv_2026-08-13.csv")[,-1]
-sea_scaled_full <- read.csv("data/EnvDat/full_seascape_scaled_indiv_2026-08-13.csv")[,-1]
+curr_full_env <- read.env("data/EnvDat/full_seascapeEnv_indlvl_only_2026-09-04.env")
+curr_mll_env <- read.env("data/EnvDat/mll_seascapeEnv_indlvl_only_2026-09-04.env")
+exp_env <- read.env("data/EnvDat/full_expEnv_indlvl_only_2026-09-04.env")
+trt_env <- read.env("data/EnvDat/full_trtEnv_indlvl_only_2026-09-04.env")
+trt_scaled <- read.csv("data/EnvDat/trt_scaled_ind_only_2026-09-04.csv")[,-1]
+exp_scaled <- read.csv("data/EnvDat/exp_scaled_ind_only_2026-09-04.csv")[,-1]
+sea_scaled_mll <- read.csv("data/EnvDat/mll_seascape_scaled_ind_only_2026-09-04.csv")[,-1]
+sea_scaled_full <- read.csv("data/EnvDat/full_seascape_scaled_ind_only_2026-09-04.csv")[,-1]
 
 ## seascape data
-seascape_sites_trim <- read.csv("data/seascape_data/seascape_sites_forinterpolation.csv")[,-1]
-sea_scaled_full_curr <- read.env("data/EnvDat/fullsea_curr_forint.env")
-sea_scaled_mll_curr <- read.env("data/EnvDat/mllsea_curr_forint.env")
-sea_scaled_full_fut <- read.env("data/EnvDat/fullsea_fut_forint.env")
-sea_scaled_mll_fut <- read.env("data/EnvDat/mllsea_fut_forint.env")
-
-full_sea_dat <- read.csv("data/EnvDat/fullsea_curr_forint.csv")[,c("coast", "cf", "pop", "mll_no", "indv_no", "site_full", "trt")]
-mll_sea_dat <- read.csv("data/EnvDat/mllsea_curr_forint.csv")[,c("coast", "cf", "pop", "mll_no", "indv_no", "site_full", "trt")]
+# seascape_sites_trim <- read.csv("data/seascape_data/seascape_sites_forinterpolation.csv")[,-1]
+# sea_scaled_full_curr <- read.env("data/EnvDat/fullsea_curr_forint.env")
+# sea_scaled_mll_curr <- read.env("data/EnvDat/mllsea_curr_forint.env")
+# sea_scaled_full_fut <- read.env("data/EnvDat/fullsea_fut_forint.env")
+# sea_scaled_mll_fut <- read.env("data/EnvDat/mllsea_fut_forint.env")
+# 
+# full_sea_dat <- read.csv("data/EnvDat/fullsea_curr_forint.csv")[,c("coast", "cf", "pop", "mll_no", "indv_no", "site_full", "trt")]
+# mll_sea_dat <- read.csv("data/EnvDat/mllsea_curr_forint.csv")[,c("coast", "cf", "pop", "mll_no", "indv_no", "site_full", "trt")]
 ```
 
 ## Data Prep
@@ -194,7 +194,7 @@ gg_mll_ind <- genetic.offset(input = lfmm_mll,
                           K = 12)
 
 # check corr
-cor(gg_mll_ind$offset, gg_full_ind$offset) # 0.7853203
+cor(gg_mll_ind$offset, gg_full_ind$offset) # 0.9955437
 
 # associate with metadata
 inds_exp_trim <- inds_exp %>% dplyr::select(pop, trt, bagnum_text, tank_ID)
@@ -268,14 +268,14 @@ gap_df_plotting <- merge(exp_pops, gap_df_wide, by = "pop")
 # plot
 ggplot(gap_df_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (gg_mll_ind))) +
   geom_tile(color = "white") +
-  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.006)) +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,max(gap_df_plotting$gg_mll_ind))) +
   theme_classic() +
   labs(title = "Genomic Offsets (LEA, MLL)", x = "Population", y = "Treatment", fill = "Offset")
 
 # and the full offsets
 ggplot(gap_df_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (gg_full_ind))) +
   geom_tile(color = "white") +
-  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.006)) +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,max(gap_df_plotting$gg_full_ind))) +
   theme_classic() +
   labs(title = "Genomic Offsets (LEA, Full)", x = "Population", y = "Treatment", fill = "Offset")
 ```

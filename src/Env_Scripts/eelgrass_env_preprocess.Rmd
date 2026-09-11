@@ -1,0 +1,261 @@
+---
+title: "eelgrass_env_process.Rmd"
+author: "Camille Rumberger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Environmental Data Processing
+
+This script is for processing environmental data for genomic offset calculation of the project "VR_Zostera_genomic_offset." It includes processing of the seascape data used to train offset models, as well as processing of the mesocosm environmental data used to make final offset predictions. The copernicus data is processed already in the "ncDat_process.R" script. Hobo logger data is also pre-processed in the "exp_hobo_loggers.R" script. Scripts for environmental distance calculation and plotting of environmental trends are named "env_dist.R" and "env_plot.R" respectively. 
+
+### Setup
+
+```{r}
+# packages
+library(BiocManager) # needed to download specific packages
+library(readxl) # reading xlsx files
+library(LEA) # landscape genomics
+library(psych) # environmental data cleaning
+library(vegan) # environmental data cleaning
+library(tidyr) # data cleaning
+library(dplyr) # data cleaning
+library(stringr) # data cleaning
+library(vcfR) # for vcf
+library(ggplot2) # plotting
+library(viridis) # plotting
+library(forcats) # order data
+library(s2) # mapping
+library(rnaturalearth) # mapping
+library(rnaturalearthdata) # mapping
+library(maps) # mapping
+library(ggspatial) # mapping
+library(ncdf4) # for nc data
+library(raster) # for nc data
+library(pdist) # for env dists
+
+# setwd for data
+setwd("~/Documents/GitHub/BalticEelgrass")
+
+# data
+seascape_dat <- read.csv("data/EnvDat/summary_env_data_meadows_GEA.csv") # seascape env data
+exp_dat_cop <- read.csv("data/EnvDat/complete_expSites_copernicus_2025-12-01.csv")[,-1]
+exp_dat <- read_excel("data/EnvDat/Camille_env_data_experiment.xlsx")
+trt_dat <- read.csv("data/EnvDat/trt_env_dat_2025-12-31.csv")
+indiv_list <- read_excel("data/seascape_data/MLL_per_individual_list.xlsx") # seascape individuals data
+eelgrass_vcf_MLL <- read.vcfR("data/seascape_data/zostera_230619_seascape_miss25_sorted_95_MLL.recode.vcf") # read in vcf eelgrass mll
+indiv_trt_env_dat <- read.csv("data/EnvDat/indiv_trt_env_dat_2025-12-31.csv")[,-1]
+```
+
+### Pre-processing 
+
+Start with formatting
+
+```{r}
+# seascape env data reads in funky, change column names and remove first row
+colnames(seascape_dat) <- seascape_dat[1,]
+seascape_dat <- seascape_dat[-1,]
+
+# the column names have spaces in them, change names to be more code friendly
+colnames(seascape_dat) <- c("region","site_full","pop","long","lat","median_temp","median_sal","temp_8.5","sal_8.5","max_temp","min_sal")
+
+# also deal with lat/long
+seascape_dat$long <- as.numeric(gsub(",", ".", gsub("\\.", "", seascape_dat$long)))
+seascape_dat$lat <- as.numeric(gsub(",", ".", gsub("\\.", "", seascape_dat$lat)))
+
+# and ensure consistency in site abbreviations by getting rid of funky characters
+seascape_dat$pop[seascape_dat$pop == "ÅLA"] <- "ALA"
+seascape_dat$pop[seascape_dat$pop == "BÅD"] <- "BAD"
+
+# exp dat also has these column name issues
+exp_dat2 <- exp_dat[,1:10]
+colnames(exp_dat2) <- c("site_full","pop","long","lat","median_temp","temp_4.5","temp_8.5","median_sal","sal_4.5","sal_8.5")
+
+# trim experimental individual data to just relevant columns
+exp_ind <- exp_inds[,c("bagnum_num", "tank_ID", "DNA_label", "new_label", "temp_full", "sal_full")]
+```
+
+Now that I have environmental data for all my sites in a coding-friendly format, I need to figure out which of these variables should be included in my model. To do so, I will make sure that I don't have any variables that are too correlated. I should also separate out the "future" environmental data from the dataset I want to use for training offsets. Here I will start with the seascape data and the experimental data (i.e. everything from various environmental models)
+
+```{r}
+# start by splitting current and future data
+curr_sea <- seascape_dat[,c("region","site_full","pop","long","lat","median_temp","max_temp","median_sal","min_sal")]
+fut_sea <- seascape_dat[,c("region","site_full","pop","long","lat","temp_8.5","sal_8.5")]
+
+# let's also keep a df with the population data only
+pop_sea <- curr_sea[,c("region","site_full","pop","long","lat")]
+
+# now I need to look at variable correlation
+pairs.panels(curr_sea[,6:9]) # perfect, nothing is too correlated! probably Steffi already did this step :)
+
+# merge the experimental pop data
+(ex_pop_dat <- merge(exp_dat2[,c("site_full","pop","long","lat","median_temp","median_sal")], exp_dat_cop[,c("pop","temp_max","sal_min")], by = c("pop")))
+
+colnames(ex_pop_dat)[colnames(ex_pop_dat) == "temp_max"] <- "max_temp"
+colnames(ex_pop_dat)[colnames(ex_pop_dat) == "sal_min"] <- "min_sal"
+```
+
+I need to adjust the environmental data for the site-of-origin for experimental pops according to the procedure outlined [here](docs.google.com/document/d/1J54wsnxtk5UFdv5PXPYA2CnWi6fN4DvJ/view). Specifically, I will adjust to use data from symphony +4C for all mean temps and -5psu for W coast mean salinities.
+
+```{r}
+# adjust temp
+ex_pop_dat$temp_median_adjust <- (ex_pop_dat$median_temp + 4)
+
+# add a coast identifier
+ex_pop_dat$coast <- ifelse(ex_pop_dat$pop %in% c("VIK","VAT","HOG","BAR"), "West", "East")
+
+# adjust salinity
+ex_pop_dat$sal_median_adjust <- ifelse(ex_pop_dat$coast == "West", ex_pop_dat$median_sal - 5, ex_pop_dat$median_sal)
+
+# trim
+exp_pop_env <- ex_pop_dat[,c("pop","coast","long","lat","temp_median_adjust","max_temp","sal_median_adjust","min_sal")]
+
+# colnames
+colnames(exp_pop_env)[colnames(exp_pop_env) == "temp_median_adjust"] <- "median_temp"
+colnames(exp_pop_env)[colnames(exp_pop_env) == "sal_median_adjust"] <- "median_sal"
+```
+
+Now I will prep the treatment data to be comparable to the seascape and experimental source data
+
+```{r}
+# reduce treatment data to comparable dataset
+trt_dat_red <- trt_dat[,c("trt","median_temp","max_temp","median_sal","min_sal")]
+
+# line up all the mins/maxes/averages for both temp and salinity
+trt_env <- trt_dat_red[,c("median_temp","max_temp","median_sal","min_sal")]
+rownames(trt_env) <- trt_dat_red$trt
+trt_env$df <- "treatment"
+exp_env <- exp_pop_env[,c("median_temp","max_temp","median_sal","min_sal")]
+rownames(exp_env) <- exp_pop_env$pop
+exp_env$df <- "experiment"
+sea_env <- seascape_dat2[,c("median_temp","max_temp","median_sal","min_sal")]
+rownames(sea_env) <- seascape_dat2$pop
+sea_env$df <- "seascape"
+colnames(trt_env) <- colnames(exp_env) <- colnames(sea_env) <- c("median_temp","max_temp","median_sal","min_sal","df")
+all_env <- rbind(trt_env, exp_env, sea_env) # this is not what will actually be used for scaling, just for single df to look at correlations
+
+# # ensure proper data types
+all_env$median_temp <- as.numeric(all_env$median_temp)
+all_env$max_temp <- as.numeric(all_env$max_temp)
+all_env$median_sal <- as.numeric(all_env$median_sal)
+all_env$min_sal <- as.numeric(all_env$min_sal)
+
+# look at correlations
+pairs.panels(all_env[,1:4]) # median and min sal are at 0.7 corr, so right on the brink
+```
+
+For the actual genomic offset predictions, I will use individual level data such that each row in my seascape and experimental datasets will line up with either the genomic data (seascape) or the fitness data (experiment)
+
+```{r}
+# deal with individual data
+indiv_list <- as.data.frame(indiv_list)
+pops_split <- stringr::str_split_fixed(indiv_list$`Indv #`, "-", 2) # split Indv # to have population in a seperate column
+indiv_list_full <- cbind(indiv_list, pops_split) # add this info back to original file
+colnames(indiv_list_full) <- c("mll_no","indv_no","pop","pop_no")
+table(indiv_list_full$pop) # between 4 and 20 individuals in each pop - most 17+ inds
+
+# also put together an mll dataset
+mll_split <- stringr::str_split_fixed(colnames(eelgrass_vcf_MLL@gt), "-", 3)
+mll_inds <- mll_split[-1,3]
+indiv_list_mll <- indiv_list_full[indiv_list_full$indv_no %in% mll_inds,]
+
+# subset just relevant env dat from trts, rename to clarify origin
+trt_env_ind <- indiv_trt_env_dat %>%
+  dplyr::select(pop, trt, tank_ID, bagnum_text, median_temp, max_temp, median_sal, min_sal) %>%
+  mutate(df = "treatment")
+
+# expand relevant data to individual level
+seascape_dat_expand <- merge(indiv_list_full, seascape_dat, by = "pop") %>%
+  dplyr::select(pop, mll_no, median_temp, max_temp, median_sal, min_sal) %>%
+  arrange(mll_no)
+
+exp_env$pop <- rownames(exp_env)
+exp_dat_expand <- merge(trt_env_ind[,c("pop","bagnum_text")], exp_env, by = "pop") %>%
+  arrange(bagnum_text)
+
+# combine
+sea_env_prep <- seascape_dat_expand %>%
+  dplyr::select(median_temp, max_temp, median_sal, min_sal) %>%
+  mutate_all(as.numeric) %>%
+  mutate(df = "seascape", order = 1:nrow(seascape_dat_expand)) %>%
+  as.data.frame()
+
+exp_env_prep <- exp_dat_expand %>%
+  as.data.frame() %>%
+  dplyr::select(median_temp, max_temp, median_sal, min_sal, df) %>%
+  mutate(order = exp_dat_expand$bagnum_text) %>%
+  arrange(order) %>%
+  as.data.frame()
+
+trt_env_prep <- trt_env_ind %>%
+  dplyr::select(median_temp, max_temp, median_sal, min_sal, bagnum_text, df) %>%
+  rename(order = bagnum_text) %>%
+  as.data.frame()
+```
+
+### Data Scaling
+
+Now I will scale the data for the seascape training data, save those scaling factors, and also apply them to the experimental source and mesocosm treatment data. 
+
+```{r}
+# use expanded dat
+head(seascape_dat_expand)
+seascape_dat_expand$mll_no <- as.factor(seascape_dat_expand$mll_no)
+seascape_dat_expand[,c("median_temp","max_temp","median_sal","min_sal")] <- apply(seascape_dat_expand[,c("median_temp","max_temp","median_sal","min_sal")], 2, as.numeric)
+summary(seascape_dat_expand)
+
+# scale and save scaling factors
+seascape_scaled_ind <- scale(seascape_dat_expand[,c("median_temp","max_temp","median_sal","min_sal")])
+center_sea <- attr(seascape_scaled_ind,"scaled:center")
+scale_sea <- attr(seascape_scaled_ind,"scaled:scale")
+
+seascape_scaled_ind1 <- cbind(seascape_dat_expand, seascape_scaled_ind)
+
+# apply to ind lvl exp dat and trt dat
+exp_scaled_ind <- scale(exp_dat_expand[,c("median_temp","max_temp","median_sal","min_sal")], center = center_sea, scale = scale_sea)
+trt_scaled_ind <- scale(trt_env_ind[,c("median_temp","max_temp","median_sal","min_sal")], center = center_sea, scale = scale_sea)
+
+# reattach ind dat
+colnames(seascape_scaled_ind) <- colnames(exp_scaled_ind) <- colnames(trt_scaled_ind) <- c("median_temp_std","max_temp_std","median_sal_std","min_sal_std")
+seascape_scaled_ind1 <- cbind(seascape_dat_expand, seascape_scaled_ind)
+seascape_scaled_ind1$df <- "seascape"
+exp_scaled_ind1 <- cbind(exp_dat_expand, exp_scaled_ind)
+trt_scaled_ind1 <- cbind(trt_env_ind, trt_scaled_ind)
+
+# mll data for seascape
+seascape_scaled_ind1_mll <- seascape_scaled_ind1[!duplicated(seascape_scaled_ind1$mll_no),]
+
+# output dat
+write.csv(seascape_scaled_ind1, paste0("data/EnvDat/full_seascape_scaled_ind_only", Sys.Date(), ".csv"))
+write.csv(seascape_scaled_ind1_mll, paste0("data/EnvDat/mll_seascape_scaled_ind_only", Sys.Date(), ".csv"))
+write.csv(exp_scaled_ind1, paste0("data/EnvDat/exp_scaled_ind_only", Sys.Date(), ".csv"))
+write.csv(trt_scaled_ind1, paste0("data/EnvDat/trt_scaled_ind_only", Sys.Date(), ".csv"))
+```
+
+Now I can format this data for the different GO methods...
+
+### Formatting for LEA
+
+LEA requires environmental data be formatted as a .env file type.
+
+```{r}
+mat1 <- as.matrix(seascape_scaled_ind1[,c("median_temp_std", "max_temp_std", "median_sal_std", "min_sal_std")])
+mat2 <- as.matrix(seascape_scaled_ind1_mll[,c("median_temp_std", "max_temp_std", "median_sal_std", "min_sal_std")])
+mat3 <- as.matrix(exp_scaled_ind1[,c("median_temp_std", "max_temp_std", "median_sal_std", "min_sal_std")])
+mat4 <- as.matrix(trt_scaled_ind1[,c("median_temp_std", "max_temp_std", "median_sal_std", "min_sal_std")])
+
+colnames(mat1) <- colnames(mat2) <- colnames(mat3) <- colnames(mat4) <- c("median_temp", "max_temp", "median_sal", "min_sal")
+
+write.env(mat1, paste0("data/EnvDat/full_seascapeEnv_indlvl_only_", Sys.Date(), ".env"))
+write.env(mat2, paste0("data/EnvDat/mll_seascapeEnv_indlvl_only_", Sys.Date(), ".env"))
+write.env(mat3, paste0("data/EnvDat/full_expEnv_indlvl_only_", Sys.Date(), ".env"))
+write.env(mat4, paste0("data/EnvDat/full_trtEnv_indlvl_only_", Sys.Date(), ".env"))
+```
+
+### Formatting for RDA & GF
+
+RDA needs information in the exact format I already had it in, so no need to do any further processing - just know that I will use the csv for RDA. When I go to run RDA, I will likely also want to correct for population structure by including PCs from a PCA, but this will come when the analysis is actually run (since that requires genetic information). GF requires environmental data in the same format as RDA, just a regular table format. 

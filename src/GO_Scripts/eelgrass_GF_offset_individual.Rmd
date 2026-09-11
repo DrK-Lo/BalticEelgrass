@@ -39,18 +39,18 @@ geno_mll <- read.geno("data/seascape_data/gen_MLL_imp_mat.geno")
 geno_full <- read.geno("data/seascape_data/gen_full_rm_imp_mat.geno")
 
 ## env dat
-trt_scaled <- read.csv("data/EnvDat/exp_trt_scaled_indiv_2026-08-13.csv")[,-1]
-exp_scaled <- read.csv("data/EnvDat/exp_home_scaled_indiv_2026-08-13.csv")[,-1]
-sea_scaled_mll <- read.csv("data/EnvDat/mll_seascape_scaled_indiv_2026-08-13.csv")[,-1]
-sea_scaled_full <- read.csv("data/EnvDat/full_seascape_scaled_indiv_2026-08-13.csv")[,-1]
+trt_scaled <- read.csv("data/EnvDat/trt_scaled_ind_only_2026-09-04.csv")[,-1]
+exp_scaled <- read.csv("data/EnvDat/exp_scaled_ind_only_2026-09-04.csv")[,-1]
+sea_scaled_mll <- read.csv("data/EnvDat/mll_seascape_scaled_ind_only_2026-09-04.csv")[,-1]
+sea_scaled_full <- read.csv("data/EnvDat/full_seascape_scaled_ind_only_2026-09-04.csv")[,-1]
 
 ## seascape data
-seascape_sites_trim <- read.csv("data/seascape_data/seascape_sites_forinterpolation.csv")[,-1]
-
-full_sea_dat_curr <- read.csv("data/EnvDat/fullsea_curr_forint.csv")[,-1]
-mll_sea_dat_curr <- read.csv("data/EnvDat/mllsea_curr_forint.csv")[,-1]
-full_sea_dat_fut <- read.csv("data/EnvDat/fullsea_fut_forint.csv")[,-1]
-mll_sea_dat_fut <- read.csv("data/EnvDat/mllsea_fut_forint.csv")[,-1]
+# seascape_sites_trim <- read.csv("data/seascape_data/seascape_sites_forinterpolation.csv")[,-1]
+# 
+# full_sea_dat_curr <- read.csv("data/EnvDat/fullsea_curr_forint.csv")[,-1]
+# mll_sea_dat_curr <- read.csv("data/EnvDat/mllsea_curr_forint.csv")[,-1]
+# full_sea_dat_fut <- read.csv("data/EnvDat/fullsea_fut_forint.csv")[,-1]
+# mll_sea_dat_fut <- read.csv("data/EnvDat/mllsea_fut_forint.csv")[,-1]
 ###############
 ```
 
@@ -172,8 +172,8 @@ saveRDS(gf_geno_mll, paste0("results/GO_results/gf_geno_mll_indiv_",Sys.Date(),"
 saveRDS(gf_geno_full, paste0("results/GO_results/gf_geno_full_indiv_",Sys.Date(),".RDS"))
 
 # read in models trained in trainGF.R / trainGF.sh
-gf_geno_mll <- readRDS("results/GO_results/gf_geno_mll_indiv_2026-08-13.RDS")
-gf_geno_full <- readRDS("results/GO_results/gf_geno_full_indiv_2026-08-13.RDS")
+gf_geno_mll <- readRDS("results/GO_results/gf_geno_mll_indiv_2026-09-07.RDS")
+gf_geno_full <- readRDS("results/GO_results/gf_geno_full_indiv_2026-09-07.RDS")
 
 # plot bar graphs depicting importance of each spatial and climate variable
 plot(gf_geno_mll)
@@ -243,92 +243,92 @@ write.csv(gf_offsets, paste0("results/GO_results/GF_offsets_exptrt_ind_long_",Sy
 Also calculate GOs for seascape populations
 
 ```{r}
-# seascape env data
-full_sea_dat_curr_red <- full_sea_dat_curr %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
-full_sea_dat_fut_red <- full_sea_dat_fut %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
-mll_sea_dat_curr_red <- mll_sea_dat_curr %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
-mll_sea_dat_fut_red <- mll_sea_dat_fut %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
-
-# predictions
-#############
-# predict to home site
-pred_geno_home_sea_mll <- predict(gf_geno_mll, sea_scaled_mll_red)
-pred_geno_home_sea_full <- predict(gf_geno_full, sea_scaled_full_red)
-
-# predict to current trt
-pred_geno_curr_sea_mll <- predict(gf_geno_mll, mll_sea_dat_curr_red)
-pred_geno_curr_sea_full <- predict(gf_geno_full, full_sea_dat_curr_red)
-
-# predict to future trt
-pred_geno_fut_sea_mll <- predict(gf_geno_mll, mll_sea_dat_fut_red)
-pred_geno_fut_sea_full <- predict(gf_geno_full, full_sea_dat_fut_red)
-#############
-
-# calculate euclidean distance for offset
-#########################################
-# number preds
-nb_pred_sea_mll <- nrow(mll_sea_dat_fut_red)
-nb_pred_sea_full <- nrow(full_sea_dat_fut_red)
-
-# calculate offset
-# mll current
-df_geno_mll_sea_curr <- data.frame() # df
-for (i in 1:nb_pred_sea_mll){ # calc offset
-  ec_dist <- as.data.frame(euclidean(pred_geno_home_sea_mll[i,], pred_geno_curr_sea_mll[i,]))
-  df_geno_mll_sea_curr <- rbind(df_geno_mll_sea_curr, ec_dist)
-}
-geno_offset_mll_sea_curr <- data.frame(pop = mll_sea_dat_curr$pop, offset_gf_geno_mll = df_geno_mll_sea_curr, cc = "mll") # associate metadata with offset calculation
-colnames(geno_offset_mll_sea_curr) <- c("pop", "offset_curr", "cc")
-
-# geno full
-df_geno_full_sea_curr <- data.frame() # df
-for (i in 1:nb_pred_sea_full){ # calc offset
-  ec_dist <- as.data.frame(euclidean(pred_geno_home_sea_full[i,], pred_geno_curr_sea_full[i,]))
-  df_geno_full_sea_curr <- rbind(df_geno_full_sea_curr, ec_dist)
-}
-geno_offset_full_sea_curr <- data.frame(pop = full_sea_dat_curr$pop, offset_gf_geno_full = df_geno_full_sea_curr, cc = "full") # associate metadata with offset calculation
-colnames(geno_offset_full_sea_curr) <- c("pop", "offset_curr", "cc")
-
-# geno mll fut
-df_geno_mll_sea_fut <- data.frame() # df
-for (i in 1:nb_pred_sea_mll){ # calc offset
-  ec_dist <- as.data.frame(euclidean(pred_geno_home_sea_mll[i,], pred_geno_fut_sea_mll[i,]))
-  df_geno_mll_sea_fut <- rbind(df_geno_mll_sea_fut, ec_dist)
-}
-geno_offset_mll_sea_fut <- data.frame(pop = mll_sea_dat_fut$pop, offset_gf_geno_mll = df_geno_mll_sea_fut, cc = "mll") # associate metadata with offset calculation
-colnames(geno_offset_mll_sea_fut) <- c("pop", "offset_fut", "cc")
-
-# geno full fut
-df_geno_full_sea_fut <- data.frame() # df
-for (i in 1:nb_pred_sea_full){ # calc offset
-  ec_dist <- as.data.frame(euclidean(pred_geno_home_sea_full[i,], pred_geno_fut_sea_full[i,]))
-  df_geno_full_sea_fut <- rbind(df_geno_full_sea_fut, ec_dist)
-}
-geno_offset_full_sea_fut <- data.frame(pop = full_sea_dat_fut$pop, offset_gf_geno_full = df_geno_full_sea_fut, cc = "full") # associate metadata with offset calculation
-colnames(geno_offset_full_sea_fut) <- c("pop", "offset_fut", "cc")
-#########################################
-
-# put it all together
-#####################
-# combine & trim to relevant pops
-offsets_mll_sea_go_gf <- merge(geno_offset_mll_sea_curr, geno_offset_mll_sea_fut, by = c("pop", "cc")) %>% filter(pop %in% seascape_sites_trim$pop) %>% as.data.frame()
-offsets_full_sea_go_gf <- merge(geno_offset_full_sea_curr, geno_offset_full_sea_fut, by = c("pop", "cc")) %>% filter(pop %in% seascape_sites_trim$pop) %>% as.data.frame()
-
-# summarize
-offsets_mll_sea_go_gf_summary <- offsets_mll_sea_go_gf %>%
-  group_by(pop) %>% 
-  summarize(go_current_mll = mean(offset_curr), go_future_mll = mean(offset_fut))
-offsets_full_sea_go_gf_summary <- offsets_full_sea_go_gf %>%
-  group_by(pop) %>% 
-  summarize(go_current_full = mean(offset_curr), go_future_full = mean(offset_fut))
-
-# combine averaged info & add metadata
-gf_offsets_sea <- merge(offsets_mll_sea_go_gf_summary, offsets_full_sea_go_gf_summary, by = "pop")
-gf_offsets_sea_mg <- merge(seascape_sites_trim, gf_offsets_sea, by = "pop") %>% mutate(method = "gf_offset")
-
-# save output
-write.csv(gf_offsets_sea_mg, paste0("results/GO_results/gf_offset_seascape_go.csv"))
-#####################
+# # seascape env data
+# full_sea_dat_curr_red <- full_sea_dat_curr %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
+# full_sea_dat_fut_red <- full_sea_dat_fut %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
+# mll_sea_dat_curr_red <- mll_sea_dat_curr %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
+# mll_sea_dat_fut_red <- mll_sea_dat_fut %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
+# 
+# # predictions
+# #############
+# # predict to home site
+# pred_geno_home_sea_mll <- predict(gf_geno_mll, sea_scaled_mll_red)
+# pred_geno_home_sea_full <- predict(gf_geno_full, sea_scaled_full_red)
+# 
+# # predict to current trt
+# pred_geno_curr_sea_mll <- predict(gf_geno_mll, mll_sea_dat_curr_red)
+# pred_geno_curr_sea_full <- predict(gf_geno_full, full_sea_dat_curr_red)
+# 
+# # predict to future trt
+# pred_geno_fut_sea_mll <- predict(gf_geno_mll, mll_sea_dat_fut_red)
+# pred_geno_fut_sea_full <- predict(gf_geno_full, full_sea_dat_fut_red)
+# #############
+# 
+# # calculate euclidean distance for offset
+# #########################################
+# # number preds
+# nb_pred_sea_mll <- nrow(mll_sea_dat_fut_red)
+# nb_pred_sea_full <- nrow(full_sea_dat_fut_red)
+# 
+# # calculate offset
+# # mll current
+# df_geno_mll_sea_curr <- data.frame() # df
+# for (i in 1:nb_pred_sea_mll){ # calc offset
+#   ec_dist <- as.data.frame(euclidean(pred_geno_home_sea_mll[i,], pred_geno_curr_sea_mll[i,]))
+#   df_geno_mll_sea_curr <- rbind(df_geno_mll_sea_curr, ec_dist)
+# }
+# geno_offset_mll_sea_curr <- data.frame(pop = mll_sea_dat_curr$pop, offset_gf_geno_mll = df_geno_mll_sea_curr, cc = "mll") # associate metadata with offset calculation
+# colnames(geno_offset_mll_sea_curr) <- c("pop", "offset_curr", "cc")
+# 
+# # geno full
+# df_geno_full_sea_curr <- data.frame() # df
+# for (i in 1:nb_pred_sea_full){ # calc offset
+#   ec_dist <- as.data.frame(euclidean(pred_geno_home_sea_full[i,], pred_geno_curr_sea_full[i,]))
+#   df_geno_full_sea_curr <- rbind(df_geno_full_sea_curr, ec_dist)
+# }
+# geno_offset_full_sea_curr <- data.frame(pop = full_sea_dat_curr$pop, offset_gf_geno_full = df_geno_full_sea_curr, cc = "full") # associate metadata with offset calculation
+# colnames(geno_offset_full_sea_curr) <- c("pop", "offset_curr", "cc")
+# 
+# # geno mll fut
+# df_geno_mll_sea_fut <- data.frame() # df
+# for (i in 1:nb_pred_sea_mll){ # calc offset
+#   ec_dist <- as.data.frame(euclidean(pred_geno_home_sea_mll[i,], pred_geno_fut_sea_mll[i,]))
+#   df_geno_mll_sea_fut <- rbind(df_geno_mll_sea_fut, ec_dist)
+# }
+# geno_offset_mll_sea_fut <- data.frame(pop = mll_sea_dat_fut$pop, offset_gf_geno_mll = df_geno_mll_sea_fut, cc = "mll") # associate metadata with offset calculation
+# colnames(geno_offset_mll_sea_fut) <- c("pop", "offset_fut", "cc")
+# 
+# # geno full fut
+# df_geno_full_sea_fut <- data.frame() # df
+# for (i in 1:nb_pred_sea_full){ # calc offset
+#   ec_dist <- as.data.frame(euclidean(pred_geno_home_sea_full[i,], pred_geno_fut_sea_full[i,]))
+#   df_geno_full_sea_fut <- rbind(df_geno_full_sea_fut, ec_dist)
+# }
+# geno_offset_full_sea_fut <- data.frame(pop = full_sea_dat_fut$pop, offset_gf_geno_full = df_geno_full_sea_fut, cc = "full") # associate metadata with offset calculation
+# colnames(geno_offset_full_sea_fut) <- c("pop", "offset_fut", "cc")
+# #########################################
+# 
+# # put it all together
+# #####################
+# # combine & trim to relevant pops
+# offsets_mll_sea_go_gf <- merge(geno_offset_mll_sea_curr, geno_offset_mll_sea_fut, by = c("pop", "cc")) %>% filter(pop %in% seascape_sites_trim$pop) %>% as.data.frame()
+# offsets_full_sea_go_gf <- merge(geno_offset_full_sea_curr, geno_offset_full_sea_fut, by = c("pop", "cc")) %>% filter(pop %in% seascape_sites_trim$pop) %>% as.data.frame()
+# 
+# # summarize
+# offsets_mll_sea_go_gf_summary <- offsets_mll_sea_go_gf %>%
+#   group_by(pop) %>% 
+#   summarize(go_current_mll = mean(offset_curr), go_future_mll = mean(offset_fut))
+# offsets_full_sea_go_gf_summary <- offsets_full_sea_go_gf %>%
+#   group_by(pop) %>% 
+#   summarize(go_current_full = mean(offset_curr), go_future_full = mean(offset_fut))
+# 
+# # combine averaged info & add metadata
+# gf_offsets_sea <- merge(offsets_mll_sea_go_gf_summary, offsets_full_sea_go_gf_summary, by = "pop")
+# gf_offsets_sea_mg <- merge(seascape_sites_trim, gf_offsets_sea, by = "pop") %>% mutate(method = "gf_offset")
+# 
+# # save output
+# write.csv(gf_offsets_sea_mg, paste0("results/GO_results/gf_offset_seascape_go.csv"))
+# #####################
 ```
 
 ## Plotting
@@ -344,16 +344,15 @@ gf_offsets_plotting <- merge(exp_pops, gf_offsets, by = "pop")
 # mll
 ggplot(gf_offsets_plotting[gf_offsets_plotting$cc == "mll",], aes(x = fct_reorder(pop, order), y = trt, fill = (offset))) +
   geom_tile(color = "white") +
-  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.1)) +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0, max(gf_offsets_plotting[gf_offsets_plotting$cc == "mll",]$offset))) +
   theme_classic() +
   labs(title = "Genomic Offsets (GFgeno, MLL)", x = "Population", y = "Treatment", fill = "Offset")
 
 # and the full offsets
 ggplot(gf_offsets_plotting[gf_offsets_plotting$cc == "full",], aes(x = fct_reorder(pop, order), y = trt, fill = (offset))) +
   geom_tile(color = "white") +
-  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,0.15)) +
+  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0, max(gf_offsets_plotting[gf_offsets_plotting$cc == "full",]$offset))) +
   theme_classic() +
   labs(title = "Genomic Offsets (GFgeno, Full)", x = "Population", y = "Treatment", fill = "Offset")
 ```
-
 

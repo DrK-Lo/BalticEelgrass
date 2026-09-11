@@ -32,13 +32,21 @@ latlons <- read.csv("data/experiment/eelgrass_exp_sites.csv")
 poptrts_df <- read.csv("data/experiment/poptrts_df.csv")
 
 # experimental
-lea_go <- read.csv("results/GO_results/LEA_offsets_exptrt_long_2025-12-03.csv")[,-1]
-rda_go <- read.csv("results/GO_results/RDA_offsets_exptrt_long_2025-12-03.csv")[,-1]
-gf_go <- read.csv("results/GO_results/GF_offsets_exptrt_long_2025-12-03.csv")[,-1]
+lea_go <- read.csv("results/GO_results/LEA_offsets_exptrt_ind_long_2026-08-13.csv")[,-1]
+rda_go <- read.csv("results/GO_results/RDA_offsets_exptrt_ind_long_2026-08-13.csv")[,-1]
+gf_go <- read.csv("results/GO_results/GF_offsets_exptrt_ind_long_2026-08-13.csv")[,-1]
 env_dist <- read.csv("results/GO_results/euclidean_long_trt_exp.csv")[,-1]
 
-# seascape
+# experimental averaged env data
+lea_go_avg <- read.csv("results/GO_results/LEA_offsets_exptrt_long_2025-12-03.csv")[,-1]
+rda_go_avg <- read.csv("results/GO_results/RDA_offsets_exptrt_long_2025-12-03.csv")[,-1]
+gf_go_avg <- read.csv("results/GO_results/GF_offsets_exptrt_long_2025-12-03.csv")[,-1]
+env_dist_avg <- read.csv("results/GO_results/euclidean_long_trt_exp.csv")[,-1]
 
+# seascape
+lea_go_sea <- read.csv("results/GO_results/lea_offset_seascape_go.csv")[,-1]
+rda_go_sea <- read.csv("results/GO_results/rda_offset_seascape_go.csv")[,-1]
+gf_go_sea <- read.csv("results/GO_results/gf_offset_seascape_go.csv")[,-1]
 ```
 
 # Eelgrass GO Mapping
@@ -50,70 +58,488 @@ This script is to map the GO of experimental populations to experimental treatme
 Start by combining all the data to prep for mapping.
 
 ```{r}
-# prep the offset dat
-lea_prep <- lea_go %>% pivot_longer(cols = c(gap_mll, gap_full), names_to = "cc", values_to = "offset") %>% mutate(cc = str_split_fixed(cc, "_", 2)[,2], method = "lea") 
-rda_prep <- rda_go %>% pivot_longer(cols = c(offset_mll, offset_full), names_to = "cc", values_to = "offset") %>% mutate(cc = str_split_fixed(cc, "_", 2)[,2], method = "rda")
-gf_prep <- gf_go %>% pivot_longer(cols = c(offset_gf_geno_mll, offset_gf_geno_full), names_to = "cc", values_to = "offset") %>% mutate(cc = str_split_fixed(cc, "_", 4)[,4], method = "gf") %>% dplyr::select(-offset_gf_af_mll, -offset_gf_af_full)
+# prep latlon data
+# vat and vik are switched in latlon metadata
+latlons[latlons$site == "Inre Vattenholmen", c("site", "site_abbrev")] <- c("Vik", "VIK")
+latlons[2, c("site", "site_abbrev")] <- c("Inre Vattenholmen", "VAT")
+latlons$pop <- latlons$site_abbrev
+
+# prep the offset dat (averaged from individual env dat)
+lea_prep <- lea_go %>% group_by(pop, trt, cc) %>% summarize(offset = mean(offset)) %>% mutate(method = "lea_offset") %>% as.data.frame()
+rda_prep <- rda_go %>% group_by(pop, trt, cc) %>% summarize(offset = mean(offset)) %>% mutate(method = "rda_offset") %>% as.data.frame()
+gf_prep <- gf_go %>% group_by(pop, trt, cc) %>% summarize(offset = mean(offset)) %>% mutate(method = "gf_offset") %>% as.data.frame()
 
 # and env dist
 env_prep <- env_dist %>% filter(pops2 %in% c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu") & !(pops1 %in% c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"))) %>% mutate(pop = pops1, trt = pops2, offset = distances, cc = "mll", method = "env") %>% dplyr::select(pop, trt, cc, offset, method)
 
+# prep the offset dat (calculated from population averaged env data)
+lea_prep_avg <- lea_go_avg %>% pivot_longer(cols = c(gap_mll, gap_full), names_to = "cc", values_to = "offset") %>% mutate(cc = str_split_fixed(cc, "_", 2)[,2], method = "lea") 
+rda_prep_avg <- rda_go_avg %>% pivot_longer(cols = c(offset_mll, offset_full), names_to = "cc", values_to = "offset") %>% mutate(cc = str_split_fixed(cc, "_", 2)[,2], method = "rda")
+gf_prep_avg <- gf_go_avg %>% pivot_longer(cols = c(offset_gf_geno_mll, offset_gf_geno_full), names_to = "cc", values_to = "offset") %>% mutate(cc = str_split_fixed(cc, "_", 4)[,4], method = "gf") %>% dplyr::select(-offset_gf_af_mll, -offset_gf_af_full)
+
+env_prep_avg <- env_dist_avg %>% filter(pops2 %in% c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu") & !(pops1 %in% c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"))) %>% mutate(pop = pops1, trt = pops2, offset = distances, cc = "mll", method = "env") %>% dplyr::select(pop, trt, cc, offset, method)
+
 # combine
 go <- rbind(lea_prep, rda_prep, gf_prep, env_prep)
+go_avg <- rbind(lea_prep_avg, rda_prep_avg, gf_prep_avg, env_prep_avg)
 
 # add the latlon
-latlons <- latlons %>% rename(pop = site_abbrev)
 go_prep <- merge(latlons, go, by = "pop")
+go_prep_avg <- merge(latlons, go_avg, by = "pop")
 
 # coast info
-pops <- popsdf %>% dplyr::select(poptrt, order, coast) %>% filter(!(coast == "trt")) %>% rename(pop = poptrt, pop_coast = coast, pop_order = order)
+pops <- poptrts_df %>% dplyr::select(poptrt, poptrt2, order, coast) %>% filter(!(coast == "trt")) %>% rename(pop = poptrt, pop_coast = coast, pop_order = order, poptrt_names = poptrt2)
 go_prep1 <- merge(pops, go_prep, by = "pop")
+go_prep1_avg <- merge(pops, go_prep_avg, by = "pop")
 
 # trts
 trtdf <- data.frame(trt = c("TempControl-21psu", "TempControl-7psu", "TempWarm-16psu", "TempWarm-5psu"), trt_coast = c("West", "East", "West", "East"), temp = c("current", "current", "future", "future"), trt_order = c(1:4))
 
 # add trt dat
 go_plotting <- merge(trtdf, go_prep1, by = "trt")
+go_plotting_avg <- merge(trtdf, go_prep1_avg, by = "trt")
 ```
 
 Also interpolate the seascape data to prep for plotting
 
 ```{r}
+## prep GOs
+###########
+# arrange gos by pop order and rm single outlier pop from seascape
+lea_go_sea <- lea_go_sea %>% arrange(order) %>% filter(go_future_mll < 0.0055) %>% as.data.frame()
+rda_go_sea <- rda_go_sea %>% arrange(order) %>% as.data.frame()
+gf_go_sea <- gf_go_sea %>% arrange(order) %>% as.data.frame()
 
+# add experimental gos into interpolation dataset
+# first pull out experimental site values from dfs
+lea_go_sea_rm <- lea_go_sea %>% filter(!(pop %in% lea_prep$pop))
+rda_go_sea_rm <- rda_go_sea %>% filter(!(pop %in% rda_prep$pop))
+gf_go_sea_rm <- gf_go_sea %>% filter(!(pop %in% gf_prep$pop))
+
+# put together
+go_sea_rm <- rbind(lea_go_sea_rm, rda_go_sea_rm, gf_go_sea_rm) %>% dplyr::select(pop, lat, long, order, coast, method, go_current_full, go_future_full, go_current_mll, go_future_mll)
+col_order <- colnames(go_sea_rm)
+
+# pull out relevant dat - pivot_wider gives lots of NAs so doing stepwise method
+# lea
+lea_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & method == "lea_offset")
+lea_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & method == "lea_offset")
+lea_future_coast_go <- rbind(lea_go_west_fut, lea_go_east_fut) %>% pivot_wider(names_from = "cc", values_from = "offset") %>% dplyr::select(-c(trt, trt_coast, trt_order)) %>% rename(go_future_full = full, go_future_mll = mll, coast = pop_coast) %>% as.data.frame()
+lea_go_west_curr <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "current" & method == "lea_offset")
+lea_go_east_curr <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "current" & method == "lea_offset")
+lea_current_coast_go <- rbind(lea_go_west_curr, lea_go_east_curr) %>% pivot_wider(names_from = "cc", values_from = "offset") %>% dplyr::select(-c(trt, trt_coast, trt_order)) %>% rename(go_current_full = full, go_current_mll = mll, coast = pop_coast) %>% as.data.frame()
+lea_coast_go <- merge(lea_future_coast_go, lea_current_coast_go, by = c("temp", "pop", "pop_order", "coast", "site", "lat", "long", "method"))
+
+# rda
+rda_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & method == "rda_offset")
+rda_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & method == "rda_offset")
+rda_future_coast_go <- rbind(rda_go_west_fut, rda_go_east_fut) %>% pivot_wider(names_from = "cc", values_from = "offset") %>% dplyr::select(-c(trt, trt_coast, trt_order)) %>% rename(go_future_full = full, go_future_mll = mll, coast = pop_coast) %>% as.data.frame()
+rda_go_west_curr <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "current" & method == "rda_offset")
+rda_go_east_curr <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "current" & method == "rda_offset")
+rda_current_coast_go <- rbind(rda_go_west_curr, rda_go_east_curr) %>% pivot_wider(names_from = "cc", values_from = "offset") %>% dplyr::select(-c(trt, trt_coast, trt_order)) %>% rename(go_current_full = full, go_current_mll = mll, coast = pop_coast) %>% as.data.frame()
+rda_coast_go <- merge(rda_future_coast_go, rda_current_coast_go, by = c("temp", "pop", "pop_order", "coast", "site", "lat", "long", "method"))
+
+# gf
+gf_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & method == "gf_offset")
+gf_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & method == "gf_offset")
+gf_future_coast_go <- rbind(gf_go_west_fut, gf_go_east_fut) %>% pivot_wider(names_from = "cc", values_from = "offset") %>% dplyr::select(-c(trt, trt_coast, trt_order)) %>% rename(go_future_full = full, go_future_mll = mll, coast = pop_coast) %>% as.data.frame()
+gf_go_west_curr <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "current" & method == "gf_offset")
+gf_go_east_curr <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "current" & method == "gf_offset")
+gf_current_coast_go <- rbind(gf_go_west_curr, gf_go_east_curr) %>% pivot_wider(names_from = "cc", values_from = "offset") %>% dplyr::select(-c(trt, trt_coast, trt_order)) %>% rename(go_current_full = full, go_current_mll = mll, coast = pop_coast) %>% as.data.frame()
+gf_coast_go <- merge(gf_future_coast_go, gf_current_coast_go, by = c("temp", "pop", "pop_order", "coast", "site", "lat", "long", "method"))
+
+# put together & order columns
+go_interpolation_coasts <- rbind(lea_coast_go, rda_coast_go, gf_coast_go) %>% dplyr::select(-temp, - site) %>% rename(order = pop_order) %>% relocate(col_order)
+
+go_interpolation <- rbind(go_sea_rm, go_interpolation_coasts)
+###########
+
+## prep geom 
+############
+# set geom
+sf::sf_use_s2(FALSE)
+
+# load and crop layers
+world <- ne_countries(scale = "medium", returnclass = "sf")
+world_crop <- st_crop(world, c(xmin = 10, xmax = 20, ymin = 54, ymax = 61))
+
+coast <- ne_coastline(scale = "medium", returnclass = "sf")
+coast_crop <- st_crop(coast, c(xmin = 10, xmax = 20, ymin = 54, ymax = 61))
+
+# turn multiline into single line
+coast_parts <- st_cast(coast_crop, "MULTILINESTRING") |>
+  st_cast("LINESTRING")
+
+coast_parts$id <- seq_len(nrow(coast_parts))
+
+# label and id pieces
+plot(st_geometry(coast_parts))
+cent <- st_coordinates(st_centroid(st_geometry(coast_parts)))
+text(cent, labels = coast_parts$id, col = "red", cex = 1)
+
+# keep only relevant ids
+keep_ids <- c(1, 10, 13, 14, 15, 22)
+
+coast_sweden <- coast_parts[coast_parts$id %in% keep_ids,]
+
+plot(st_geometry(coast_sweden), col = "lightblue")
+
+# eyeball the unwanted region approx lon/lat extent from above plot
+rm_bbox <- st_as_sfc(st_bbox(c(xmin = 13.2, xmax = 14.1, ymin = 55.8, ymax = 57), crs = st_crs(coast_sweden)))
+
+plot(st_geometry(coast_sweden), col = "lightblue")
+plot(rm_bbox, add = TRUE, border = "red")
+
+# split into main vs. everything else
+main_coast <- st_difference(coast_sweden, rm_bbox)
+plot(st_geometry(main_coast), col = "darkblue")
+
+# buffer dist
+dist <- 0.6  # roughly miles
+
+buffered_region <- st_buffer(st_union(main_coast), dist)
+plot(buffered_region, col = "lightblue2")
+
+# crop ocean layer
+oceans50 <- ne_download(scale = 50, type = "ocean", category = "physical")
+oceans_crop <- st_crop(oceans50, c(xmin = 10, xmax = 20, ymin = 54, ymax = 61))
+
+# intersect
+int_region <- st_intersection(oceans_crop, buffered_region)
+
+plot(st_geometry(int_region), col = "lightblue2")
+plot(st_geometry(main_coast), col = "darkblue", add = TRUE)
+
+# define grid across ocean area
+grid <- st_make_grid(buffered_region, cellsize = 0.05, what = "polygons")
+grid_int <- st_intersection(grid, buffered_region)
+grid_int_crop <- sf::st_crop(grid_int, c(xmin = 10, xmax = 20, ymin = 54, ymax = 61))
+
+# another version using just experimental sites for interpolation
+# keep only relevant region
+keep_ids1 <- 22
+coast_sweden1 <- coast_parts[coast_parts$id %in% keep_ids1,]
+buffered_region1 <- st_buffer(st_union(coast_sweden1), dist)
+
+# intersect
+int_region1 <- st_intersection(oceans_crop, buffered_region1)
+
+grid1 <- st_make_grid(buffered_region1, cellsize = 0.05, what = "polygons")
+grid_int1 <- st_intersection(grid1, buffered_region1)
+grid_int_crop1 <- sf::st_crop(grid_int1, c(xmin = 10, xmax = 20, ymin = 54, ymax = 61))
+############
+
+## interpolate
+##############
+# go data as sf
+sf_lea <- st_as_sf(go_interpolation[go_interpolation$method == "lea_offset",], 
+                   coords = c("long","lat"),
+                   crs = 4326) # for WGS84 projection
+sf_rda <- st_as_sf(go_interpolation[go_interpolation$method == "rda_offset",], 
+                   coords = c("long","lat"),
+                   crs = 4326) # for WGS84 projection
+sf_gf <- st_as_sf(go_interpolation[go_interpolation$method == "gf_offset",], 
+                   coords = c("long","lat"),
+                   crs = 4326) # for WGS84 projection
+
+# doing mll only since only plotting mll
+interpolated_lea_curr <- idw(go_current_mll~1, sf_lea, grid_int)
+interpolated_lea_fut <- idw(go_future_mll~1, sf_lea, grid_int)
+interpolated_rda_curr <- idw(go_current_mll~1, sf_rda, grid_int)
+interpolated_rda_fut <- idw(go_future_mll~1, sf_rda, grid_int)
+interpolated_gf_curr <- idw(go_current_mll~1, sf_gf, grid_int)
+interpolated_gf_fut <- idw(go_future_mll~1, sf_gf, grid_int)
+##############
+
+## rasterize
+############
+# empty raster
+ext <- ext(st_bbox(interpolated_lea_curr)) # get spatial extent
+rast_empty <- rast(ext, resolution = 0.05, crs = "+proj=longlat +datum=WGS84")
+
+# create a raster stack
+# set up
+sf_ls <- list(interpolated_lea_curr, interpolated_lea_fut, interpolated_rda_curr, interpolated_rda_fut, interpolated_gf_curr, interpolated_gf_fut)
+rast_ls <- list()
+
+# loop through sf files to rasterize
+for (i in seq_along(sf_ls)) {
+  rast = st_rasterize(sf_ls[[i]] %>% dplyr::select(var1.pred, geometry))
+  rast_ls[[i]] = rast
+}
+
+# combine
+rast_all <- c(rast_ls)
+names(rast_all) <- c("interpolated_lea_curr", "interpolated_lea_fut", "interpolated_rda_curr", "interpolated_rda_fut", "interpolated_gf_curr", "interpolated_gf_fut")
+
+# save
+saveRDS(rast_all, "results/GO_results/seascape_interpolated_go.RDS")
+############
 ```
+
+And interpolate using just the experimental predictions
+
+```{r}
+## prep dat
+###########
+# check data
+head(go_plotting_avg)
+
+# pull relevant data
+go_interpolation_w_avg <- go_plotting_avg %>% filter(pop_coast == "West" & trt_coast == "West") %>% dplyr::select(-trt, -trt_coast, -trt_order) %>% rename(coast = pop_coast) %>% filter(cc == "mll") %>% 
+  pivot_wider(names_from = temp, values_from = offset) %>% as.data.frame()
+go_interpolation_e_avg <- go_plotting_avg %>% filter(pop_coast == "East" & trt_coast == "East") %>% dplyr::select(-trt, -trt_coast, -trt_order) %>% rename(coast = pop_coast) %>% filter(cc == "mll") %>% 
+  pivot_wider(names_from = temp, values_from = offset) %>% as.data.frame()
+go_plotting_exp <- rbind(go_interpolation_w_avg, go_interpolation_e_avg)
+
+# split by method and coast
+go_lea_exp_w <- go_interpolation_w_avg %>% filter(method == "lea" & coast == "West")
+go_lea_exp_e <- go_interpolation_e_avg %>% filter(method == "lea" & coast == "East")
+go_rda_exp_w <- go_interpolation_w_avg %>% filter(method == "rda" & coast == "West")
+go_rda_exp_e <- go_interpolation_e_avg %>% filter(method == "rda" & coast == "East")
+go_gf_exp_w <- go_interpolation_w_avg %>% filter(method == "gf" & coast == "West")
+go_gf_exp_e <- go_interpolation_e_avg %>% filter(method == "gf" & coast == "East")
+go_env_exp_w <- go_interpolation_w_avg %>% filter(method == "env" & coast == "West")
+go_env_exp_e <- go_interpolation_e_avg %>% filter(method == "env" & coast == "East")
+###########
+
+## prep geom
+############
+sf::sf_use_s2(FALSE)
+
+# load and crop coastline
+world <- ne_countries(scale = "medium", returnclass = "sf")
+world_crop <- sf::st_crop(world, c(xmin = 8, xmax = 20, ymin = 54, ymax = 61))
+
+coast <- ne_coastline(scale = "medium", returnclass = "sf")
+coast_crop <- st_crop(coast, c(xmin = 8.5, xmax = 20, ymin = 54, ymax = 61))
+
+# turn multiline into single lines, id + inspect pieces
+coast_parts <- st_cast(coast_crop, "MULTILINESTRING") |> st_cast("LINESTRING")
+coast_parts$id <- seq_len(nrow(coast_parts))
+
+plot(st_geometry(coast_parts))
+cent <- st_coordinates(st_centroid(st_geometry(coast_parts)))
+text(cent, labels = coast_parts$id, col = "red", cex = 1)
+
+# keep only the relevant piece -- this single line covers BOTH coasts
+keep_ids <- 24
+coast_sweden <- coast_parts[coast_parts$id %in% keep_ids, ]
+plot(st_geometry(coast_sweden), col = "lightblue")
+
+# trim area beyond desired interpolation region to west of sweden
+# eyeball the unwanted region approx lon/lat extent
+rm_bbox <- st_as_sfc(st_bbox(c(xmin = 8.5, xmax = 10.5, ymin = 58, ymax = 60), crs = st_crs(coast_sweden)))
+plot(st_geometry(coast_sweden), col = "lightblue")
+plot(rm_bbox, add = TRUE, border = "red")
+
+# identify main coast region
+main_coast <- st_difference(coast_sweden, rm_bbox)
+plot(st_geometry(main_coast), col = "darkblue")
+
+# split coast
+coast_seg <- st_segmentize(main_coast, units::set_units(200, "m")) # vertex every ~200 m
+
+coast_pts <- coast_seg %>% st_cast("MULTIPOINT") %>% st_cast("POINT") %>% st_sf(geometry = .)
+
+seg_len <- st_distance(coast_pts[-1, ], coast_pts[-nrow(coast_pts), ], by_element = TRUE)
+coast_pts$dist_along <- c(0, cumsum(as.numeric(seg_len)))
+
+kur_sf <- st_as_sf(surv_interpolation_coasts[surv_interpolation_coasts$pop == "KUR", ], coords = c("long", "lat"), crs = 4326)
+kur_idx  <- st_nearest_feature(kur_sf, coast_pts)
+kur_dist <- coast_pts$dist_along[kur_idx]
+
+# sanity check
+coast_pts$side <- ifelse(coast_pts$dist_along <= kur_dist, "West", "East")
+plot(st_geometry(coast_pts), col = ifelse(coast_pts$dist_along <= kur_dist, "blue", "red"))
+
+coast_w <- coast_pts[coast_pts$side == "West", ] %>% st_combine() %>% st_cast("LINESTRING")
+coast_e <- coast_pts[coast_pts$side == "East", ] %>% st_combine() %>% st_cast("LINESTRING")
+
+# buffers + grid
+dist <- 0.6  # roughly 40 miles
+
+buffer_w <- st_buffer(st_union(coast_w), dist)
+buffer_e <- st_buffer(st_union(coast_e), dist)
+buffered_region <- st_union(buffer_w, buffer_e)
+
+grid <- st_make_grid(buffered_region, cellsize = 0.05, what = "polygons")
+grid_int <- st_intersection(grid, buffered_region)
+############
+
+## interpolate
+##############
+lea_w_avg <- st_as_sf(go_lea_exp_w, coords = c("long", "lat"), crs = 4326)
+lea_e_avg <- st_as_sf(go_lea_exp_e, coords = c("long", "lat"), crs = 4326)
+
+rda_w_avg <- st_as_sf(go_rda_exp_w, coords = c("long", "lat"), crs = 4326)
+rda_e_avg <- st_as_sf(go_rda_exp_e, coords = c("long", "lat"), crs = 4326)
+
+gf_w_avg <- st_as_sf(go_gf_exp_w, coords = c("long", "lat"), crs = 4326)
+gf_e_avg <- st_as_sf(go_gf_exp_e, coords = c("long", "lat"), crs = 4326)
+
+env_w_avg <- st_as_sf(go_env_exp_w, coords = c("long", "lat"), crs = 4326)
+env_e_avg <- st_as_sf(go_env_exp_e, coords = c("long", "lat"), crs = 4326)
+
+# lea
+int_lea_curr_w <- idw(current~1, lea_w_avg, grid_int)
+int_lea_curr_e <- idw(current~1,  lea_e_avg, grid_int)
+int_lea_fut_w <- idw(future~1, lea_w_avg, grid_int)
+int_lea_fut_e <- idw(future~1,  lea_e_avg, grid_int)
+
+# rda
+int_rda_curr_w <- idw(current~1, rda_w_avg, grid_int)
+int_rda_curr_e <- idw(current~1,  rda_e_avg, grid_int)
+int_rda_fut_w <- idw(future~1, rda_w_avg, grid_int)
+int_rda_fut_e <- idw(future~1,  rda_e_avg, grid_int)
+
+# gf
+int_gf_curr_w <- idw(current~1, gf_w_avg, grid_int)
+int_gf_curr_e <- idw(current~1,  gf_e_avg, grid_int)
+int_gf_fut_w <- idw(future~1, gf_w_avg, grid_int)
+int_gf_fut_e <- idw(future~1,  gf_e_avg, grid_int)
+
+# env dist
+int_env_curr_w <- idw(current~1, env_w_avg, grid_int)
+int_env_curr_e <- idw(current~1,  env_e_avg, grid_int)
+int_env_fut_w <- idw(future~1, env_w_avg, grid_int)
+int_env_fut_e <- idw(future~1,  env_e_avg, grid_int)
+##############
+
+## combine west + east blend southern tip
+#########################################
+grid_cent <- st_centroid(grid_int)
+nearest_grid <- st_nearest_feature(grid_cent, coast_pts)
+grid_side <- coast_pts$side[nearest_grid]
+
+grid_lat <- st_coordinates(grid_cent)[, "Y"]
+kur_lat <- st_coordinates(kur_sf)[, "Y"]
+
+bandwidth_north_m <- 40000
+bandwidth_north_deg <- bandwidth_north_m / 111320
+
+d_lat <- grid_lat - kur_lat
+
+w_west <- ifelse(grid_side == "West", pmin(1, pmax(0, d_lat / bandwidth_north_deg)), 0)
+w_east <- 1 - w_west
+
+# lea
+interpolated_curr_lea_avg <- int_lea_curr_w
+interpolated_curr_lea_avg$var1.pred <- w_west * int_lea_curr_w$var1.pred + w_east * int_lea_curr_e$var1.pred
+
+interpolated_fut_lea_avg <- int_lea_fut_w
+interpolated_fut_lea_avg$var1.pred <- w_west * int_lea_fut_w$var1.pred + w_east * int_lea_fut_e$var1.pred
+
+# rda
+interpolated_curr_rda_avg <- int_rda_curr_w
+interpolated_curr_rda_avg$var1.pred <- w_west * int_rda_curr_w$var1.pred + w_east * int_rda_curr_e$var1.pred
+
+interpolated_fut_rda_avg <- int_rda_fut_w
+interpolated_fut_rda_avg$var1.pred <- w_west * int_rda_fut_w$var1.pred + w_east * int_rda_fut_e$var1.pred
+
+# gf
+interpolated_curr_gf_avg <- int_gf_curr_w
+interpolated_curr_gf_avg$var1.pred <- w_west * int_gf_curr_w$var1.pred + w_east * int_gf_curr_e$var1.pred
+
+interpolated_fut_gf_avg <- int_gf_fut_w
+interpolated_fut_gf_avg$var1.pred <- w_west * int_gf_fut_w$var1.pred + w_east * int_gf_fut_e$var1.pred
+
+# env
+interpolated_curr_env_avg <- int_env_curr_w
+interpolated_curr_env_avg$var1.pred <- w_west * int_env_curr_w$var1.pred + w_east * int_env_curr_e$var1.pred
+
+interpolated_fut_env_avg <- int_env_fut_w
+interpolated_fut_env_avg$var1.pred <- w_west * int_env_fut_w$var1.pred + w_east * int_env_fut_e$var1.pred
+#########################################
+
+## rasterize
+############
+ext <- ext(st_bbox(interpolated_curr_lea_avg))
+rast_empty <- rast(ext, resolution = 0.05, crs = "+proj=longlat +datum=WGS84")
+
+sf_ls <- list(interpolated_curr_lea_avg, interpolated_fut_lea_avg, interpolated_curr_rda_avg, interpolated_fut_rda_avg, interpolated_curr_gf_avg, interpolated_fut_gf_avg, interpolated_curr_env_avg, interpolated_fut_env_avg)
+rast_ls <- list()
+for (i in seq_along(sf_ls)) {
+  rast = st_rasterize(sf_ls[[i]] %>% dplyr::select(var1.pred, geometry))
+  rast_ls[[i]] = rast
+}
+rast_all <- c(rast_ls)
+names(rast_all) <- c("interpolated_lea_curr", "interpolated_lea_fut", "interpolated_rda_curr", "interpolated_rda_fut", "interpolated_gf_curr", "interpolated_gf_fut", "interpolated_env_curr", "interpolated_env_fut")
+
+# save
+saveRDS(rast_all, "results/GO_results/go_exp_interpolated_avg.RDS")
+############
+
+## plotting setup
+#################
+# color ramp
+pal <- colorRamp(c("green", "red"))
+
+# masking region for interpolation
+interpolated_lea_curr_masked_avg <- interpolated_curr_lea_avg %>% filter(y >= 54 & y <= 61, x >= 8.5 & x <= 20)
+interpolated_lea_fut_masked_avg <- interpolated_fut_lea_avg %>% filter(y >= 54 & y <= 61, x >= 8.5 & x <= 20)
+interpolated_rda_curr_masked_avg <- interpolated_curr_rda_avg %>% filter(y >= 54 & y <= 61, x >= 8.5 & x <= 20)
+interpolated_rda_fut_masked_avg <- interpolated_fut_rda_avg %>% filter(y >= 54 & y <= 61, x >= 8.5 & x <= 20)
+interpolated_gf_curr_masked_avg <- interpolated_curr_gf_avg %>% filter(y >= 54 & y <= 61, x >= 8.5 & x <= 20)
+interpolated_gf_fut_masked_avg <- interpolated_fut_gf_avg %>% filter(y >= 54 & y <= 61, x >= 8.5 & x <= 20)
+interpolated_env_curr_masked_avg <- interpolated_curr_env_avg %>% filter(y >= 54 & y <= 61, x >= 8.5 & x <= 20)
+interpolated_env_fut_masked_avg <- interpolated_fut_env_avg %>% filter(y >= 54 & y <= 61, x >= 8.5 & x <= 20)
+#################
+```
+
 
 ## Mapping
 
-Now make the plots. I'm going to start off making "climate change" maps, which visualize the offset between current/future W and current/future E on the same plot.
-
-First prep the plotting range.
-
-```{r}
-# set spherical geometry
-sf::sf_use_s2(FALSE)
-
-# set object
-world <- ne_countries(scale = "medium", returnclass = "sf")
-world_crop <- sf::st_crop(world, c(xmin = 10, xmax = 20, ymin = 54, ymax = 61))
-```
+Now make the plots. I'm going to start off making "climate change" maps, which visualize the genomic offset between current/future W and current/future E on the same plot.
 
 ### LEA
 
 ```{r}
-# relevant data
-lea_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & cc == "mll" & method == "lea")
-lea_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & cc == "mll" & method == "lea")
-lea_future_coast_go <- rbind(lea_go_west_fut, lea_go_east_fut)
+# color ramp
+pal <- colorRamp(c("green", "red"))
+
+# masking region for interpolation
+interpolated_lea_fut_masked <- interpolated_lea_fut %>%
+  filter(y >= 54 & y <= 61, x >= 10 & x <= 20)
+interpolated_lea_curr_masked <- interpolated_lea_curr %>%
+  filter(y >= 54 & y <= 61, x >= 10 & x <= 20)
 
 # map
+## lea curr
+###########
+lea_curr_coast <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_lea_curr_masked), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = lea_go_sea, aes(x = long, y = lat, fill = go_current_mll), shape = 21, size = 2) +
+  geom_point(data = lea_current_coast_go, aes(x = long, y = lat, 
+                                              fill = go_current_mll), 
+             shape = 21, size = 4) +
+  scale_fill_distiller(palette = "RdYlGn", limits = c(0, 0.0055)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 0.0055)) +
+  geom_label_repel(data = lea_current_coast_go,
+                  aes(x=long, y=lat, label = pop),
+               #   nudge_x = -3,
+               #   nudge_y = 1,
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(A) Predicted ", LEA[offset])), subtitle = "Current Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
+lea_curr_coast
+###########
+
+## lea fut
+##########
 lea_fut_coast <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = st_as_sf(interpolated_lea_fut_masked), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = lea_go_sea, aes(x = long, y = lat, fill = go_future_mll), shape = 21, size = 2) +
   geom_point(data = lea_future_coast_go, aes(x = long, y = lat, 
-                                              fill = offset), 
+                                              fill = go_future_mll), 
              shape = 21, size = 4) +
-  scale_colour_viridis_c(option = "rocket", direction = -1, limits = c(0,0.06)) +
-  scale_fill_viridis_c(option = "rocket", direction = -1, limits = c(0,0.06)) +
+    scale_fill_distiller(palette = "RdYlGn", limits = c(0, 0.0055)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 0.0055)) +
   geom_label_repel(data = lea_future_coast_go,
                   aes(x=long, y=lat, label = pop),
                #   nudge_x = -3,
@@ -121,27 +547,56 @@ lea_fut_coast <- ggplot(data = world) +
                   fill = "white")+
   theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
         panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
-  labs(title = expression(paste("(A) Predicted ", LEA[offset], " to Future Climate")), x = "Longitude", y = "Latitude", fill = "Genomic \nOffset")
+  labs(title = expression(paste("(B) Predicted ", LEA[offset])), subtitle = "Future Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
 lea_fut_coast
+##########
 ```
 
 ### RDA
 
 ```{r}
-# relevant data
-rda_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & cc == "mll" & method == "rda")
-rda_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & cc == "mll" & method == "rda")
-rda_future_coast_go <- rbind(rda_go_west_fut, rda_go_east_fut)
+# masking region for interpolation
+interpolated_rda_fut_masked <- interpolated_rda_fut %>%
+  filter(y >= 54 & y <= 61, x >= 10 & x <= 20)
+interpolated_rda_curr_masked <- interpolated_rda_curr %>%
+  filter(y >= 54 & y <= 61, x >= 10 & x <= 20)
 
 # map
+## rda curr
+###########
+rda_curr_coast <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_rda_curr_masked), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = rda_go_sea, aes(x = long, y = lat, fill = go_current_mll), shape = 21, size = 2) +
+  geom_point(data = rda_current_coast_go, aes(x = long, y = lat, 
+                                              fill = go_current_mll), 
+             shape = 21, size = 4) +
+  scale_fill_distiller(palette = "RdYlGn", limits = c(0, 3.5)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 3.5)) +
+  geom_label_repel(data = rda_current_coast_go,
+                  aes(x=long, y=lat, label = pop),
+               #   nudge_x = -3,
+               #   nudge_y = 1,
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(A) Predicted ", RDA[offset])), subtitle = "Current Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
+rda_curr_coast
+###########
+
+## rda fut
+##########
 rda_fut_coast <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = st_as_sf(interpolated_rda_fut_masked), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = rda_go_sea, aes(x = long, y = lat, fill = go_future_mll), shape = 21, size = 2) +
   geom_point(data = rda_future_coast_go, aes(x = long, y = lat, 
-                                              fill = offset), 
+                                              fill = go_future_mll), 
              shape = 21, size = 4) +
-  scale_colour_viridis_c(option = "rocket", direction = -1, limits = c(0,1)) +
-  scale_fill_viridis_c(option = "rocket", direction = -1, limits = c(0,1)) +
+    scale_fill_distiller(palette = "RdYlGn", limits = c(0, 3.5)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 3.5)) +
   geom_label_repel(data = rda_future_coast_go,
                   aes(x=long, y=lat, label = pop),
                #   nudge_x = -3,
@@ -149,36 +604,62 @@ rda_fut_coast <- ggplot(data = world) +
                   fill = "white")+
   theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
         panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
-  labs(title = expression(paste("(B) Predicted ", RDA[offset], " to Future Climate")), x = "Longitude", y = "Latitude", col = "Genomic \nOffset", fill = "Genomic \nOffset")
+  labs(title = expression(paste("(B) Predicted ", RDA[offset])), subtitle = "Future Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
 rda_fut_coast
+##########
 ```
 
 ### GF
 
 ```{r}
-# relevant data
-gf_go_west_fut <- go_plotting %>% filter(pop_coast == "West" & trt_coast == "West" & temp == "future" & cc == "mll" & method == "gf")
-gf_go_east_fut <- go_plotting %>% filter(pop_coast == "East" & trt_coast == "East" & temp == "future" & cc == "mll" & method == "gf")
-gf_future_coast_go <- rbind(gf_go_west_fut, gf_go_east_fut)
+# masking region for interpolation
+interpolated_gf_fut_masked <- interpolated_gf_fut %>%
+  filter(y >= 54 & y <= 61, x >= 10 & x <= 20)
+interpolated_gf_curr_masked <- interpolated_gf_curr %>%
+  filter(y >= 54 & y <= 61, x >= 10 & x <= 20)
 
 # map
-gf_fut_coast <- ggplot(data = world) +
+## gf curr
+###########
+gf_curr_coast <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
-  geom_point(data = gf_future_coast_go, aes(x = long, y = lat, 
-                                              fill = offset), 
+  geom_sf(data = st_as_sf(interpolated_gf_curr_masked), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = gf_go_sea, aes(x = long, y = lat, fill = go_current_mll), shape = 21, size = 2) +
+  geom_point(data = gf_current_coast_go, aes(x = long, y = lat, 
+                                              fill = go_current_mll), 
              shape = 21, size = 4) +
-  scale_colour_viridis_c(option = "rocket", direction = -1, limits = c(0,0.1)) +
-  scale_fill_viridis_c(option = "rocket", direction = -1, limits = c(0,0.1)) +
-  geom_label_repel(data = gf_future_coast_go,
+  scale_fill_distiller(palette = "RdYlGn", limits = c(0, 0.12)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 0.12)) +
+  geom_label_repel(data = gf_current_coast_go,
                   aes(x=long, y=lat, label = pop),
-               #   nudge_x = -3,
-               #   nudge_y = 1,
                   fill = "white")+
   theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
         panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
-  labs(title = expression(paste("(C) Predicted ", GF[offset], " to Future Climate")), x = "Longitude", y = "Latitude", col = "Genomic \nOffset", fill = "Genomic \nOffset")
+  labs(title = expression(paste("(A) Predicted ", GF[offset])), subtitle = "Current Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
+gf_curr_coast
+###########
+
+## gf fut
+##########
+gf_fut_coast <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_gf_fut_masked), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = gf_go_sea, aes(x = long, y = lat, fill = go_future_mll), shape = 21, size = 2) +
+  geom_point(data = gf_future_coast_go, aes(x = long, y = lat, 
+                                              fill = go_future_mll), 
+             shape = 21, size = 4) +
+    scale_fill_distiller(palette = "RdYlGn", limits = c(0, 0.12)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 0.12)) +
+  geom_label_repel(data = gf_future_coast_go,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(B) Predicted ", GF[offset])), subtitle = "Future Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
 gf_fut_coast
+##########
 ```
 
 ### Env Dist
@@ -209,3 +690,272 @@ env_fut_coast <- ggplot(data = world) +
 env_fut_coast
 ```
 
+## Mapping with Averages
+
+### LEA
+
+```{r}
+# reset world crop
+world <- ne_countries(scale = "medium", returnclass = "sf")
+world_crop <- sf::st_crop(world, c(xmin = 8, xmax = 20, ymin = 54, ymax = 61))
+
+# subset data
+go_plotting_exp_lea <- go_plotting_exp %>% filter(method == "lea")
+
+# map
+## lea curr
+###########
+lea_curr_coast_avg <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_lea_curr_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = go_plotting_exp_lea, aes(x = long, y = lat, 
+                                             fill = current), 
+             shape = 21, size = 4) +
+  scale_fill_distiller(palette = "RdYlGn", limits = c(0, 0.06)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 0.06)) +
+  geom_label_repel(data = lea_current_coast_go,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  geom_text(label = "North \nSea", 
+             x = 9.3, y = 57.9,
+             size = 3, fontface = "italic") +
+  geom_text(label = "Baltic \nSea", 
+             x = 18.7, y = 56.2,
+             size = 3, fontface = "italic") +
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(A) Predicted ", LEA[offset])), subtitle = "Current Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
+lea_curr_coast_avg
+###########
+
+## lea fut
+##########
+lea_fut_coast_avg <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_lea_fut_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = go_plotting_exp_lea, aes(x = long, y = lat, 
+                                              fill = future), 
+             shape = 21, size = 4) +
+    scale_fill_distiller(palette = "RdYlGn", limits = c(0, 0.06)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 0.06)) +
+  geom_label_repel(data = lea_future_coast_go,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  geom_text(label = "North \nSea", 
+             x = 9.3, y = 57.9,
+             size = 3, fontface = "italic") +
+  geom_text(label = "Baltic \nSea", 
+             x = 18.7, y = 56.2,
+             size = 3, fontface = "italic") +
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(B) Predicted ", LEA[offset])), subtitle = "Future Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
+lea_fut_coast_avg
+##########
+```
+
+### RDA
+
+```{r}
+# subset data
+go_plotting_exp_rda <- go_plotting_exp %>% filter(method == "rda")
+
+# map
+## rda curr
+###########
+rda_curr_coast_avg <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_rda_curr_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = go_plotting_exp_rda, aes(x = long, y = lat, 
+                                             fill = current), 
+             shape = 21, size = 4) +
+  scale_fill_distiller(palette = "RdYlGn", limits = c(0, 2)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 2)) +
+  geom_label_repel(data = rda_current_coast_go,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  geom_text(label = "North \nSea", 
+             x = 9.3, y = 57.9,
+             size = 3, fontface = "italic") +
+  geom_text(label = "Baltic \nSea", 
+             x = 18.7, y = 56.2,
+             size = 3, fontface = "italic") +
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(C) Predicted ", RDA[offset])), subtitle = "Current Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
+rda_curr_coast_avg
+###########
+
+## rda fut
+##########
+rda_fut_coast_avg <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_rda_fut_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = go_plotting_exp_rda, aes(x = long, y = lat, 
+                                              fill = future), 
+             shape = 21, size = 4) +
+    scale_fill_distiller(palette = "RdYlGn", limits = c(0, 2)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 2)) +
+  geom_label_repel(data = rda_future_coast_go,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  geom_text(label = "North \nSea", 
+             x = 9.3, y = 57.9,
+             size = 3, fontface = "italic") +
+  geom_text(label = "Baltic \nSea", 
+             x = 18.7, y = 56.2,
+             size = 3, fontface = "italic") +
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(D) Predicted ", RDA[offset])), subtitle = "Future Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
+rda_fut_coast_avg
+##########
+```
+
+### GF
+
+```{r}
+# subset data
+go_plotting_exp_gf <- go_plotting_exp %>% filter(method == "gf")
+
+# map
+## gf curr
+###########
+gf_curr_coast_avg <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_gf_curr_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = go_plotting_exp_gf, aes(x = long, y = lat, 
+                                             fill = current), 
+             shape = 21, size = 4) +
+  scale_fill_distiller(palette = "RdYlGn", limits = c(0, 0.1)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 0.1)) +
+  geom_label_repel(data = gf_current_coast_go,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  geom_text(label = "North \nSea", 
+             x = 9.3, y = 57.9,
+             size = 3, fontface = "italic") +
+  geom_text(label = "Baltic \nSea", 
+             x = 18.7, y = 56.2,
+             size = 3, fontface = "italic") +
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(E) Predicted ", GF[offset])), subtitle = "Current Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
+gf_curr_coast_avg
+###########
+
+## gf fut
+##########
+gf_fut_coast_avg <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_gf_fut_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = go_plotting_exp_gf, aes(x = long, y = lat, 
+                                              fill = future), 
+             shape = 21, size = 4) +
+    scale_fill_distiller(palette = "RdYlGn", limits = c(0, 0.1)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 0.1)) +
+  geom_label_repel(data = gf_future_coast_go,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  geom_text(label = "North \nSea", 
+             x = 9.3, y = 57.9,
+             size = 3, fontface = "italic") +
+  geom_text(label = "Baltic \nSea", 
+             x = 18.7, y = 56.2,
+             size = 3, fontface = "italic") +
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = expression(paste("(F) Predicted ", GF[offset])), subtitle = "Future Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
+gf_fut_coast_avg
+##########
+```
+
+### env dist
+
+```{r}
+# subset data
+go_plotting_exp_env <- go_plotting_exp %>% filter(method == "env")
+
+# map
+## env curr
+###########
+env_curr_coast_avg <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_env_curr_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = go_plotting_exp_env, aes(x = long, y = lat, 
+                                             fill = current), 
+             shape = 21, size = 4) +
+  scale_fill_distiller(palette = "RdYlGn", limits = c(0, 7)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 7)) +
+  geom_label_repel(data = gf_current_coast_go,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  geom_text(label = "North \nSea", 
+             x = 9.3, y = 57.9,
+             size = 3, fontface = "italic") +
+  geom_text(label = "Baltic \nSea", 
+             x = 18.7, y = 56.2,
+             size = 3, fontface = "italic") +
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = "(G) Environmental Distance", subtitle = "Current Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
+env_curr_coast_avg
+###########
+
+## env fut
+##########
+env_fut_coast_avg <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_env_fut_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "white") +
+  geom_point(data = go_plotting_exp_env, aes(x = long, y = lat, 
+                                              fill = future), 
+             shape = 21, size = 4) +
+    scale_fill_distiller(palette = "RdYlGn", limits = c(0, 7)) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 7)) +
+  geom_label_repel(data = gf_current_coast_go,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white")+
+  geom_text(label = "North \nSea", 
+             x = 9.3, y = 57.9,
+             size = 3, fontface = "italic") +
+  geom_text(label = "Baltic \nSea", 
+             x = 18.7, y = 56.2,
+             size = 3, fontface = "italic") +
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = "(H) Environmental Distance", subtitle = "Future Treatment", x = "Longitude", y = "Latitude", fill = "Genomic \nOffset", col = "Genomic \nOffset")
+env_fut_coast_avg
+##########
+```
+
+### Export Plots
+
+```{r}
+# export
+doc <- read_pptx() %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = lea_curr_coast_avg), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = lea_fut_coast_avg), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = rda_curr_coast_avg), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = rda_fut_coast_avg), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = gf_curr_coast_avg), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = gf_fut_coast_avg), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = env_curr_coast_avg), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = env_fut_coast_avg), location = ph_location(left = 1, top = 1, width = 6.5, height = 4))
+print(doc, target = "results/figures/climchg_genomic_offset_maps.pptx")
+```

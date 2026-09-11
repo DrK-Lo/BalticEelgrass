@@ -34,10 +34,10 @@ gf <- read.csv("results/GO_results/GF_offsets_exptrt_wide_2025-12-03.csv")[,-1]
 env_dist <- read.csv("results/GO_results/euclidean_long_trt_exp.csv")[,-1]
 
 # individual
-lea_ind <- read.csv("results/GO_results/LEA_offsets_exptrt_ind_long_2026-08-13.csv")[,-1]
-rda_ind <- read.csv("results/GO_results/RDA_offsets_exptrt_ind_long_2026-08-13.csv")[,-1]
-gf_ind <- read.csv("results/GO_results/GF_offsets_exptrt_ind_long_2026-08-13.csv")[,-1]
-env_dist_ind <- read.csv("data/EnvDat/euclidian_trt_exp_ind.csv")[,-1]
+lea_ind <- read.csv("results/GO_results/LEA_offsets_exptrt_ind_long_2026-09-07.csv")[,-1]
+rda_ind <- read.csv("results/GO_results/RDA_offsets_exptrt_ind_long_2026-09-07.csv")[,-1]
+gf_ind <- read.csv("results/GO_results/GF_offsets_exptrt_ind_long_2026-09-07.csv")[,-1]
+env_dist_ind <- read.csv("data/EnvDat/euclidean_trt_exp_indiv.csv")[,-1]
 ```
 
 
@@ -102,7 +102,7 @@ gf_ind <- gf_ind[,c("pop", "trt", "bagnum", "method", "cc", "offset")]
 
 # envdist
 head(env_dist_ind)
-env_dist_ind1 <- env_dist_ind %>% mutate(bagnum = as.numeric(bagnum_text), offset = dist, method = "env_dist", cc = "none") %>% dplyr::select(pop, trt, bagnum, method, cc, offset)
+env_dist_ind1 <- env_dist_ind %>% mutate(bagnum = as.numeric(bagnum_text), offset = ind_dists, method = "env_dist", cc = "none") %>% dplyr::select(pop, trt, bagnum, method, cc, offset)
 
 # put everything together
 go_long_ind <- rbind(lea_ind, rda_ind, gf_ind, env_dist_ind1)
@@ -138,6 +138,14 @@ grow_trim$trt <- gsub("_", "-", grow_trim$trt)
 grow_trim$coast_pop <- ifelse(grow_trim$pop %in% w_pops, "west", "east")
 grow_trim$coast_trt <- ifelse(grow_trim$trt %in% w_trts, "west", "east")
 grow_trim$curr_fut <- ifelse(grow_trim$trt %in% curr_trts, "current", "future")
+
+# also do pop level fitness offsets
+surv_offsets <- go_surv %>% 
+  group_by(pop, curr_fut) %>% 
+  summarize(surv = mean(isAlive)) %>% 
+  pivot_wider(id_cols = pop, names_from = curr_fut, values_from = c(surv)) %>%
+  mutate(surv_offset = current - future) %>% 
+  rename(current_surv = current, future_surv = future) %>%
 ```
 
 #### Combine GOfit
@@ -712,6 +720,7 @@ weigh_corr_mll <- rbind(weigh_corr_lea_mll, weigh_corr_rda_mll, weigh_corr_gf_ml
 
 # put together
 fit_corr <- rbind(surv_corr_full, len_corr_full, weigh_corr_full, surv_corr_mll, len_corr_mll, weigh_corr_mll)
+fit_corr$coast <- "both"
 ```
 
 By coast
@@ -843,8 +852,32 @@ weigh_corr_w_mll <- rbind(weigh_corr_lea_w_mll, weigh_corr_rda_w_mll, weigh_corr
 fit_corr_w_mll <- rbind(surv_corr_w_mll, len_corr_w_mll, weigh_corr_w_mll) %>% mutate(coast = "west")
 #############
 
+## plotting
+###########
 # together
 fit_corr_coast <- rbind(fit_corr_w_full, fit_corr_e_full, fit_corr_w_mll, fit_corr_e_mll)
+
+# combine with the all coasts results
+fit_corr_both <- rbind(fit_corr, fit_corr_coast)
+
+# put in format for corrplot - just mll
+fit_for_corplot <- fit_corr_both %>% 
+  filter(cc %in% c("mll", "none") & metric == "surv") %>% 
+  distinct()
+
+# recoding labels
+coast_recode <- c("west" = "North Sea", "east" = "Baltic Sea", "both" = "Overall")
+method_recode <- c("lea_offset" = "LEA", "rda_offset" = "RDA", "gf_offset" = "GF", "env_dist" = "Environmental\nDistance")
+fit_for_corplot1 <- fit_for_corplot %>% mutate(label_coast = coast_recode[coast], label_method = method_recode[method])
+
+# correlation plot
+ggplot(fit_for_corplot1, aes(x = label_method, y = label_coast, fill = corr)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = round(corr, 3))) +
+  scale_fill_gradient2(low = "chartreuse3", mid = "ivory2", high = "maroon3", limits = c(-1, 1), midpoint = 0) +
+  labs(title = "Correlations between Survival and Genomic Offset", subtitle = "All Treatments", fill = "Kendall's\nTau", x = NULL, y = NULL) +
+  theme_minimal()
+###########
 ```
 
 Future outcomes overall
@@ -904,6 +937,8 @@ weigh_corr_mll_fut <- rbind(weigh_corr_lea_mll_fut, weigh_corr_rda_mll_fut, weig
 
 # put together
 fit_corr_fut <- rbind(surv_corr_full_fut, len_corr_full_fut, weigh_corr_full_fut, surv_corr_mll_fut, len_corr_mll_fut, weigh_corr_mll_fut)
+
+fit_corr_fut$coast <- "both"
 ```
 
 Future outcomes by coast (mll only)
@@ -971,8 +1006,30 @@ weigh_corr_w_fut <- rbind(weigh_corr_lea_w_fut, weigh_corr_rda_w_fut, weigh_corr
 fit_corr_w_fut <- rbind(surv_corr_w_fut, len_corr_w_fut, weigh_corr_w_fut) %>% mutate(coast = "west")
 #############
 
+## plotting
+###########
 # put together
 fit_corr_coast_fut <- rbind(fit_corr_w_fut, fit_corr_e_fut)
+
+# combine with the all coasts results
+fit_corr_both_fut <- rbind(fit_corr_fut, fit_corr_coast_fut)
+
+# put in format for corrplot - just mll
+fit_fut_for_corplot <- fit_corr_both_fut %>% 
+  filter(cc %in% c("mll", "none") & metric == "surv") %>% 
+  distinct()
+
+# recoding labels
+fit_for_corplot_fut1 <- fit_fut_for_corplot %>% mutate(label_coast = coast_recode[coast], label_method = method_recode[method])
+
+# correlation plot
+ggplot(fit_for_corplot_fut1, aes(x = label_method, y = label_coast, fill = corr)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = round(corr, 3))) +
+  scale_fill_gradient2(low = "chartreuse3", mid = "ivory2", high = "maroon3", limits = c(-1, 1), midpoint = 0) +
+  labs(title = "Correlations between Survival and Genomic Offset", subtitle = "Future Treatments Only", fill = "Kendall's\nTau", x = NULL, y = NULL) +
+  theme_minimal()
+###########
 ```
 
 Current outcomes overall
@@ -1032,6 +1089,7 @@ weigh_corr_mll_curr <- rbind(weigh_corr_lea_mll_curr, weigh_corr_rda_mll_curr, w
 
 # put together
 fit_corr_curr <- rbind(surv_corr_full_curr, len_corr_full_curr, weigh_corr_full_curr, surv_corr_mll_curr, len_corr_mll_curr, weigh_corr_mll_curr)
+fit_corr_curr$coast <- "both"
 ```
 
 Current outcomes by coast (mll only)
@@ -1101,6 +1159,31 @@ fit_corr_w_curr <- rbind(surv_corr_w_curr, len_corr_w_curr, weigh_corr_w_curr) %
 
 # put together
 fit_corr_coast_curr <- rbind(fit_corr_w_curr, fit_corr_e_curr)
+
+## plotting
+###########
+# put together
+fit_corr_coast_curr <- rbind(fit_corr_w_curr, fit_corr_e_curr)
+
+# combine with the all coasts results
+fit_corr_both_curr <- rbind(fit_corr_curr, fit_corr_coast_curr)
+
+# put in format for corrplot - just mll
+fit_curr_for_corplot <- fit_corr_both_curr %>% 
+  filter(cc %in% c("mll", "none") & metric == "surv") %>% 
+  distinct()
+
+# recoding labels
+fit_for_corplot_curr1 <- fit_curr_for_corplot %>% mutate(label_coast = coast_recode[coast], label_method = method_recode[method])
+
+# correlation plot
+ggplot(fit_for_corplot_curr1, aes(x = label_method, y = label_coast, fill = corr)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = round(corr, 3))) +
+  scale_fill_gradient2(low = "chartreuse3", mid = "ivory2", high = "maroon3", limits = c(-1, 1), midpoint = 0) +
+  labs(title = "Correlations between Survival and Genomic Offset", subtitle = "Current Treatments Only", fill = "Kendall's\nTau", x = NULL, y = NULL) +
+  theme_minimal()
+###########
 ```
 
 ### Modeling & ANCOVA

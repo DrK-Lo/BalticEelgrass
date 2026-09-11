@@ -22,6 +22,7 @@ library(multcompView)
 library(car)
 library(performance)
 library(corrplot)
+library(blme)
 
 # data
 fit <- read.csv("data/experiment/eelgrass_mesocosm_start_end_complete.csv")[,-1]

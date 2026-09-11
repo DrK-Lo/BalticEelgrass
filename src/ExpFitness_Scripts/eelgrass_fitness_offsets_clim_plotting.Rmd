@@ -27,11 +27,19 @@ library(ggspatial) # mapping
 library(ggrepel) # mapping
 library(stars) # mapping
 library(ggpubr) # plotting
+library(plotrix) # std error
+library(dplyr)
+library(gstat)
+library(terra)
+library(lwgeom)
+library(officer)
+library(rvg)
 
 # data
 cf_off <- read.csv("results/fit_results/climate_change_fitness_offsets_2026-05-28.csv")[,-1]
 sites <- read.csv("data/experiment/eelgrass_exp_sites.csv")
 poptrts_df <- read.csv("data/experiment/poptrts_df.csv")
+surv_dat <- read.csv("data/experiment/eelgrass_mesocosm_start_end_complete.csv")[,-1]
 ```
 
 # Plotting Fitness Offsets
@@ -52,13 +60,42 @@ sites$pop <- sites$site_abbrev
 
 # combine
 clim_offs <- merge(sites, cf_off, by = "pop")
+
+# survival data indiv level
+# pop/trt info
+w_pops <- c("VAT", "VIK", "BAR", "HOG")
+e_pops <- c("KUR", "KAL", "HOR", "BJO")
+w_trts <- c("TempControl-21psu", "TempWarm-16psu")
+e_trts <- c("TempControl-7psu", "TempWarm-5psu")
+curr_trts <- c("TempControl-21psu", "TempControl-7psu")
+fut_trts <- c("TempWarm-16psu", "TempWarm-5psu")
+
+# add pop/trt metadata
+fit_full$trt <- gsub("_", "-", fit_full$trt)
+fit_full$coast_pop <- ifelse(fit_full$pop %in% w_pops, "west", "east")
+fit_full$coast_trt <- ifelse(fit_full$trt %in% w_trts, "west", "east")
+fit_full$curr_fut <- ifelse(fit_full$trt %in% curr_trts, "current", "future")
+
+# surv
+surv_all <- fit_full[,c("pop", "trt", "bagnum", "tank_ID", "isAlive", "coast_pop", "coast_trt", "curr_fut")]
+surv_all$isAlive <- ifelse(surv_all$isAlive == TRUE, 1, 0)
+
+# pop avgs for plotting
+surv_avgs <- surv_all %>% 
+  group_by(pop, coast_trt, curr_fut) %>% 
+  summarise(surv = mean(isAlive), surv_se = std.error(isAlive), .groups = "drop_last")
+
+# just relevant west/east combos
+surv_avgs_w <- surv_avgs %>% filter(pop %in% w_pops & coast_trt == "west")
+surv_avgs_e <- surv_avgs %>% filter(pop %in% e_pops & coast_trt == "east")
+surv_avgs_df <- rbind(surv_avgs_w, surv_avgs_e) %>% rename(coast = coast_trt) %>% as.data.frame()
 ```
 
 ## Plotting
 
 ### Maps
 
-Start by visualizing these fitness offsets as maps
+Start by visualizing fitness offsets as maps
 
 I'm going to start off making "climate change" maps, which visualize the offset between current/future W and current/future E on the same plot.
 
@@ -70,7 +107,7 @@ sf::sf_use_s2(FALSE)
 
 # set object
 world <- ne_countries(scale = "medium", returnclass = "sf")
-world_crop <- sf::st_crop(world, c(xmin = 10, xmax = 20, ymin = 54, ymax = 61))
+world_crop <- sf::st_crop(world, c(xmin = 8, xmax = 20, ymin = 54, ymax = 61))
 ```
 
 #### Survival Maps
@@ -90,34 +127,34 @@ std.error(surv_cf[surv_cf$coast == "East",]$CF_abs_offset)
 ###################
 surv_abs_map_curr <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = world_crop, fill = 'white') +
   geom_point(data = surv_cf, aes(x = long, y = lat, 
                                  fill = abs_current), 
              shape = 21, size = 4) +
-  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
-  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
+  scale_fill_distiller(palette = "RdYlGn", direction = 1, limits = c(0, 1)) +
+  scale_color_distiller(palette = "RdYlGn", direction = 1, limits = c(0, 1)) +
   geom_label_repel(data = surv_cf,
                   aes(x=long, y=lat, label = pop),
                   fill = "white")+
   theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
         panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
-  labs(title = expression(paste("(A) Survival in Current \nTreatment")), x = "Longitude", y = "Latitude", fill = "Survival")
+  labs(title = "(A) Survival in Current \nTreatment", x = "Longitude", y = "Latitude", fill = "Survival")
 surv_abs_map_curr
 
 surv_abs_map_fut <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = world_crop, fill = 'white') +
   geom_point(data = surv_cf, aes(x = long, y = lat, 
                                  fill = abs_future), 
              shape = 21, size = 4) +
-  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
-  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(0,1)) +
+  scale_fill_distiller(palette = "RdYlGn", direction = 1, limits = c(0, 1)) +
+  scale_color_distiller(palette = "RdYlGn", direction = 1, limits = c(0, 1)) +
   geom_label_repel(data = surv_cf,
                   aes(x=long, y=lat, label = pop),
                   fill = "white")+
   theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
         panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
-  labs(title = expression(paste("(B) Survival in Future \nTreatment")), x = "Longitude", y = "Latitude", fill = "Survival")
+  labs(title = "(B) Survival in Future \nTreatment", x = "Longitude", y = "Latitude", fill = "Survival")
 surv_abs_map_fut
 ###################
 
@@ -144,18 +181,18 @@ surv_abs_map_fut
 #################
 surv_abs_off_map <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = world_crop, fill = 'white') +
   geom_point(data = surv_cf, aes(x = long, y = lat, 
                                  fill = CF_abs_offset), 
              shape = 21, size = 4) +
-  scale_colour_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
-  scale_fill_viridis_c(option = "magma", direction = 1, limits = c(-1,0)) +
+  scale_fill_distiller(palette = "RdYlGn", direction = 1, limits = c(-1, 0)) +
+  scale_color_distiller(palette = "RdYlGn", direction = 1, limits = c(-1, 0)) +
   geom_label_repel(data = surv_cf,
                   aes(x=long, y=lat, label = pop),
                   fill = "white")+
   theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
         panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
-  labs(title = expression(paste("(C) Survival Offset in \nFuture Treatment")), x = "Longitude", y = "Latitude", fill = "Fitness \nOffset")
+  labs(title = "(C) Survival Offset in \nFuture Treatment", x = "Longitude", y = "Latitude", fill = "Fitness \nOffset")
 surv_abs_off_map
 #################
 
@@ -186,6 +223,237 @@ surv_maps
 ###############
 ```
 
+Also interpolate survival around coast
+
+```{r}
+## prep dat
+###########
+# check data
+head(surv_cf)
+
+# order columns
+surv_interpolation_coasts <- surv_cf %>% dplyr::select(-CF_rel_offset, -CF_relative, -metric, -site_abbrev) %>% rename(order = pop_ord) %>% arrange(order) %>% as.data.frame()
+###########
+
+## prep geom
+############
+sf::sf_use_s2(FALSE)
+
+# load and crop coastline
+coast <- ne_coastline(scale = "medium", returnclass = "sf")
+coast_crop <- st_crop(coast, c(xmin = 8.5, xmax = 20, ymin = 54, ymax = 61))
+
+# turn multiline into single lines, id + inspect pieces
+coast_parts <- st_cast(coast_crop, "MULTILINESTRING") |> st_cast("LINESTRING")
+coast_parts$id <- seq_len(nrow(coast_parts))
+
+plot(st_geometry(coast_parts))
+cent <- st_coordinates(st_centroid(st_geometry(coast_parts)))
+text(cent, labels = coast_parts$id, col = "red", cex = 1)
+
+# keep only the relevant piece -- this single line covers BOTH coasts
+keep_ids <- 24
+coast_sweden <- coast_parts[coast_parts$id %in% keep_ids, ]
+plot(st_geometry(coast_sweden), col = "lightblue")
+
+# trim area beyond desired interpolation region to west of sweden
+# eyeball the unwanted region approx lon/lat extent
+rm_bbox <- st_as_sfc(st_bbox(c(xmin = 8.5, xmax = 10.5, ymin = 58, ymax = 60), crs = st_crs(coast_sweden)))
+plot(st_geometry(coast_sweden), col = "lightblue")
+plot(rm_bbox, add = TRUE, border = "red")
+
+# identify main coast region
+main_coast <- st_difference(coast_sweden, rm_bbox)
+plot(st_geometry(main_coast), col = "darkblue")
+
+# split coast
+coast_seg <- st_segmentize(main_coast, units::set_units(200, "m")) # vertex every ~200 m
+
+coast_pts <- coast_seg %>% st_cast("MULTIPOINT") %>% st_cast("POINT") %>% st_sf(geometry = .)
+
+seg_len <- st_distance(coast_pts[-1, ], coast_pts[-nrow(coast_pts), ], by_element = TRUE)
+coast_pts$dist_along <- c(0, cumsum(as.numeric(seg_len)))
+
+kur_sf <- st_as_sf(surv_interpolation_coasts[surv_interpolation_coasts$pop == "KUR", ], coords = c("long", "lat"), crs = 4326)
+kur_idx  <- st_nearest_feature(kur_sf, coast_pts)
+kur_dist <- coast_pts$dist_along[kur_idx]
+
+# sanity check
+coast_pts$side <- ifelse(coast_pts$dist_along <= kur_dist, "West", "East")
+plot(st_geometry(coast_pts), col = ifelse(coast_pts$dist_along <= kur_dist, "blue", "red"))
+
+coast_w <- coast_pts[coast_pts$side == "West", ] %>% st_combine() %>% st_cast("LINESTRING")
+coast_e <- coast_pts[coast_pts$side == "East", ] %>% st_combine() %>% st_cast("LINESTRING")
+
+# buffers + grid
+dist <- 0.6  # roughly miles
+
+buffer_w <- st_buffer(st_union(coast_w), dist)
+buffer_e <- st_buffer(st_union(coast_e), dist)
+buffered_region <- st_union(buffer_w, buffer_e)
+
+grid <- st_make_grid(buffered_region, cellsize = 0.05, what = "polygons")
+grid_int <- st_intersection(grid, buffered_region)
+############
+
+## interpolate
+##############
+sf_surv_w <- st_as_sf(surv_interpolation_coasts[surv_interpolation_coasts$coast == "West", ], coords = c("long", "lat"), crs = 4326)
+sf_surv_e <- st_as_sf(surv_interpolation_coasts[surv_interpolation_coasts$coast == "East", ], coords = c("long", "lat"), crs = 4326)
+
+interpolated_curr_w <- idw(abs_current~1, sf_surv_w, grid_int)
+interpolated_fut_w <- idw(abs_future~1,  sf_surv_w, grid_int)
+interpolated_cf_w <- idw(CF_abs_offset~1, sf_surv_w, grid_int)
+
+interpolated_curr_e <- idw(abs_current~1, sf_surv_e, grid_int)
+interpolated_fut_e <- idw(abs_future~1,  sf_surv_e, grid_int)
+interpolated_cf_e <- idw(CF_abs_offset~1, sf_surv_e, grid_int)
+##############
+
+## combine west + east blend southern tip
+#########################################
+grid_cent <- st_centroid(grid_int)
+nearest_grid <- st_nearest_feature(grid_cent, coast_pts)
+grid_side <- coast_pts$side[nearest_grid]
+
+grid_lat <- st_coordinates(grid_cent)[, "Y"]
+kur_lat <- st_coordinates(kur_sf)[, "Y"]
+
+bandwidth_north_m <- 40000
+bandwidth_north_deg <- bandwidth_north_m / 111320
+
+d_lat <- grid_lat - kur_lat
+
+w_west <- ifelse(grid_side == "West", pmin(1, pmax(0, d_lat / bandwidth_north_deg)), 0)
+w_east <- 1 - w_west
+interpolated_curr <- interpolated_curr_w
+interpolated_curr$var1.pred <- w_west * interpolated_curr_w$var1.pred + w_east * interpolated_curr_e$var1.pred
+
+interpolated_fut <- interpolated_fut_w
+interpolated_fut$var1.pred <- w_west * interpolated_fut_w$var1.pred + w_east * interpolated_fut_e$var1.pred
+
+interpolated_cf <- interpolated_cf_w
+interpolated_cf$var1.pred <- w_west * interpolated_cf_w$var1.pred + w_east * interpolated_cf_e$var1.pred
+#########################################
+
+## rasterize
+############
+ext <- ext(st_bbox(interpolated_curr))
+rast_empty <- rast(ext, resolution = 0.05, crs = "+proj=longlat +datum=WGS84")
+
+sf_ls <- list(interpolated_curr, interpolated_fut, interpolated_cf)
+rast_ls <- list()
+for (i in seq_along(sf_ls)) {
+  rast = st_rasterize(sf_ls[[i]] %>% dplyr::select(var1.pred, geometry))
+  rast_ls[[i]] = rast
+}
+rast_all <- c(rast_ls)
+names(rast_all) <- c("interpolated_curr", "interpolated_fut", "interpolated_cf")
+
+# save
+saveRDS(rast_all, "results/fit_results/survival_interpolated.RDS")
+############
+
+## plotting setup
+#################
+# color ramp
+pal <- colorRamp(c("green", "red"))
+
+# masking region for interpolation
+interpolated_curr_masked <- interpolated_curr %>% filter(y >= 54 & y <= 61, x >= 8.5 & x <= 20)
+interpolated_fut_masked <- interpolated_fut %>% filter(y >= 54 & y <= 61, x >= 8.5 & x <= 20)
+interpolated_cf_masked <- interpolated_cf %>% filter(y >= 54 & y <= 61, x >= 8.5 & x <= 20)
+#################
+
+# plot curr
+###########
+surv_curr_coast <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_curr_masked), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "gray90") +
+  geom_point(data = surv_interpolation_coasts, aes(x = long, y = lat, fill = abs_current), shape = 21, size = 4) +
+  scale_fill_distiller(palette = "RdYlGn", limits = c(0, 1), direction = 1) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 1), direction = 1) +
+  geom_label_repel(data = surv_interpolation_coasts,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white",
+                  size = 2.5)+
+  geom_text(label = "North \nSea", 
+             x = 9.3, y = 57.9,
+             size = 3, fontface = "italic") +
+  geom_text(label = "Baltic \nSea", 
+             x = 18.7, y = 56.2,
+             size = 3, fontface = "italic") +
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = "(A) Absolute Survival", subtitle = "Current Treatment", x = "Longitude", y = "Latitude", fill = "Survival", col = "Survival")
+surv_curr_coast
+###########
+
+# plot fut
+###########
+surv_fut_coast <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_fut_masked), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "gray90") +
+  geom_point(data = surv_interpolation_coasts, aes(x = long, y = lat, fill = abs_future), shape = 21, size = 4) +
+  scale_fill_distiller(palette = "RdYlGn", limits = c(0, 1), direction = 1) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(0, 1), direction = 1) +
+  geom_label_repel(data = surv_interpolation_coasts,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white",
+                  size = 2.5)+
+  geom_text(label = "North \nSea", 
+             x = 9.3, y = 57.9,
+             size = 3, fontface = "italic") +
+  geom_text(label = "Baltic \nSea", 
+             x = 18.7, y = 56.2,
+             size = 3, fontface = "italic") +
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = "(B) Absolute Survival", subtitle = "Future Treatment", x = "Longitude", y = "Latitude", fill = "Survival", col = "Survival")
+surv_fut_coast
+###########
+
+# plot cf
+###########
+surv_cf_coast <- ggplot(data = world) +
+  theme_bw()+
+  geom_sf(data = st_as_sf(interpolated_cf_masked), mapping = aes(fill = var1.pred, col = var1.pred)) +
+  geom_sf(data = world_crop, fill = "gray90") +
+  geom_point(data = surv_interpolation_coasts, aes(x = long, y = lat, fill = CF_abs_offset), shape = 21, size = 4) +
+  scale_fill_distiller(palette = "RdYlGn", limits = c(-1, 0), direction = 1) +
+  scale_color_distiller(palette = "RdYlGn", limits = c(-1, 0), direction = 1) +
+  geom_label_repel(data = surv_interpolation_coasts,
+                  aes(x=long, y=lat, label = pop),
+                  fill = "white",
+                  size = 2.5)+
+  geom_text(label = "North \nSea", 
+             x = 9.3, y = 57.9,
+             size = 3, fontface = "italic") +
+  geom_text(label = "Baltic \nSea", 
+             x = 18.7, y = 56.2,
+             size = 3, fontface = "italic") +
+  theme(plot.title = element_text(size = 18), panel.grid.major = element_line(color = "aliceblue"),
+        panel.background = element_rect(fill = "aliceblue"), legend.position = 'right')+
+  labs(title = "(C) Survival Offset", subtitle = "Current to Future Treatment", x = "Longitude", y = "Latitude", fill = "Survival \nOffset", col = "Survival \nOffset")
+surv_cf_coast
+###########
+
+# export plots
+##############
+doc <- read_pptx() %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_curr_coast), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_fut_coast), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_cf_coast), location = ph_location(left = 1, top = 1, width = 6.5, height = 4))
+
+print(doc, target = "results/figures/climchg_fit_maps.pptx")
+##############
+```
+
 #### Length Plots
 
 ```{r}
@@ -197,7 +465,7 @@ len_cf <- clim_offs %>% filter(metric == "len")
 #################
 len_abs_map <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = world_crop, fill = 'white') +
   geom_point(data = len_cf, aes(x = long, y = lat, 
                                  fill = abs_future), 
              shape = 21, size = 4) +
@@ -216,7 +484,7 @@ len_abs_map
 #################
 len_rel_map <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = world_crop, fill = 'white') +
   geom_point(data = len_cf, aes(x = long, y = lat, 
                                  fill = CF_relative), 
              shape = 21, size = 4) +
@@ -235,7 +503,7 @@ len_rel_map
 ################
 len_abs_off_map <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = world_crop, fill = 'white') +
   geom_point(data = len_cf, aes(x = long, y = lat, 
                                  fill = CF_abs_offset), 
              shape = 21, size = 4) +
@@ -254,7 +522,7 @@ len_abs_off_map
 ################
 len_rel_off_map <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = world_crop, fill = 'white') +
   geom_point(data = len_cf, aes(x = long, y = lat, 
                                  fill = CF_rel_offset), 
              shape = 21, size = 4) +
@@ -286,7 +554,7 @@ weigh_cf <- clim_offs %>% filter(metric == "weigh")
 ###################
 weigh_abs_map <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = world_crop, fill = 'white') +
   geom_point(data = weigh_cf, aes(x = long, y = lat, 
                                  fill = abs_future), 
              shape = 21, size = 4) +
@@ -305,7 +573,7 @@ weigh_abs_map
 ###################
 weigh_rel_map <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = world_crop, fill = 'white') +
   geom_point(data = weigh_cf, aes(x = long, y = lat, 
                                  fill = CF_relative), 
              shape = 21, size = 4) +
@@ -324,7 +592,7 @@ weigh_rel_map
 #################
 weigh_abs_off_map <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = world_crop, fill = 'white') +
   geom_point(data = weigh_cf, aes(x = long, y = lat, 
                                  fill = CF_abs_offset), 
              shape = 21, size = 4) +
@@ -343,7 +611,7 @@ weigh_abs_off_map
 #################
 weigh_rel_off_map <- ggplot(data = world) +
   theme_bw()+
-  geom_sf(data = world_crop, fill = 'antiquewhite1') +
+  geom_sf(data = world_crop, fill = 'white') +
   geom_point(data = weigh_cf, aes(x = long, y = lat, 
                                  fill = CF_rel_offset), 
              shape = 21, size = 4) +
