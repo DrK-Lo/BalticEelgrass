@@ -6,9 +6,8 @@
 data/largeDat/*
 results/lg_results/*
 
-# ignore gea scripts
-src/GO_scripts/eelgrass_RDA_gea.Rmd
-src/GO_scripts/eelgrass_LEA_gea.Rmd
+# ignore .RDS objects
+results/GO_results/*.RDS
 
 # Session Data files
 .RData
