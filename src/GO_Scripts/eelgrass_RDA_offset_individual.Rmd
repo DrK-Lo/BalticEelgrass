@@ -51,14 +51,6 @@ trt_scaled <- read.csv("data/EnvDat/trt_scaled_ind_only_2026-09-04.csv")[,-1]
 exp_scaled <- read.csv("data/EnvDat/exp_scaled_ind_only_2026-09-04.csv")[,-1]
 sea_scaled_mll <- read.csv("data/EnvDat/mll_seascape_scaled_ind_only_2026-09-04.csv")[,-1]
 sea_scaled_full <- read.csv("data/EnvDat/full_seascape_scaled_ind_only_2026-09-04.csv")[,-1]
-
-## seascape data
-# seascape_sites_trim <- read.csv("data/seascape_data/seascape_sites_forinterpolation.csv")[,-1]
-# 
-# full_sea_dat_curr <- read.csv("data/EnvDat/fullsea_curr_forint.csv")[,-1]
-# mll_sea_dat_curr <- read.csv("data/EnvDat/mllsea_curr_forint.csv")[,-1]
-# full_sea_dat_fut <- read.csv("data/EnvDat/fullsea_fut_forint.csv")[,-1]
-# mll_sea_dat_fut <- read.csv("data/EnvDat/mllsea_fut_forint.csv")[,-1]
 ###############
 ```
 
@@ -590,7 +582,7 @@ inds_sea_ord_mll <- inds_sea_ord[!(duplicated(inds_sea_ord$mll)),]
 
 ### Environmental Data
 
-Environmental data has been pre-processed in the script "EnvDatProcess.Rmd". Here I just double check that everything looks right and is in the correct order to match with genomic data.
+Environmental data has been pre-processed in the script "env_preprocess.Rmd". Here I just double check that everything looks right and is in the correct order to match with genomic data.
 
 ```{r}
 # inspect data
@@ -654,25 +646,6 @@ end <- (Sys.time())
 print(end-start)
 #############
 
-# outlier detection
-###################
-# K = 2 for first 2 axes
-rdadapt_sea_mll <- rdadapt::rdadapt(RDA = rda_mll, K = 2)
-rdadapt_sea_full <- rdadapt::rdadapt(RDA = rda_full, K = 2)
-
-# bonferroni correction
-# P-values threshold after Bonferroni correction
-thres_env_mll <- 0.01 / length(rdadapt_sea_mll$p.values)
-thres_env_full <- 0.01 / length(rdadapt_sea_full$p.values)
-
-# Identifying the loci that are below the p-value threshold
-outliers_mll <- (1:ncol(geno_mll))[which(rdadapt_sea_mll$p.values < thres_env_mll)]
-length(outliers_mll) # 374 outliers
-
-outliers_full <- (1:ncol(geno_full))[which(rdadapt_sea_full$p.values < thres_env_full)]
-length(outliers_full) # 497 outliers
-###################
-
 # model selection
 #################
 # model sel
@@ -697,29 +670,6 @@ length(outliers_full) # 497 outliers
 # (signif_mll <- anova.cca(rda_mll, parallel=getOption("mc.cores"))) # signif
 # (signif_full <- anova.cca(rda_full, parallel=getOption("mc.cores"))) # signif
 #################
-
-# retrain on outliers
-#####################
-# outlier datasets
-geno_mll_out <- geno_mll[,outliers_mll]
-geno_full_out <- geno_full[,outliers_full]
-
-# mll
-start <- (Sys.time())
-rda_mll_out <- rda(geno_mll_out ~ ., as.data.frame(sea_scaled_mll_red))
-plot(rda_mll_out)
-screeplot(rda_mll_out, main = "Eigenvalues of constrained axes")
-end <- (Sys.time())
-print(end-start)
-
-# full
-start <- (Sys.time())
-rda_full_out <- rda(geno_full_out ~ ., as.data.frame(sea_scaled_full_red))
-plot(rda_full_out)
-screeplot(rda_full_out, main = "Eigenvalues of constrained axes")
-end <- (Sys.time())
-print(end-start)
-#####################
 ```
 
 
@@ -753,98 +703,7 @@ offsets_rda_l <- offsets_rda %>% pivot_longer(cols = c(offset_mll, offset_full),
 write.csv(offsets_rda, paste0("results/GO_results/RDA_offsets_exptrt_ind_wide_",Sys.Date(),".csv"))
 write.csv(offsets_rda_l, paste0("results/GO_results/RDA_offsets_exptrt_ind_long_",Sys.Date(),".csv"))
 ###########
-
-# outlier version
-#################
-# estimate genomic offset
-offsets_mll_out <- rdadapt::genomic_offset(RDA = rda_mll_out, 
-                              K = 2, # because we only have 4 axes, we can only have max K = 4 - instead I will use just the first two axes (broken stick criterion)
-                              env_pres = as.data.frame(exp_scaled_red), 
-                              env_fut = as.data.frame(trt_scaled_red), 
-                              method = "loadings")
-offsets_full_out <- rdadapt::genomic_offset(RDA = rda_full_out,
-                                 K = 1, # because we only have 4 axes, we can only have max K = 4 - instead I will use just the two axes (broken stick criterion)
-                                 env_pres = as.data.frame(exp_scaled_red), 
-                                 env_fut = as.data.frame(trt_scaled_red), 
-                                 method = "loadings")
-
-# add metadata
-offsets_rda_out <- data.frame(pop = trt_scaled$pop, trt = trt_scaled$trt, bagnum = as.numeric(trt_scaled$bagnum_text), offset_mll = offsets_mll_out$genomic_offset$Global, offset_full = offsets_full_out$genomic_offset$Global)
-
-# long version
-offsets_rda_l_out <- offsets_rda_out %>% pivot_longer(cols = c(offset_mll, offset_full), names_to = "cc", values_to = "offset") %>% mutate(cc = str_split_fixed(cc, "_", 2)[,2]) %>% as.data.frame()
-
-# save offsets
-write.csv(offsets_rda_l_out, paste0("results/GO_results/RDA_offsets_exptrt_ind_outliers_long_",Sys.Date(),".csv"))
-#################
 ```
-
-Seascape offset prediction
-
-```{r}
-# # seascape env data
-# full_sea_dat_curr_red <- full_sea_dat_curr %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
-# full_sea_dat_fut_red <- full_sea_dat_fut %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
-# mll_sea_dat_curr_red <- mll_sea_dat_curr %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
-# mll_sea_dat_fut_red <- mll_sea_dat_fut %>% dplyr::select(median_temp, max_temp, median_sal, min_sal)
-# 
-# # estimate genomic offset
-# offsets_mll_sea_curr <- rdadapt::genomic_offset(RDA = rda_mll, 
-#                               K = 2,
-#                               env_pres = as.data.frame(sea_scaled_mll_red), 
-#                               env_fut = as.data.frame(mll_sea_dat_curr_red), 
-#                               method = "loadings")
-# offsets_full_sea_curr <- rdadapt::genomic_offset(RDA = rda_full,
-#                                  K = 2,
-#                                  env_pres = as.data.frame(sea_scaled_full_red),
-#                                  env_fut = as.data.frame(full_sea_dat_curr_red), 
-#                                  method = "loadings")
-# 
-# offsets_mll_sea_fut <- rdadapt::genomic_offset(RDA = rda_mll, 
-#                               K = 2,
-#                               env_pres = as.data.frame(sea_scaled_mll_red), 
-#                               env_fut = as.data.frame(mll_sea_dat_fut_red), 
-#                               method = "loadings")
-# offsets_full_sea_fut <- rdadapt::genomic_offset(RDA = rda_full,
-#                                  K = 2,
-#                                  env_pres = as.data.frame(sea_scaled_full_red),
-#                                  env_fut = as.data.frame(full_sea_dat_fut_red), 
-#                                  method = "loadings")
-# 
-# # offset dfs
-# offsets_mll_sea_go_df <- data.frame(offset_current = offsets_mll_sea_curr$genomic_offset$Global, offset_future = offsets_mll_sea_fut$genomic_offset$Global)
-# 
-# offsets_full_sea_go_df <- data.frame(offset_current = offsets_full_sea_curr$genomic_offset$Global, offset_future = offsets_full_sea_fut$genomic_offset$Global)
-# 
-# # add metadata
-# mll_info <- mll_sea_dat_curr %>% dplyr::select(coast, pop, indv_no, site_full) %>% mutate(method = "rda_offset")
-# full_info <- full_sea_dat_curr %>% dplyr::select(coast, pop, indv_no, site_full) %>% mutate(method = "rda_offset")
-# 
-# offsets_mll_sea_go <- cbind(mll_info, offsets_mll_sea_go_df)
-# offsets_full_sea_go <- cbind(full_info, offsets_full_sea_go_df)
-# 
-# # trim to relevant populations
-# offsets_mll_sea_go_trim <- offsets_mll_sea_go[offsets_mll_sea_go$pop %in% seascape_sites_trim$pop,]
-# offsets_full_sea_go_trim <- offsets_full_sea_go[offsets_full_sea_go$pop %in% seascape_sites_trim$pop,]
-# 
-# # summarize
-# offsets_mll_summary <- offsets_mll_sea_go_trim %>% 
-#   group_by(pop) %>% 
-#   summarize(go_current_mll = mean(offset_current), go_future_mll = mean(offset_future))
-# offsets_mll_summary_df <- merge(seascape_sites_trim, offsets_mll_summary, by = "pop") %>% arrange(order) %>% mutate(cc = "mll")
-# 
-# offsets_full_summary <- offsets_full_sea_go_trim %>% 
-#   group_by(pop) %>% 
-#   summarize(go_current_full = mean(offset_current), go_future_full = mean(offset_future))
-# offsets_full_summary_df <- merge(seascape_sites_trim, offsets_full_summary, by = "pop") %>% arrange(order) %>% mutate(cc = "full")
-# 
-# # combine
-# offsets_summary_df <- merge(offsets_mll_summary_df, offsets_full_summary, by = "pop") %>% mutate(method = "rda_offset")
-# 
-# # write info
-# write.csv(offsets_summary_df, "results/GO_results/rda_offset_seascape_go.csv")
-```
-
 
 ## Plotting
 
@@ -856,8 +715,8 @@ exp_pops$order <- 1:8
 offsets_rda_plotting <- merge(exp_pops, offsets_rda, by = "pop")
 offsets_rda_plotting_out <- merge(exp_pops, offsets_rda_out, by = "pop")
 
-# plot all loci
-###############
+# plot
+######
 ggplot(offsets_rda_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_mll))) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0, max(offsets_rda_plotting$offset_mll))) +
@@ -870,22 +729,6 @@ ggplot(offsets_rda_plotting, aes(x = fct_reorder(pop, order), y = trt, fill = (o
   scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0, max(offsets_rda_plotting$offset_full))) +
   theme_classic() +
   labs(title = "Genomic Offsets (RDA, Full)", x = "Population", y = "Treatment", fill = "Offset")
-###############
-
-# plot outliers
-###############
-ggplot(offsets_rda_plotting_out, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_mll))) +
-  geom_tile(color = "white") +
-  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,max(offsets_rda_plotting_out$offset_mll))) +
-  theme_classic() +
-  labs(title = "Genomic Offsets (RDA, MLL): Outliers", x = "Population", y = "Treatment", fill = "Offset")
-
-# and the full offsets
-ggplot(offsets_rda_plotting_out, aes(x = fct_reorder(pop, order), y = trt, fill = (offset_full))) +
-  geom_tile(color = "white") +
-  scale_fill_viridis_c(option = "magma", direction = -1, limits = c(0,max(offsets_rda_plotting_out$offset_full))) +
-  theme_classic() +
-  labs(title = "Genomic Offsets (RDA, Full): Outliers", x = "Population", y = "Treatment", fill = "Offset")
-###############
+######
 ```
 

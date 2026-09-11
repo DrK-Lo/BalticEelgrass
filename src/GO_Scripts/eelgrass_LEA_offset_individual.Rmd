@@ -58,16 +58,6 @@ trt_scaled <- read.csv("data/EnvDat/trt_scaled_ind_only_2026-09-04.csv")[,-1]
 exp_scaled <- read.csv("data/EnvDat/exp_scaled_ind_only_2026-09-04.csv")[,-1]
 sea_scaled_mll <- read.csv("data/EnvDat/mll_seascape_scaled_ind_only_2026-09-04.csv")[,-1]
 sea_scaled_full <- read.csv("data/EnvDat/full_seascape_scaled_ind_only_2026-09-04.csv")[,-1]
-
-## seascape data
-# seascape_sites_trim <- read.csv("data/seascape_data/seascape_sites_forinterpolation.csv")[,-1]
-# sea_scaled_full_curr <- read.env("data/EnvDat/fullsea_curr_forint.env")
-# sea_scaled_mll_curr <- read.env("data/EnvDat/mllsea_curr_forint.env")
-# sea_scaled_full_fut <- read.env("data/EnvDat/fullsea_fut_forint.env")
-# sea_scaled_mll_fut <- read.env("data/EnvDat/mllsea_fut_forint.env")
-# 
-# full_sea_dat <- read.csv("data/EnvDat/fullsea_curr_forint.csv")[,c("coast", "cf", "pop", "mll_no", "indv_no", "site_full", "trt")]
-# mll_sea_dat <- read.csv("data/EnvDat/mllsea_curr_forint.csv")[,c("coast", "cf", "pop", "mll_no", "indv_no", "site_full", "trt")]
 ```
 
 ## Data Prep
@@ -207,53 +197,6 @@ gap_df$method <- gap_df_wide$method <- "lea_offset"
 # save offsets
 write.csv(gap_df, paste0("results/GO_results/LEA_offsets_exptrt_ind_long_",Sys.Date(),".csv"))
 write.csv(gap_df_wide, paste0("results/GO_results/LEA_offsets_exptrt_ind_wide_",Sys.Date(),".csv"))
-```
-
-I will also predict offsets for the seascape populations in order to interpolate across the study range. 
-
-```{r}
-# current
-gg_full_sea_curr <- genetic.offset(input = lfmm_full,
-                          env = curr_full_env,
-                          pred.env = sea_scaled_full_curr, 
-                          K = 12)
-gg_mll_sea_curr <- genetic.offset(input = lfmm_mll,
-                          env = curr_mll_env,
-                          pred.env = sea_scaled_mll_curr, 
-                          K = 12)
-
-# future
-gg_full_sea_fut <- genetic.offset(input = lfmm_full,
-                          env = curr_full_env,
-                          pred.env = sea_scaled_full_fut, 
-                          K = 12)
-gg_mll_sea_fut <- genetic.offset(input = lfmm_mll,
-                          env = curr_mll_env,
-                          pred.env = sea_scaled_mll_fut, 
-                          K = 12)
-
-# df
-sea_full_go_df <- data.frame(pop = names(gg_full_sea_curr$offset), go_current = gg_full_sea_curr$offset, go_future = gg_full_sea_fut$offset, cc = "full")
-sea_mll_go_df <- data.frame(pop = names(gg_mll_sea_curr$offset), go_current = gg_mll_sea_curr$offset, go_future = gg_mll_sea_fut$offset, cc = "mll")
-sea_go_df <- rbind(sea_full_go_df, sea_mll_go_df)
-
-# write this out
-write.csv(sea_go_df, "results/GO_results/seascape_GO_all.csv")
-
-# averages by population
-sea_full_go_avg <- sea_full_go_df %>% 
-  group_by(pop) %>% 
-  summarize(go_current_full = mean(go_current), go_future_full = mean(go_future))
-sea_mll_go_avg <- sea_mll_go_df %>% 
-  group_by(pop) %>% 
-  summarize(go_current_mll = mean(go_current), go_future_mll = mean(go_future))
-sea_go_avg <- merge(sea_full_go_avg, sea_mll_go_avg, by = "pop")
-
-# subset to relevant seascape populations, i.e. coastal swedish populations by merging with trimmed metadata
-sea_go_trim <- merge(seascape_sites_trim, sea_go_avg, by = "pop") %>% arrange(order) %>% mutate(method = "lea_offset")
-
-# write
-write.csv(sea_go_trim, "results/GO_results/lea_offset_seascape_go.csv")
 ```
 
 ## Offset Plotting
