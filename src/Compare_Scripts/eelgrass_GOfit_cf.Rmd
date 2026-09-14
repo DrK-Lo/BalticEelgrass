@@ -23,17 +23,9 @@ library(multcompView)
 # data
 # exp fit
 fit_full <- read.csv("data/experiment/eelgrass_mesocosm_start_end_complete.csv")[,-1]
-# surv <- read.csv("data/experiment/survival_dat_trt_pop.csv")[,-1] # not using pop data
 grow <- read.csv("data/experiment/fit_growth_dat.csv")[,-1]
 
-# go
-lea <- read.csv("results/GO_results/LEA_offsets_exptrt_wide_2025-12-03.csv")[,-1]
-# lea_cand <- read.csv("results/GO_results/LEA_offsets_exptrt_wide_gea_2026-06-30.csv")[,-1]
-rda <- read.csv("results/GO_results/RDA_offsets_exptrt_wide_2026-01-02.csv")[,-1]
-gf <- read.csv("results/GO_results/GF_offsets_exptrt_wide_2025-12-03.csv")[,-1]
-env_dist <- read.csv("results/GO_results/euclidean_long_trt_exp.csv")[,-1]
-
-# individual
+# go individual
 lea_ind <- read.csv("results/GO_results/LEA_offsets_exptrt_ind_long_2026-09-07.csv")[,-1]
 rda_ind <- read.csv("results/GO_results/RDA_offsets_exptrt_ind_long_2026-09-07.csv")[,-1]
 gf_ind <- read.csv("results/GO_results/GF_offsets_exptrt_ind_long_2026-09-07.csv")[,-1]
@@ -50,41 +42,6 @@ I will start by comparing genomic offset to fitness metrics, specifically surviv
 #### Genomic Offsets
 
 ```{r}
-## pop level
-############
-# lea
-lea_long <- lea %>% pivot_longer(
-  cols = c(BAR, BJO, HOG, HOR, KAL, KUR, VAT, VIK),
-  names_to = "pop",
-  values_to = "lea_offset")
-
-# rda
-rda_long <- rda %>% pivot_longer(
-  cols = c(BAR, BJO, HOG, HOR, KAL, KUR, VAT, VIK),
-  names_to = "pop",
-  values_to = "rda_offset")
-
-# gf
-gf_long <- gf %>% pivot_longer(
-  cols = c(BAR, BJO, HOG, HOR, KAL, KUR, VAT, VIK),
-  names_to = "pop",
-  values_to = "gf_offset")
-
-# env dist
-env_dist_trt <- env_dist %>% filter(pops1 %in% c("TempWarm-5psu", "TempWarm-16psu", "TempControl-7psu", "TempControl-21psu") & !(pops2 %in% c("TempWarm-5psu", "TempWarm-16psu", "TempControl-7psu", "TempControl-21psu"))) %>% dplyr::select(pops1, pops2, distances) %>% rename(pop = pops2, trt = pops1, env_dist = distances)
-
-# put everything together
-go1 <- merge(lea_long, rda_long, by = c("trt", "cc", "pop"))
-go2 <- merge(go1, gf_long[gf_long$mod == "geno", c("trt","pop","cc","gf_offset")], by = c("trt", "cc", "pop"))
-go_wide <- merge(go2, env_dist_trt, by = c("pop", "trt"))
-
-# long version of all
-go_long <- go_wide %>% pivot_longer(
-  cols = c("lea_offset","rda_offset","gf_offset", "env_dist"),
-  names_to = "method",
-  values_to = "offset")
-############
-
 ## ind level
 ############
 # lea already in long format
@@ -145,7 +102,7 @@ surv_offsets <- go_surv %>%
   summarize(surv = mean(isAlive)) %>% 
   pivot_wider(id_cols = pop, names_from = curr_fut, values_from = c(surv)) %>%
   mutate(surv_offset = current - future) %>% 
-  rename(current_surv = current, future_surv = future) %>%
+  rename(current_surv = current, future_surv = future)
 ```
 
 #### Combine GOfit
@@ -162,12 +119,12 @@ go_clim_ind_e <- go_long_ind %>% filter(pop %in% e_pops & trt %in% e_trts)
 go_clim_ind <- rbind(go_clim_ind_w, go_clim_ind_e)
 
 # combine with survival and growth data
-go_surv <- merge(go_clim, surv_all, by = c("pop", "trt"))
-go_grow <- merge(go_clim, grow_trim, by = c("pop", "trt"))
-
-# also combine individual level gos/fitness
 go_surv_ind <- merge(go_clim_ind, surv_all, by = c("bagnum", "pop", "trt"))
 go_grow_ind <- merge(go_clim_ind, grow_trim, by = c("bagnum", "pop", "trt"))
+
+# also fully factorial data
+go_surv <- merge(go_long_ind, surv_all, by = c("bagnum", "pop", "trt"))
+go_grow <- merge(go_long_ind, grow_trim, by = c("bagnum", "pop", "trt"))
 ```
 
 
@@ -218,7 +175,7 @@ gofit_corr <- function(df, go, clone, fit_met) {
 }
 ```
 
-#### Calculating Correlations - Populations
+#### Calculating Correlations - Fully Factorial
 
 Overall
 
@@ -229,21 +186,21 @@ Overall
 surv_corr_lea_full <- gofit_corr(df = go_surv, go = "lea_offset", clone = "full", fit_met = "surv")
 surv_corr_rda_full <- gofit_corr(df = go_surv, go = "rda_offset", clone = "full", fit_met = "surv")
 surv_corr_gf_full <- gofit_corr(df = go_surv, go = "gf_offset", clone = "full", fit_met = "surv")
-surv_corr_envdist_full <- gofit_corr(df = go_surv, go = "env_dist", clone = "full", fit_met = "surv")
+surv_corr_envdist_full <- gofit_corr(df = go_surv, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_full <- rbind(surv_corr_lea_full, surv_corr_rda_full, surv_corr_gf_full, surv_corr_envdist_full)
 
 # length
 len_corr_lea_full <- gofit_corr(df = go_grow, go = "lea_offset", clone = "full", fit_met = "len")
 len_corr_rda_full <- gofit_corr(df = go_grow, go = "rda_offset", clone = "full", fit_met = "len")
 len_corr_gf_full <- gofit_corr(df = go_grow, go = "gf_offset", clone = "full", fit_met = "len")
-len_corr_envdist_full <- gofit_corr(df = go_grow, go = "env_dist", clone = "full", fit_met = "len")
+len_corr_envdist_full <- gofit_corr(df = go_grow, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_full <- rbind(len_corr_lea_full, len_corr_rda_full, len_corr_gf_full, len_corr_envdist_full)
 
 # weight
 weigh_corr_lea_full <- gofit_corr(df = go_grow, go = "lea_offset", clone = "full", fit_met = "weigh")
 weigh_corr_rda_full <- gofit_corr(df = go_grow, go = "rda_offset", clone = "full", fit_met = "weigh")
 weigh_corr_gf_full <- gofit_corr(df = go_grow, go = "gf_offset", clone = "full", fit_met = "weigh")
-weigh_corr_envdist_full <- gofit_corr(df = go_grow, go = "env_dist", clone = "full", fit_met = "weigh")
+weigh_corr_envdist_full <- gofit_corr(df = go_grow, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_full <- rbind(weigh_corr_lea_full, weigh_corr_rda_full, weigh_corr_gf_full, weigh_corr_envdist_full)
 #######
 
@@ -253,21 +210,21 @@ weigh_corr_full <- rbind(weigh_corr_lea_full, weigh_corr_rda_full, weigh_corr_gf
 surv_corr_lea_mll <- gofit_corr(df = go_surv, go = "lea_offset", clone = "mll", fit_met = "surv")
 surv_corr_rda_mll <- gofit_corr(df = go_surv, go = "rda_offset", clone = "mll", fit_met = "surv")
 surv_corr_gf_mll <- gofit_corr(df = go_surv, go = "gf_offset", clone = "mll", fit_met = "surv")
-surv_corr_envdist_mll <- gofit_corr(df = go_surv, go = "env_dist", clone = "mll", fit_met = "surv")
+surv_corr_envdist_mll <- gofit_corr(df = go_surv, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_mll <- rbind(surv_corr_lea_mll, surv_corr_rda_mll, surv_corr_gf_mll, surv_corr_envdist_mll)
 
 # length
 len_corr_lea_mll <- gofit_corr(df = go_grow, go = "lea_offset", clone = "mll", fit_met = "len")
 len_corr_rda_mll <- gofit_corr(df = go_grow, go = "rda_offset", clone = "mll", fit_met = "len")
 len_corr_gf_mll <- gofit_corr(df = go_grow, go = "gf_offset", clone = "mll", fit_met = "len")
-len_corr_envdist_mll <- gofit_corr(df = go_grow, go = "env_dist", clone = "mll", fit_met = "len")
+len_corr_envdist_mll <- gofit_corr(df = go_grow, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_mll <- rbind(len_corr_lea_mll, len_corr_rda_mll, len_corr_gf_mll, len_corr_envdist_mll)
 
 # weight
 weigh_corr_lea_mll <- gofit_corr(df = go_grow, go = "lea_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_rda_mll <- gofit_corr(df = go_grow, go = "rda_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_gf_mll <- gofit_corr(df = go_grow, go = "gf_offset", clone = "mll", fit_met = "weigh")
-weigh_corr_envdist_mll <- gofit_corr(df = go_grow, go = "env_dist", clone = "mll", fit_met = "weigh")
+weigh_corr_envdist_mll <- gofit_corr(df = go_grow, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_mll <- rbind(weigh_corr_lea_mll, weigh_corr_rda_mll, weigh_corr_gf_mll, weigh_corr_envdist_mll)
 ######
 
@@ -289,21 +246,21 @@ go_grow_e <- go_grow[go_grow$coast_pop == "east",]
 surv_corr_lea_e_full <- gofit_corr(df = go_surv_e, go = "lea_offset", clone = "full", fit_met = "surv")
 surv_corr_rda_e_full <- gofit_corr(df = go_surv_e, go = "rda_offset", clone = "full", fit_met = "surv")
 surv_corr_gf_e_full <- gofit_corr(df = go_surv_e, go = "gf_offset", clone = "full", fit_met = "surv")
-surv_corr_envdist_e_full <- gofit_corr(df = go_surv_e, go = "env_dist", clone = "full", fit_met = "surv")
+surv_corr_envdist_e_full <- gofit_corr(df = go_surv_e, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_e_full <- rbind(surv_corr_lea_e_full, surv_corr_rda_e_full, surv_corr_gf_e_full, surv_corr_envdist_e_full)
 
 # length
 len_corr_lea_e_full <- gofit_corr(df = go_grow_e, go = "lea_offset", clone = "full", fit_met = "len")
 len_corr_rda_e_full <- gofit_corr(df = go_grow_e, go = "rda_offset", clone = "full", fit_met = "len")
 len_corr_gf_e_full <- gofit_corr(df = go_grow_e, go = "gf_offset", clone = "full", fit_met = "len")
-len_corr_envdist_e_full <- gofit_corr(df = go_grow_e, go = "env_dist", clone = "full", fit_met = "len")
+len_corr_envdist_e_full <- gofit_corr(df = go_grow_e, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_e_full <- rbind(len_corr_lea_e_full, len_corr_rda_e_full, len_corr_gf_e_full, len_corr_envdist_e_full)
 
 # weight
 weigh_corr_lea_e_full <- gofit_corr(df = go_grow_e, go = "lea_offset", clone = "full", fit_met = "weigh")
 weigh_corr_rda_e_full <- gofit_corr(df = go_grow_e, go = "rda_offset", clone = "full", fit_met = "weigh")
 weigh_corr_gf_e_full <- gofit_corr(df = go_grow_e, go = "gf_offset", clone = "full", fit_met = "weigh")
-weigh_corr_envdist_e_full <- gofit_corr(df = go_grow_e, go = "env_dist", clone = "full", fit_met = "weigh")
+weigh_corr_envdist_e_full <- gofit_corr(df = go_grow_e, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_e_full <- rbind(weigh_corr_lea_e_full, weigh_corr_rda_e_full, weigh_corr_gf_e_full, weigh_corr_envdist_e_full)
 
 # put together
@@ -320,21 +277,21 @@ go_grow_w <- go_grow[go_grow$coast_pop == "west",]
 surv_corr_lea_w_full <- gofit_corr(df = go_surv_w, go = "lea_offset", clone = "full", fit_met = "surv")
 surv_corr_rda_w_full <- gofit_corr(df = go_surv_w, go = "rda_offset", clone = "full", fit_met = "surv")
 surv_corr_gf_w_full <- gofit_corr(df = go_surv_w, go = "gf_offset", clone = "full", fit_met = "surv")
-surv_corr_envdist_w_full <- gofit_corr(df = go_surv_w, go = "env_dist", clone = "full", fit_met = "surv")
+surv_corr_envdist_w_full <- gofit_corr(df = go_surv_w, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_w_full <- rbind(surv_corr_lea_w_full, surv_corr_rda_w_full, surv_corr_gf_w_full, surv_corr_envdist_w_full)
 
 # length
 len_corr_lea_w_full <- gofit_corr(df = go_grow_w, go = "lea_offset", clone = "full", fit_met = "len")
 len_corr_rda_w_full <- gofit_corr(df = go_grow_w, go = "rda_offset", clone = "full", fit_met = "len")
 len_corr_gf_w_full <- gofit_corr(df = go_grow_w, go = "gf_offset", clone = "full", fit_met = "len")
-len_corr_envdist_w_full <- gofit_corr(df = go_grow_w, go = "env_dist", clone = "full", fit_met = "len")
+len_corr_envdist_w_full <- gofit_corr(df = go_grow_w, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_w_full <- rbind(len_corr_lea_w_full, len_corr_rda_w_full, len_corr_gf_w_full, len_corr_envdist_w_full)
 
 # weight
 weigh_corr_lea_w_full <- gofit_corr(df = go_grow_w, go = "lea_offset", clone = "full", fit_met = "weigh")
 weigh_corr_rda_w_full <- gofit_corr(df = go_grow_w, go = "rda_offset", clone = "full", fit_met = "weigh")
 weigh_corr_gf_w_full <- gofit_corr(df = go_grow_w, go = "gf_offset", clone = "full", fit_met = "weigh")
-weigh_corr_envdist_w_full <- gofit_corr(df = go_grow_w, go = "env_dist", clone = "full", fit_met = "weigh")
+weigh_corr_envdist_w_full <- gofit_corr(df = go_grow_w, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_w_full <- rbind(weigh_corr_lea_w_full, weigh_corr_rda_w_full, weigh_corr_gf_w_full, weigh_corr_envdist_w_full)
 
 # put together
@@ -352,21 +309,21 @@ go_grow_e <- go_grow[go_grow$coast_pop == "east",]
 surv_corr_lea_e_mll <- gofit_corr(df = go_surv_e, go = "lea_offset", clone = "mll", fit_met = "surv")
 surv_corr_rda_e_mll <- gofit_corr(df = go_surv_e, go = "rda_offset", clone = "mll", fit_met = "surv")
 surv_corr_gf_e_mll <- gofit_corr(df = go_surv_e, go = "gf_offset", clone = "mll", fit_met = "surv")
-surv_corr_envdist_e_mll <- gofit_corr(df = go_surv_e, go = "env_dist", clone = "mll", fit_met = "surv")
+surv_corr_envdist_e_mll <- gofit_corr(df = go_surv_e, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_e_mll <- rbind(surv_corr_lea_e_mll, surv_corr_rda_e_mll, surv_corr_gf_e_mll, surv_corr_envdist_e_mll)
 
 # length
 len_corr_lea_e_mll <- gofit_corr(df = go_grow_e, go = "lea_offset", clone = "mll", fit_met = "len")
 len_corr_rda_e_mll <- gofit_corr(df = go_grow_e, go = "rda_offset", clone = "mll", fit_met = "len")
 len_corr_gf_e_mll <- gofit_corr(df = go_grow_e, go = "gf_offset", clone = "mll", fit_met = "len")
-len_corr_envdist_e_mll <- gofit_corr(df = go_grow_e, go = "env_dist", clone = "mll", fit_met = "len")
+len_corr_envdist_e_mll <- gofit_corr(df = go_grow_e, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_e_mll <- rbind(len_corr_lea_e_mll, len_corr_rda_e_mll, len_corr_gf_e_mll, len_corr_envdist_e_mll)
 
 # weight
 weigh_corr_lea_e_mll <- gofit_corr(df = go_grow_e, go = "lea_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_rda_e_mll <- gofit_corr(df = go_grow_e, go = "rda_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_gf_e_mll <- gofit_corr(df = go_grow_e, go = "gf_offset", clone = "mll", fit_met = "weigh")
-weigh_corr_envdist_e_mll <- gofit_corr(df = go_grow_e, go = "env_dist", clone = "mll", fit_met = "weigh")
+weigh_corr_envdist_e_mll <- gofit_corr(df = go_grow_e, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_e_mll <- rbind(weigh_corr_lea_e_mll, weigh_corr_rda_e_mll, weigh_corr_gf_e_mll, weigh_corr_envdist_e_mll)
 
 # put together
@@ -383,21 +340,21 @@ go_grow_w <- go_grow[go_grow$coast_pop == "west",]
 surv_corr_lea_w_mll <- gofit_corr(df = go_surv_w, go = "lea_offset", clone = "mll", fit_met = "surv")
 surv_corr_rda_w_mll <- gofit_corr(df = go_surv_w, go = "rda_offset", clone = "mll", fit_met = "surv")
 surv_corr_gf_w_mll <- gofit_corr(df = go_surv_w, go = "gf_offset", clone = "mll", fit_met = "surv")
-surv_corr_envdist_w_mll <- gofit_corr(df = go_surv_w, go = "env_dist", clone = "mll", fit_met = "surv")
+surv_corr_envdist_w_mll <- gofit_corr(df = go_surv_w, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_w_mll <- rbind(surv_corr_lea_w_mll, surv_corr_rda_w_mll, surv_corr_gf_w_mll, surv_corr_envdist_w_mll)
 
 # length
 len_corr_lea_w_mll <- gofit_corr(df = go_grow_w, go = "lea_offset", clone = "mll", fit_met = "len")
 len_corr_rda_w_mll <- gofit_corr(df = go_grow_w, go = "rda_offset", clone = "mll", fit_met = "len")
 len_corr_gf_w_mll <- gofit_corr(df = go_grow_w, go = "gf_offset", clone = "mll", fit_met = "len")
-len_corr_envdist_w_mll <- gofit_corr(df = go_grow_w, go = "env_dist", clone = "mll", fit_met = "len")
+len_corr_envdist_w_mll <- gofit_corr(df = go_grow_w, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_w_mll <- rbind(len_corr_lea_w_mll, len_corr_rda_w_mll, len_corr_gf_w_mll, len_corr_envdist_w_mll)
 
 # weight
 weigh_corr_lea_w_mll <- gofit_corr(df = go_grow_w, go = "lea_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_rda_w_mll <- gofit_corr(df = go_grow_w, go = "rda_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_gf_w_mll <- gofit_corr(df = go_grow_w, go = "gf_offset", clone = "mll", fit_met = "weigh")
-weigh_corr_envdist_w_mll <- gofit_corr(df = go_grow_w, go = "env_dist", clone = "mll", fit_met = "weigh")
+weigh_corr_envdist_w_mll <- gofit_corr(df = go_grow_w, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_w_mll <- rbind(weigh_corr_lea_w_mll, weigh_corr_rda_w_mll, weigh_corr_gf_w_mll, weigh_corr_envdist_w_mll)
 
 # put together
@@ -421,21 +378,21 @@ go_grow_fut <- go_grow[go_grow$curr_fut == "future",]
 surv_corr_lea_full_fut <- gofit_corr(df = go_surv_fut, go = "lea_offset", clone = "full", fit_met = "surv")
 surv_corr_rda_full_fut <- gofit_corr(df = go_surv_fut, go = "rda_offset", clone = "full", fit_met = "surv")
 surv_corr_gf_full_fut <- gofit_corr(df = go_surv_fut, go = "gf_offset", clone = "full", fit_met = "surv")
-surv_corr_envdist_full_fut <- gofit_corr(df = go_surv_fut, go = "env_dist", clone = "full", fit_met = "surv")
+surv_corr_envdist_full_fut <- gofit_corr(df = go_surv_fut, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_full_fut <- rbind(surv_corr_lea_full_fut, surv_corr_rda_full_fut, surv_corr_gf_full_fut, surv_corr_envdist_full_fut)
 
 # length
 len_corr_lea_full_fut <- gofit_corr(df = go_grow_fut, go = "lea_offset", clone = "full", fit_met = "len")
 len_corr_rda_full_fut <- gofit_corr(df = go_grow_fut, go = "rda_offset", clone = "full", fit_met = "len")
 len_corr_gf_full_fut <- gofit_corr(df = go_grow_fut, go = "gf_offset", clone = "full", fit_met = "len")
-len_corr_envdist_full_fut <- gofit_corr(df = go_grow_fut, go = "env_dist", clone = "full", fit_met = "len")
+len_corr_envdist_full_fut <- gofit_corr(df = go_grow_fut, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_full_fut <- rbind(len_corr_lea_full_fut, len_corr_rda_full_fut, len_corr_gf_full_fut, len_corr_envdist_full_fut)
 
 # weight
 weigh_corr_lea_full_fut <- gofit_corr(df = go_grow_fut, go = "lea_offset", clone = "full", fit_met = "weigh")
 weigh_corr_rda_full_fut <- gofit_corr(df = go_grow_fut, go = "rda_offset", clone = "full", fit_met = "weigh")
 weigh_corr_gf_full_fut <- gofit_corr(df = go_grow_fut, go = "gf_offset", clone = "full", fit_met = "weigh")
-weigh_corr_envdist_full_fut <- gofit_corr(df = go_grow_fut, go = "env_dist", clone = "full", fit_met = "weigh")
+weigh_corr_envdist_full_fut <- gofit_corr(df = go_grow_fut, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_full_fut <- rbind(weigh_corr_lea_full_fut, weigh_corr_rda_full_fut, weigh_corr_gf_full_fut, weigh_corr_envdist_full_fut)
 #######
 
@@ -445,21 +402,21 @@ weigh_corr_full_fut <- rbind(weigh_corr_lea_full_fut, weigh_corr_rda_full_fut, w
 surv_corr_lea_mll_fut <- gofit_corr(df = go_surv_fut, go = "lea_offset", clone = "mll", fit_met = "surv")
 surv_corr_rda_mll_fut <- gofit_corr(df = go_surv_fut, go = "rda_offset", clone = "mll", fit_met = "surv")
 surv_corr_gf_mll_fut <- gofit_corr(df = go_surv_fut, go = "gf_offset", clone = "mll", fit_met = "surv")
-surv_corr_envdist_mll_fut <- gofit_corr(df = go_surv_fut, go = "env_dist", clone = "mll", fit_met = "surv")
+surv_corr_envdist_mll_fut <- gofit_corr(df = go_surv_fut, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_mll_fut <- rbind(surv_corr_lea_mll_fut, surv_corr_rda_mll_fut, surv_corr_gf_mll_fut, surv_corr_envdist_mll_fut)
 
 # length
 len_corr_lea_mll_fut <- gofit_corr(df = go_grow_fut, go = "lea_offset", clone = "mll", fit_met = "len")
 len_corr_rda_mll_fut <- gofit_corr(df = go_grow_fut, go = "rda_offset", clone = "mll", fit_met = "len")
 len_corr_gf_mll_fut <- gofit_corr(df = go_grow_fut, go = "gf_offset", clone = "mll", fit_met = "len")
-len_corr_envdist_mll_fut <- gofit_corr(df = go_grow_fut, go = "env_dist", clone = "mll", fit_met = "len")
+len_corr_envdist_mll_fut <- gofit_corr(df = go_grow_fut, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_mll_fut <- rbind(len_corr_lea_mll_fut, len_corr_rda_mll_fut, len_corr_gf_mll_fut, len_corr_envdist_mll_fut)
 
 # weight
 weigh_corr_lea_mll_fut <- gofit_corr(df = go_grow_fut, go = "lea_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_rda_mll_fut <- gofit_corr(df = go_grow_fut, go = "rda_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_gf_mll_fut <- gofit_corr(df = go_grow_fut, go = "gf_offset", clone = "mll", fit_met = "weigh")
-weigh_corr_envdist_mll_fut <- gofit_corr(df = go_grow_fut, go = "env_dist", clone = "mll", fit_met = "weigh")
+weigh_corr_envdist_mll_fut <- gofit_corr(df = go_grow_fut, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_mll_fut <- rbind(weigh_corr_lea_mll_fut, weigh_corr_rda_mll_fut, weigh_corr_gf_mll_fut, weigh_corr_envdist_mll_fut)
 ######
 
@@ -480,21 +437,21 @@ go_grow_e_fut <- go_grow[go_grow$coast_pop == "east" & go_surv$curr_fut == "futu
 surv_corr_lea_e_fut <- gofit_corr(df = go_surv_e_fut, go = "lea_offset", clone = "mll", fit_met = "surv")
 surv_corr_rda_e_fut <- gofit_corr(df = go_surv_e_fut, go = "rda_offset", clone = "mll", fit_met = "surv")
 surv_corr_gf_e_fut <- gofit_corr(df = go_surv_e_fut, go = "gf_offset", clone = "mll", fit_met = "surv")
-surv_corr_envdist_e_fut <- gofit_corr(df = go_surv_e_fut, go = "env_dist", clone = "mll", fit_met = "surv")
+surv_corr_envdist_e_fut <- gofit_corr(df = go_surv_e_fut, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_e_fut <- rbind(surv_corr_lea_e_fut, surv_corr_rda_e_fut, surv_corr_gf_e_fut, surv_corr_envdist_e_fut)
 
 # length
 len_corr_lea_e_fut <- gofit_corr(df = go_grow_e_fut, go = "lea_offset", clone = "mll", fit_met = "len")
 len_corr_rda_e_fut <- gofit_corr(df = go_grow_e_fut, go = "rda_offset", clone = "mll", fit_met = "len")
 len_corr_gf_e_fut <- gofit_corr(df = go_grow_e_fut, go = "gf_offset", clone = "mll", fit_met = "len")
-len_corr_envdist_e_fut <- gofit_corr(df = go_grow_e_fut, go = "env_dist", clone = "mll", fit_met = "len")
+len_corr_envdist_e_fut <- gofit_corr(df = go_grow_e_fut, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_e_fut <- rbind(len_corr_lea_e_fut, len_corr_rda_e_fut, len_corr_gf_e_fut, len_corr_envdist_e_fut)
 
 # weight
 weigh_corr_lea_e_fut <- gofit_corr(df = go_grow_e_fut, go = "lea_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_rda_e_fut <- gofit_corr(df = go_grow_e_fut, go = "rda_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_gf_e_fut <- gofit_corr(df = go_grow_e_fut, go = "gf_offset", clone = "mll", fit_met = "weigh")
-weigh_corr_envdist_e_fut <- gofit_corr(df = go_grow_e_fut, go = "env_dist", clone = "mll", fit_met = "weigh")
+weigh_corr_envdist_e_fut <- gofit_corr(df = go_grow_e_fut, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_e_fut <- rbind(weigh_corr_lea_e_fut, weigh_corr_rda_e_fut, weigh_corr_gf_e_fut, weigh_corr_envdist_e_fut)
 
 # put together
@@ -511,21 +468,21 @@ go_grow_w_fut <- go_grow[go_grow$coast_pop == "west" & go_surv$curr_fut == "futu
 surv_corr_lea_w_fut <- gofit_corr(df = go_surv_w_fut, go = "lea_offset", clone = "mll", fit_met = "surv")
 surv_corr_rda_w_fut <- gofit_corr(df = go_surv_w_fut, go = "rda_offset", clone = "mll", fit_met = "surv")
 surv_corr_gf_w_fut <- gofit_corr(df = go_surv_w_fut, go = "gf_offset", clone = "mll", fit_met = "surv")
-surv_corr_envdist_w_fut <- gofit_corr(df = go_surv_w_fut, go = "env_dist", clone = "mll", fit_met = "surv")
+surv_corr_envdist_w_fut <- gofit_corr(df = go_surv_w_fut, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_w_fut <- rbind(surv_corr_lea_w_fut, surv_corr_rda_w_fut, surv_corr_gf_w_fut, surv_corr_envdist_w_fut)
 
 # length
 len_corr_lea_w_fut <- gofit_corr(df = go_grow_w_fut, go = "lea_offset", clone = "mll", fit_met = "len")
 len_corr_rda_w_fut <- gofit_corr(df = go_grow_w_fut, go = "rda_offset", clone = "mll", fit_met = "len")
 len_corr_gf_w_fut <- gofit_corr(df = go_grow_w_fut, go = "gf_offset", clone = "mll", fit_met = "len")
-len_corr_envdist_w_fut <- gofit_corr(df = go_grow_w_fut, go = "env_dist", clone = "mll", fit_met = "len")
+len_corr_envdist_w_fut <- gofit_corr(df = go_grow_w_fut, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_w_fut <- rbind(len_corr_lea_w_fut, len_corr_rda_w_fut, len_corr_gf_w_fut, len_corr_envdist_w_fut)
 
 # weight
 weigh_corr_lea_w_fut <- gofit_corr(df = go_grow_w_fut, go = "lea_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_rda_w_fut <- gofit_corr(df = go_grow_w_fut, go = "rda_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_gf_w_fut <- gofit_corr(df = go_grow_w_fut, go = "gf_offset", clone = "mll", fit_met = "weigh")
-weigh_corr_envdist_w_fut <- gofit_corr(df = go_grow_w_fut, go = "env_dist", clone = "mll", fit_met = "weigh")
+weigh_corr_envdist_w_fut <- gofit_corr(df = go_grow_w_fut, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_w_fut <- rbind(weigh_corr_lea_w_fut, weigh_corr_rda_w_fut, weigh_corr_gf_w_fut, weigh_corr_envdist_w_fut)
 
 # put together
@@ -549,21 +506,21 @@ go_grow_curr <- go_grow[go_grow$curr_fut == "current",]
 surv_corr_lea_full_curr <- gofit_corr(df = go_surv_curr, go = "lea_offset", clone = "full", fit_met = "surv")
 surv_corr_rda_full_curr <- gofit_corr(df = go_surv_curr, go = "rda_offset", clone = "full", fit_met = "surv")
 surv_corr_gf_full_curr <- gofit_corr(df = go_surv_curr, go = "gf_offset", clone = "full", fit_met = "surv")
-surv_corr_envdist_full_curr <- gofit_corr(df = go_surv_curr, go = "env_dist", clone = "full", fit_met = "surv")
+surv_corr_envdist_full_curr <- gofit_corr(df = go_surv_curr, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_full_curr <- rbind(surv_corr_lea_full_curr, surv_corr_rda_full_curr, surv_corr_gf_full_curr, surv_corr_envdist_full_curr)
 
 # length
 len_corr_lea_full_curr <- gofit_corr(df = go_grow_curr, go = "lea_offset", clone = "full", fit_met = "len")
 len_corr_rda_full_curr <- gofit_corr(df = go_grow_curr, go = "rda_offset", clone = "full", fit_met = "len")
 len_corr_gf_full_curr <- gofit_corr(df = go_grow_curr, go = "gf_offset", clone = "full", fit_met = "len")
-len_corr_envdist_full_curr <- gofit_corr(df = go_grow_curr, go = "env_dist", clone = "full", fit_met = "len")
+len_corr_envdist_full_curr <- gofit_corr(df = go_grow_curr, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_full_curr <- rbind(len_corr_lea_full_curr, len_corr_rda_full_curr, len_corr_gf_full_curr, len_corr_envdist_full_curr)
 
 # weight
 weigh_corr_lea_full_curr <- gofit_corr(df = go_grow_curr, go = "lea_offset", clone = "full", fit_met = "weigh")
 weigh_corr_rda_full_curr <- gofit_corr(df = go_grow_curr, go = "rda_offset", clone = "full", fit_met = "weigh")
 weigh_corr_gf_full_curr <- gofit_corr(df = go_grow_curr, go = "gf_offset", clone = "full", fit_met = "weigh")
-weigh_corr_envdist_full_curr <- gofit_corr(df = go_grow_curr, go = "env_dist", clone = "full", fit_met = "weigh")
+weigh_corr_envdist_full_curr <- gofit_corr(df = go_grow_curr, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_full_curr <- rbind(weigh_corr_lea_full_curr, weigh_corr_rda_full_curr, weigh_corr_gf_full_curr, weigh_corr_envdist_full_curr)
 #######
 
@@ -573,21 +530,21 @@ weigh_corr_full_curr <- rbind(weigh_corr_lea_full_curr, weigh_corr_rda_full_curr
 surv_corr_lea_mll_curr <- gofit_corr(df = go_surv_curr, go = "lea_offset", clone = "mll", fit_met = "surv")
 surv_corr_rda_mll_curr <- gofit_corr(df = go_surv_curr, go = "rda_offset", clone = "mll", fit_met = "surv")
 surv_corr_gf_mll_curr <- gofit_corr(df = go_surv_curr, go = "gf_offset", clone = "mll", fit_met = "surv")
-surv_corr_envdist_mll_curr <- gofit_corr(df = go_surv_curr, go = "env_dist", clone = "mll", fit_met = "surv")
+surv_corr_envdist_mll_curr <- gofit_corr(df = go_surv_curr, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_mll_curr <- rbind(surv_corr_lea_mll_curr, surv_corr_rda_mll_curr, surv_corr_gf_mll_curr, surv_corr_envdist_mll_curr)
 
 # length
 len_corr_lea_mll_curr <- gofit_corr(df = go_grow_curr, go = "lea_offset", clone = "mll", fit_met = "len")
 len_corr_rda_mll_curr <- gofit_corr(df = go_grow_curr, go = "rda_offset", clone = "mll", fit_met = "len")
 len_corr_gf_mll_curr <- gofit_corr(df = go_grow_curr, go = "gf_offset", clone = "mll", fit_met = "len")
-len_corr_envdist_mll_curr <- gofit_corr(df = go_grow_curr, go = "env_dist", clone = "mll", fit_met = "len")
+len_corr_envdist_mll_curr <- gofit_corr(df = go_grow_curr, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_mll_curr <- rbind(len_corr_lea_mll_curr, len_corr_rda_mll_curr, len_corr_gf_mll_curr, len_corr_envdist_mll_curr)
 
 # weight
 weigh_corr_lea_mll_curr <- gofit_corr(df = go_grow_curr, go = "lea_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_rda_mll_curr <- gofit_corr(df = go_grow_curr, go = "rda_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_gf_mll_curr <- gofit_corr(df = go_grow_curr, go = "gf_offset", clone = "mll", fit_met = "weigh")
-weigh_corr_envdist_mll_curr <- gofit_corr(df = go_grow_curr, go = "env_dist", clone = "mll", fit_met = "weigh")
+weigh_corr_envdist_mll_curr <- gofit_corr(df = go_grow_curr, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_mll_curr <- rbind(weigh_corr_lea_mll_curr, weigh_corr_rda_mll_curr, weigh_corr_gf_mll_curr, weigh_corr_envdist_mll_curr)
 ######
 
@@ -608,21 +565,21 @@ go_grow_e_curr <- go_grow[go_grow$coast_pop == "east" & go_surv$curr_fut == "cur
 surv_corr_lea_e_curr <- gofit_corr(df = go_surv_e_curr, go = "lea_offset", clone = "mll", fit_met = "surv")
 surv_corr_rda_e_curr <- gofit_corr(df = go_surv_e_curr, go = "rda_offset", clone = "mll", fit_met = "surv")
 surv_corr_gf_e_curr <- gofit_corr(df = go_surv_e_curr, go = "gf_offset", clone = "mll", fit_met = "surv")
-surv_corr_envdist_e_curr <- gofit_corr(df = go_surv_e_curr, go = "env_dist", clone = "mll", fit_met = "surv")
+surv_corr_envdist_e_curr <- gofit_corr(df = go_surv_e_curr, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_e_curr <- rbind(surv_corr_lea_e_curr, surv_corr_rda_e_curr, surv_corr_gf_e_curr, surv_corr_envdist_e_curr)
 
 # length
 len_corr_lea_e_curr <- gofit_corr(df = go_grow_e_curr, go = "lea_offset", clone = "mll", fit_met = "len")
 len_corr_rda_e_curr <- gofit_corr(df = go_grow_e_curr, go = "rda_offset", clone = "mll", fit_met = "len")
 len_corr_gf_e_curr <- gofit_corr(df = go_grow_e_curr, go = "gf_offset", clone = "mll", fit_met = "len")
-len_corr_envdist_e_curr <- gofit_corr(df = go_grow_e_curr, go = "env_dist", clone = "mll", fit_met = "len")
+len_corr_envdist_e_curr <- gofit_corr(df = go_grow_e_curr, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_e_curr <- rbind(len_corr_lea_e_curr, len_corr_rda_e_curr, len_corr_gf_e_curr, len_corr_envdist_e_curr)
 
 # weight
 weigh_corr_lea_e_curr <- gofit_corr(df = go_grow_e_curr, go = "lea_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_rda_e_curr <- gofit_corr(df = go_grow_e_curr, go = "rda_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_gf_e_curr <- gofit_corr(df = go_grow_e_curr, go = "gf_offset", clone = "mll", fit_met = "weigh")
-weigh_corr_envdist_e_curr <- gofit_corr(df = go_grow_e_curr, go = "env_dist", clone = "mll", fit_met = "weigh")
+weigh_corr_envdist_e_curr <- gofit_corr(df = go_grow_e_curr, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_e_curr <- rbind(weigh_corr_lea_e_curr, weigh_corr_rda_e_curr, weigh_corr_gf_e_curr, weigh_corr_envdist_e_curr)
 
 # put together
@@ -639,21 +596,21 @@ go_grow_w_curr <- go_grow[go_grow$coast_pop == "west" & go_surv$curr_fut == "cur
 surv_corr_lea_w_curr <- gofit_corr(df = go_surv_w_curr, go = "lea_offset", clone = "mll", fit_met = "surv")
 surv_corr_rda_w_curr <- gofit_corr(df = go_surv_w_curr, go = "rda_offset", clone = "mll", fit_met = "surv")
 surv_corr_gf_w_curr <- gofit_corr(df = go_surv_w_curr, go = "gf_offset", clone = "mll", fit_met = "surv")
-surv_corr_envdist_w_curr <- gofit_corr(df = go_surv_w_curr, go = "env_dist", clone = "mll", fit_met = "surv")
+surv_corr_envdist_w_curr <- gofit_corr(df = go_surv_w_curr, go = "env_dist", clone = "none", fit_met = "surv")
 surv_corr_w_curr <- rbind(surv_corr_lea_w_curr, surv_corr_rda_w_curr, surv_corr_gf_w_curr, surv_corr_envdist_w_curr)
 
 # length
 len_corr_lea_w_curr <- gofit_corr(df = go_grow_w_curr, go = "lea_offset", clone = "mll", fit_met = "len")
 len_corr_rda_w_curr <- gofit_corr(df = go_grow_w_curr, go = "rda_offset", clone = "mll", fit_met = "len")
 len_corr_gf_w_curr <- gofit_corr(df = go_grow_w_curr, go = "gf_offset", clone = "mll", fit_met = "len")
-len_corr_envdist_w_curr <- gofit_corr(df = go_grow_w_curr, go = "env_dist", clone = "mll", fit_met = "len")
+len_corr_envdist_w_curr <- gofit_corr(df = go_grow_w_curr, go = "env_dist", clone = "none", fit_met = "len")
 len_corr_w_curr <- rbind(len_corr_lea_w_curr, len_corr_rda_w_curr, len_corr_gf_w_curr, len_corr_envdist_w_curr)
 
 # weight
 weigh_corr_lea_w_curr <- gofit_corr(df = go_grow_w_curr, go = "lea_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_rda_w_curr <- gofit_corr(df = go_grow_w_curr, go = "rda_offset", clone = "mll", fit_met = "weigh")
 weigh_corr_gf_w_curr <- gofit_corr(df = go_grow_w_curr, go = "gf_offset", clone = "mll", fit_met = "weigh")
-weigh_corr_envdist_w_curr <- gofit_corr(df = go_grow_w_curr, go = "env_dist", clone = "mll", fit_met = "weigh")
+weigh_corr_envdist_w_curr <- gofit_corr(df = go_grow_w_curr, go = "env_dist", clone = "none", fit_met = "weigh")
 weigh_corr_w_curr <- rbind(weigh_corr_lea_w_curr, weigh_corr_rda_w_curr, weigh_corr_gf_w_curr, weigh_corr_envdist_w_curr)
 
 # put together
@@ -1189,12 +1146,19 @@ ggplot(fit_for_corplot_curr1, aes(x = label_method, y = label_coast, fill = corr
 ### Modeling & ANCOVA
 
 ```{r}
-# info for ordering, labelling, plotting
+# plotting info
 trt_labels <- c("TempControl-21psu" = "Current W Coast", "TempControl-7psu" = "Current E Coast",  "TempWarm-16psu" = "Future W Coast", "TempWarm-5psu" = "Future E Coast")
 pop_colors <- c("VIK" = "#002e5a", "VAT" = "#0130b9", "HOG" = "#0078cf", "BAR" = "#82daff", "KUR" = "#d9ed92", "KAL" = "#4ad66d", "HOR" = "#25a244", "BJO" = "#155d27")
 pop_order <- data.frame(pop = c("VIK", "VAT", "HOG", "BAR", "KUR", "KAL", "HOR", "BJO"), pop_order = 1:8)
 trt_colors <- c("Current W Coast" = "#FFA203", "Current E Coast" = "#FE691E",  "Future W Coast" = "deeppink", "Future E Coast" = "deeppink4")
 trt_order <- data.frame(trt_name = c("Current W Coast", "Current E Coast", "Future W Coast", "Future E Coast"), trt_order = 1:4)
+coast_cols <- c("east" = "#2b991f", "west" = "#1f4699")
+coast_shapes <- c("east" = 21, "west" = 23)
+we_cols_fill <- c(pop_colors, coast_cols)
+
+# combine with data
+go_surv_plot <- merge(go_surv_ind, pop_order, by = "pop")
+go_surv_plot_fact <- merge(go_surv, pop_order, by = "pop")
 ```
 
 By population: survival
@@ -1401,22 +1365,7 @@ letters_surv_gf_mll_coast <- cld(emm_surv_gf_mll_coast, Letters = letters)
 
 #### Plotting Info
 
-```{r}
-# plotting info
-trt_labels <- c("TempControl-21psu" = "Current W Coast", "TempControl-7psu" = "Current E Coast",  "TempWarm-16psu" = "Future W Coast", "TempWarm-5psu" = "Future E Coast")
-pop_colors <- c("VIK" = "#002e5a", "VAT" = "#0130b9", "HOG" = "#0078cf", "BAR" = "#82daff", "KUR" = "#d9ed92", "KAL" = "#4ad66d", "HOR" = "#25a244", "BJO" = "#155d27")
-pop_order <- data.frame(pop = c("VIK", "VAT", "HOG", "BAR", "KUR", "KAL", "HOR", "BJO"), pop_order = 1:8)
-trt_colors <- c("Current W Coast" = "#FFA203", "Current E Coast" = "#FE691E",  "Future W Coast" = "deeppink", "Future E Coast" = "deeppink4")
-trt_order <- data.frame(trt_name = c("Current W Coast", "Current E Coast", "Future W Coast", "Future E Coast"), trt_order = 1:4)
-coast_cols <- c("east" = "#2b991f", "west" = "#1f4699")
-coast_shapes <- c("east" = 21, "west" = 23)
-we_cols_fill <- c(pop_colors, coast_cols)
-
-# combine with data
-go_surv_plot <- merge(go_surv, pop_order, by = "pop")
-```
-
-By individual: mll only
+By individual, clim only: mll only
 
 ```{r}
 ## lea
@@ -1434,8 +1383,8 @@ surv_mll_binlog_lea <- go_surv_plot %>%
   scale_colour_manual(name = "Population",
                     values = pop_colors) +
   scale_shape_manual(name = "Coast",
-                    values = c(21, 23),
-                    labels = c("West Coast", "East Coast")) +
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_mll_binlog_lea
@@ -1443,8 +1392,8 @@ surv_mll_binlog_lea
 # mll, single coast line
 surv_mll_coast_binlog_lea <- go_surv_plot %>%
   filter(method == "lea_offset" & cc == "mll") %>%
-  ggplot(aes(x = offset, y = isAlive, fill = coast_pop)) + 
-  geom_point(size = 2, shape = 21) + 
+  ggplot(aes(x = offset, y = isAlive, fill = coast_pop, shape = coast_pop)) + 
+  geom_point(size = 3) + 
   geom_smooth(aes(col = coast_pop), method = "glm", method.args = list(family = "binomial"), se = T) + 
   labs(title = "Survival in Current and Future Treatments vs \nLEA Offset", 
        x = "LEA Offset", y = "Survival") +
@@ -1452,6 +1401,9 @@ surv_mll_coast_binlog_lea <- go_surv_plot %>%
                     values = coast_cols) +
   scale_colour_manual(name = "Coast",
                     values = coast_cols) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_mll_coast_binlog_lea
@@ -1460,13 +1412,16 @@ surv_mll_coast_binlog_lea
 surv_mll_fut_all_lea <- go_surv_plot %>%
   filter(method == "lea_offset" & cc == "mll" & curr_fut == "future") %>%
   ggplot(aes(x = offset, y = isAlive)) +
-  geom_point(aes(fill = fct_reorder(pop, pop_order)), size = 2, shape = 21) + 
+  geom_point(aes(fill = fct_reorder(pop, pop_order), shape = coast_pop), size = 3) + 
   geom_smooth(method = "lm", colour = "black", se = T) + 
   labs(title = "Future Survival vs LEA Offset", 
        x = "LEA Offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = we_cols_fill,
                     breaks = names(pop_colors)) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_mll_fut_all_lea
@@ -1478,7 +1433,7 @@ surv_mll_fut_all_lea
 surv_mll_binlog_rda <- go_surv_plot %>%
   filter(method == "rda_offset" & cc == "mll") %>%
   ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
-  geom_point(size = 2, shape = 21) + 
+  geom_point(aes(shape = coast_pop), size = 3) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
   labs(title = "Survival in Current and Future Treatments vs \nRDA Offset", 
        x = "RDA Offset", y = "Survival") +
@@ -1488,7 +1443,7 @@ surv_mll_binlog_rda <- go_surv_plot %>%
                     values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
-                    labels = c("West Coast", "East Coast")) +
+                    labels = c("Baltic Sea", "North Sea")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_mll_binlog_rda
@@ -1497,14 +1452,19 @@ surv_mll_binlog_rda
 surv_mll_coast_binlog_rda <- go_surv_plot %>%
   filter(method == "rda_offset" & cc == "mll") %>%
   ggplot(aes(x = offset, y = isAlive, fill = coast_pop)) + 
-  geom_point(size = 2, shape = 21) + 
+  geom_point(aes(shape = coast_pop), size = 3) + 
   geom_smooth(aes(col = coast_pop), method = "glm", method.args = list(family = "binomial"), se = T) + 
   labs(title = "Survival in Current and Future Treatments vs \nRDA Offset", 
        x = "RDA Offset", y = "Survival") +
   scale_fill_manual(name = "Coast",
-                    values = coast_cols) +
+                    values = coast_cols, 
+                    labels = c("Baltic Sea", "North Sea")) +
   scale_colour_manual(name = "Coast",
-                    values = coast_cols) +
+                    values = coast_cols,
+                    labels = c("Baltic Sea", "North Sea")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_mll_coast_binlog_rda
@@ -1513,13 +1473,16 @@ surv_mll_coast_binlog_rda
 surv_mll_fut_all_rda <- go_surv_plot %>%
   filter(method == "rda_offset" & cc == "mll" & curr_fut == "future") %>%
   ggplot(aes(x = offset, y = isAlive)) +
-  geom_point(aes(fill = fct_reorder(pop, pop_order)), size = 2, shape = 21) + 
+  geom_point(aes(fill = fct_reorder(pop, pop_order), shape = coast_pop), size = 3) + 
   geom_smooth(method = "lm", colour = "black", se = T) + 
   labs(title = "Future Survival vs RDA Offset", 
        x = "RDA Offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = we_cols_fill,
                     breaks = names(pop_colors)) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_mll_fut_all_rda
@@ -1531,7 +1494,7 @@ surv_mll_fut_all_rda
 surv_mll_binlog_gf <- go_surv_plot %>%
   filter(method == "gf_offset" & cc == "mll") %>%
   ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
-  geom_point(size = 2, shape = 21) + 
+  geom_point(aes(shape = coast_pop), size = 3) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
   labs(title = "Survival in Current and Future Treatments vs \nGF Offset", 
        x = "GF Offset", y = "Survival") +
@@ -1541,7 +1504,7 @@ surv_mll_binlog_gf <- go_surv_plot %>%
                     values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
-                    labels = c("West Coast", "East Coast")) +
+                    labels = c("Baltic Sea", "North Sea")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_mll_binlog_gf
@@ -1550,14 +1513,19 @@ surv_mll_binlog_gf
 surv_mll_coast_binlog_gf <- go_surv_plot %>%
   filter(method == "gf_offset" & cc == "mll") %>%
   ggplot(aes(x = offset, y = isAlive, fill = coast_pop)) + 
-  geom_point(size = 2, shape = 21) + 
+  geom_point(aes(shape = coast_pop), size = 3) + 
   geom_smooth(aes(col = coast_pop), method = "glm", method.args = list(family = "binomial"), se = T) + 
   labs(title = "Survival in Current and Future Treatments vs \nGF Offset", 
        x = "GF Offset", y = "Survival") +
   scale_fill_manual(name = "Coast",
-                    values = coast_cols) +
+                    values = coast_cols, 
+                    labels = c("Baltic Sea", "North Sea")) +
   scale_colour_manual(name = "Coast",
-                    values = coast_cols) +
+                    values = coast_cols,
+                    labels = c("Baltic Sea", "North Sea")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_mll_coast_binlog_gf
@@ -1566,13 +1534,16 @@ surv_mll_coast_binlog_gf
 surv_mll_fut_all_gf <- go_surv_plot %>%
   filter(method == "gf_offset" & cc == "mll" & curr_fut == "future") %>%
   ggplot(aes(x = offset, y = isAlive)) +
-  geom_point(aes(fill = fct_reorder(pop, pop_order)), size = 2, shape = 21) + 
+  geom_point(aes(fill = fct_reorder(pop, pop_order), shape = coast_pop), size = 3) + 
   geom_smooth(method = "lm", colour = "black", se = T) + 
   labs(title = "Future Survival vs GF Offset", 
        x = "GF Offset", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = we_cols_fill,
                     breaks = names(pop_colors)) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_mll_fut_all_gf
@@ -1582,9 +1553,9 @@ surv_mll_fut_all_gf
 ###########
 # mll
 surv_mll_binlog_envdist <- go_surv_plot %>%
-  filter(method == "env_dist" & cc == "mll") %>%
-  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
-  geom_point(size = 2, shape = 21) + 
+  filter(method == "env_dist" & cc == "none") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order), shape = coast_pop)) + # shape = fct_reorder(pop_coast, pop_coast_ord))
+  geom_point(size = 3) + 
   geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
   labs(title = "Survival in Current and Future Treatments vs \nEnvironmental Distance", 
        x = "Environmental Distance", y = "Survival") +
@@ -1594,58 +1565,446 @@ surv_mll_binlog_envdist <- go_surv_plot %>%
                     values = pop_colors) +
   scale_shape_manual(name = "Coast",
                     values = c(21, 24),
-                    labels = c("West Coast", "East Coast")) +
+                    labels = c("Baltic Sea", "North Sea")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_mll_binlog_envdist
 
 # mll, single coast line
 surv_mll_coast_binlog_envdist <- go_surv_plot %>%
-  filter(method == "env_dist" & cc == "mll") %>%
-  ggplot(aes(x = offset, y = isAlive, fill = coast_pop)) + 
-  geom_point(size = 2, shape = 21) + 
+  filter(method == "env_dist" & cc == "none") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = coast_pop, shape = coast_pop)) + 
+  geom_point(size = 3) + 
   geom_smooth(aes(col = coast_pop), method = "glm", method.args = list(family = "binomial"), se = T) + 
   labs(title = "Survival in Current and Future Treatments vs \nEnvironmental Distance", 
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Coast",
-                    values = coast_cols) +
+                    values = coast_cols, 
+                    labels = c("Baltic Sea", "North Sea")) +
   scale_colour_manual(name = "Coast",
-                    values = coast_cols) +
+                    values = coast_cols, 
+                    labels = c("Baltic Sea", "North Sea")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_mll_coast_binlog_envdist
 
 # env dist future
 surv_mll_fut_all_envdist <- go_surv_plot %>%
-  filter(method == "env_dist" & cc == "mll" & curr_fut == "future") %>%
+  filter(method == "env_dist" & cc == "none" & curr_fut == "future") %>%
   ggplot(aes(x = offset, y = isAlive)) +
-  geom_point(aes(fill = fct_reorder(pop, pop_order)), size = 2, shape = 21) + 
+  geom_point(aes(fill = fct_reorder(pop, pop_order), shape = coast_pop), size = 3) + 
   geom_smooth(method = "lm", colour = "black", se = T) + 
   labs(title = "Future Survival vs Environmental Distance", 
        x = "Environmental Distance", y = "Survival") +
   scale_fill_manual(name = "Population",
                     values = we_cols_fill,
                     breaks = names(pop_colors)) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_mll_fut_all_envdist
 ###########
 ```
 
-By coast
+Fully Factorial
 
 ```{r}
+## lea
+######
+# mll
+surv_mll_binlog_lea_fact <- go_surv_plot_fact %>%
+  filter(method == "lea_offset" & cc == "mll") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) +
+  geom_point(aes(shape = coast_pop), size = 3) + 
+  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
+  labs(title = "Survival in Current and Future Treatments vs \nLEA Offset", 
+       x = "LEA Offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = pop_colors) +
+  scale_colour_manual(name = "Population",
+                    values = pop_colors) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_binlog_lea_fact
 
+# mll, single coast line
+surv_mll_coast_binlog_lea_fact <- go_surv_plot_fact %>%
+  filter(method == "lea_offset" & cc == "mll") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = coast_pop)) + 
+  geom_point(size = 3, aes(shape = coast_pop)) + 
+  geom_smooth(aes(col = coast_pop), method = "glm", method.args = list(family = "binomial"), se = T) + 
+  labs(title = "Survival in Current and Future Treatments vs \nLEA Offset", 
+       x = "LEA Offset", y = "Survival") +
+  scale_fill_manual(name = "Coast",
+                    values = coast_cols,
+                    labels = c("Baltic Sea", "North Sea")) +
+  scale_colour_manual(name = "Coast",
+                    values = coast_cols,
+                    labels = c("Baltic Sea", "North Sea")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_coast_binlog_lea_fact
+
+# lea future
+surv_mll_fut_all_lea_fact <- go_surv_plot_fact %>%
+  filter(method == "lea_offset" & cc == "mll" & curr_fut == "future") %>%
+  ggplot(aes(x = offset, y = isAlive)) +
+  geom_point(aes(fill = fct_reorder(pop, pop_order), shape = coast_pop), size = 3) + 
+  geom_smooth(method = "lm", colour = "black", se = T) + 
+  labs(title = "Future Survival vs LEA Offset", 
+       x = "LEA Offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = we_cols_fill,
+                    breaks = names(pop_colors)) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_fut_all_lea_fact
+######
+
+## rda
+######
+# mll
+surv_mll_binlog_rda_fact <- go_surv_plot_fact %>%
+  filter(method == "rda_offset" & cc == "mll") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + 
+  geom_point(size = 3, aes(shape = coast_pop)) + 
+  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
+  labs(title = "Survival in Current and Future Treatments vs \nRDA Offset", 
+       x = "RDA Offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = pop_colors) +
+  scale_colour_manual(name = "Population",
+                    values = pop_colors) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_binlog_rda_fact
+
+# mll, single coast line
+surv_mll_coast_binlog_rda_fact <- go_surv_plot_fact %>%
+  filter(method == "rda_offset" & cc == "mll") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = coast_pop)) + 
+  geom_point(size = 3, aes(shape = coast_pop)) + 
+  geom_smooth(aes(col = coast_pop), method = "glm", method.args = list(family = "binomial"), se = T) + 
+  labs(title = "Survival in Current and Future Treatments vs \nRDA Offset", 
+       x = "RDA Offset", y = "Survival") +
+  scale_fill_manual(name = "Coast",
+                    values = coast_cols,
+                    labels = c("Baltic Sea", "North Sea")) +
+  scale_colour_manual(name = "Coast",
+                    values = coast_cols,
+                    labels = c("Baltic Sea", "North Sea")) +
+  scale_shape_manual(name = "Coast",
+                     values = c(21, 24),
+                     labels = c("Baltic Sea", "North Sea")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_coast_binlog_rda_fact
+
+# rda future
+surv_mll_fut_all_rda_fact <- go_surv_plot_fact %>%
+  filter(method == "rda_offset" & cc == "mll" & curr_fut == "future") %>%
+  ggplot(aes(x = offset, y = isAlive)) +
+  geom_point(aes(fill = fct_reorder(pop, pop_order), shape = coast_pop), size = 3) + 
+  geom_smooth(method = "lm", colour = "black", se = T) + 
+  labs(title = "Future Survival vs RDA Offset", 
+       x = "RDA Offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = we_cols_fill,
+                    breaks = names(pop_colors)) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21,24),
+                    labels = c("Baltic Sea", "North Sea")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_fut_all_rda_fact
+######
+
+## gf
+######
+# mll
+surv_mll_binlog_gf_fact <- go_surv_plot_fact %>%
+  filter(method == "gf_offset" & cc == "mll") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + 
+  geom_point(size = 3, aes(shape = coast_pop)) + 
+  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
+  labs(title = "Survival in Current and Future Treatments vs \nGF Offset", 
+       x = "GF Offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = pop_colors) +
+  scale_colour_manual(name = "Population",
+                    values = pop_colors) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_binlog_gf_fact
+
+# mll, single coast line
+surv_mll_coast_binlog_gf_fact <- go_surv_plot_fact %>%
+  filter(method == "gf_offset" & cc == "mll") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = coast_pop)) + 
+  geom_point(size = 3, aes(shape = coast_pop)) + 
+  geom_smooth(aes(col = coast_pop), method = "glm", method.args = list(family = "binomial"), se = T) + 
+  labs(title = "Survival in Current and Future Treatments vs \nGF Offset", 
+       x = "GF Offset", y = "Survival") +
+  scale_fill_manual(name = "Coast",
+                    values = coast_cols, 
+                    labels = c("Baltic Sea", "North Sea")) +
+  scale_colour_manual(name = "Coast",
+                    values = coast_cols, 
+                    labels = c("Baltic Sea", "North Sea")) +
+  scale_shape_manual(name = "Coast",
+                     values = c(21, 24),
+                     labels = c("Baltic Sea", "North Sea")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_coast_binlog_gf_fact
+
+# gf future
+surv_mll_fut_all_gf_fact <- go_surv_plot_fact %>%
+  filter(method == "gf_offset" & cc == "mll" & curr_fut == "future") %>%
+  ggplot(aes(x = offset, y = isAlive)) +
+  geom_point(aes(fill = fct_reorder(pop, pop_order), shape = coast_pop), size = 3) + 
+  geom_smooth(method = "lm", colour = "black", se = T) + 
+  labs(title = "Future Survival vs GF Offset", 
+       x = "GF Offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = we_cols_fill,
+                    breaks = names(pop_colors)) +
+  scale_shape_manual(name = "Coast",
+                     values = c(21, 24),
+                     labels = c("Baltic Sea", "North Sea")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_fut_all_gf_fact
+######
+
+## env dist
+###########
+# mll
+surv_mll_binlog_envdist_fact <- go_surv_plot_fact %>%
+  filter(method == "env_dist" & cc == "none") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = fct_reorder(pop, pop_order))) + # shape = fct_reorder(pop_coast, pop_coast_ord))
+  geom_point(size = 3, aes(shape = coast_pop)) + 
+  geom_smooth(aes(col = fct_reorder(pop, pop_order)), method = "glm", method.args = list(family = "binomial"), se = F) + 
+  labs(title = "Survival in Current and Future Treatments vs \nEnvironmental Distance", 
+       x = "Environmental Distance", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = pop_colors) +
+  scale_colour_manual(name = "Population",
+                    values = pop_colors) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_binlog_envdist_fact
+
+# mll, single coast line
+surv_mll_coast_binlog_envdist_fact <- go_surv_plot_fact %>%
+  filter(method == "env_dist" & cc == "none") %>%
+  ggplot(aes(x = offset, y = isAlive, fill = coast_pop)) + 
+  geom_point(size = 3, aes(shape = coast_pop)) + 
+  geom_smooth(aes(col = coast_pop), method = "glm", method.args = list(family = "binomial"), se = T) + 
+  labs(title = "Survival in Current and Future Treatments vs \nEnvironmental Distance", 
+       x = "Environmental Distance", y = "Survival") +
+  scale_fill_manual(name = "Coast",
+                    values = coast_cols, 
+                    labels = c("Baltic Sea", "North Sea")) +
+  scale_colour_manual(name = "Coast",
+                    values = coast_cols, 
+                    labels = c("Baltic Sea", "North Sea")) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_coast_binlog_envdist_fact
+
+# env dist future
+surv_mll_fut_all_envdist_fact <- go_surv_plot_fact %>%
+  filter(method == "env_dist" & cc == "none" & curr_fut == "future") %>%
+  ggplot(aes(x = offset, y = isAlive)) +
+  geom_point(aes(fill = fct_reorder(pop, pop_order), shape = coast_pop), size = 3) + 
+  geom_smooth(method = "lm", colour = "black", se = T) + 
+  labs(title = "Future Survival vs Environmental Distance", 
+       x = "Environmental Distance", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = we_cols_fill,
+                    breaks = names(pop_colors)) +
+  scale_shape_manual(name = "Coast",
+                    values = c(21, 24),
+                    labels = c("Baltic Sea", "North Sea")) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_mll_fut_all_envdist_fact
+###########
 ```
 
-Future outcomes only
+Simulate "Good" vs "Bad" GO-Fitness relationship
 
 ```{r}
+## simulate good
+################
+# good would have mostly 1 at left and mostly 0 at right, for both datasets
+set.seed(8750787)
+x1 <- jitter(seq(0, 3, by = 0.05), 0.01)
+a1 <- 2 # shifts drop-off point to right
+b1 <- 2 # higher number makes transition steeper
+probabilities1 <- 1 / (1 + exp(-a1 + b1 * x1))
+y_good1 <- rbinom(n = length(x1), size = 1, prob = probabilities1)
 
+set.seed(09786778)
+x2 <- jitter(seq(0, 3, by = 0.05), 0.01)
+a2 <- 1.8 # shifts drop-off point to right
+b2 <- 2.3 # higher number makes transition steeper
+probabilities2 <- 1 / (1 + exp(-a2 + b2 * x2))
+y_good2 <- rbinom(n = length(x2), size = 1, prob = probabilities2)
+################
+
+## simulate bad
+###############
+# bad would have mix of 1 and 0 across datasets, maybe even more 1s towards right
+set.seed(09347)
+x3 <- jitter(seq(0, 3, by = 0.05), 0.01)
+a3 <- 0.5 # shifts drop-off point to right
+b3 <- 1 # higher number makes transition steeper
+probabilities3 <- 1 / (1 + exp(-a3 + b3 * x3))
+y_bad1 <- rbinom(n = length(x3), size = 1, prob = probabilities3)
+
+set.seed(0934777)
+x4 <- jitter(seq(0, 3, by = 0.05), 0.01)
+a4 <- 1.6
+b4 <- 0.2
+probabilities4 <- 1 / (1 + exp(-a4 + b4 * x4))
+y_bad2 <- rbinom(n = length(x4), size = 1, prob = probabilities4)
+###############
+
+## plotting
+###########
+# put good and bad plots together
+df_good1 <- data.frame(offset = x1, fitness = y_good1, quality = "good", pop = "Population 1")
+df_good2 <- data.frame(offset = x2, fitness = y_good2, quality = "good", pop = "Population 2")
+df_bad1 <- data.frame(offset = x3, fitness = y_bad1, quality = "bad", pop = "Population 1")
+df_bad2 <- data.frame(offset = x4, fitness = y_bad2, quality = "bad", pop = "Population 2")
+
+df_sim <- rbind(df_good1, df_good2, df_bad1, df_bad2)
+
+# good plot
+surv_good <- df_sim %>%
+  filter(quality == "good") %>%
+  ggplot(aes(x = offset, y = fitness, fill = pop)) +
+  geom_point(aes(fill = pop, shape = pop), size = 3) + 
+  geom_smooth(aes(col = pop), method = "glm", method.args = list(family = "binomial"), se = T) + 
+  labs(title = "Survival vs Genomic Offset (Good)", 
+       x = "Genomic Offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#2b991f", "#1f4699")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#2b991f", "#1f4699")) +
+  scale_shape_manual(name = "Population", 
+                     values = c(21, 24)) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_good
+
+# bad plot
+surv_bad <- df_sim %>%
+  filter(quality == "bad") %>%
+  ggplot(aes(x = offset, y = fitness, fill = pop)) +
+  geom_point(aes(fill = pop, shape = pop), size = 3) + 
+  geom_smooth(aes(col = pop), method = "glm", method.args = list(family = "binomial"), se = T) + 
+  labs(title = "Survival vs Genomic Offset (Bad)", 
+       x = "Genomic Offset", y = "Survival") +
+  scale_fill_manual(name = "Population",
+                    values = c("#2b991f", "#1f4699")) +
+  scale_colour_manual(name = "Population",
+                    values = c("#2b991f", "#1f4699")) +
+  scale_shape_manual(name = "Population", 
+                     values = c(21, 24)) +
+  guides(fill = guide_legend(override.aes = list(shape = 21))) +
+  theme_minimal()
+surv_bad
+###########
 ```
 
 ### Exporting Results
 
 ```{r}
+# export all figures
+####################
+doc <- read_pptx() %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_binlog_lea_fact), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_binlog_rda_fact), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_binlog_gf_fact), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_binlog_envdist_fact), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_coast_binlog_lea_fact), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_coast_binlog_rda_fact), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_coast_binlog_gf_fact), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_coast_binlog_envdist_fact), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_fut_all_lea_fact), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_fut_all_rda_fact), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_fut_all_gf_fact), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_fut_all_envdist_fact), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_binlog_lea), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_binlog_rda), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_binlog_gf), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_binlog_envdist), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_coast_binlog_lea), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_coast_binlog_rda), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_coast_binlog_gf), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_coast_binlog_envdist), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_fut_all_lea), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_fut_all_rda), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_fut_all_gf), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_mll_fut_all_envdist), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>% 
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_good), location = ph_location(left = 1, top = 1, width = 6.5, height = 4)) %>%
+  add_slide(layout = "Title and Content", master = "Office Theme") %>% 
+  ph_with(value = dml(ggobj = surv_bad), location = ph_location(left = 1, top = 1, width = 6.5, height = 4))
+####################
 
+print(doc, "results/figures/cf_regressions_survival.pptx")
 ```
