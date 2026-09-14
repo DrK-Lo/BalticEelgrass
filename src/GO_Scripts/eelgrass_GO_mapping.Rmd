@@ -306,7 +306,7 @@ go_plotting_exp_lea <- go_plotting_exp %>% filter(method == "lea_offset")
 lea_curr_coast_avg <- ggplot(data = world) +
   theme_bw()+
   geom_sf(data = st_as_sf(interpolated_lea_curr_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
-  geom_sf(data = world_crop, fill = "white") +
+  geom_sf(data = world_crop, fill = "gray90") +
   geom_point(data = go_plotting_exp_lea, aes(x = long, y = lat, 
                                              fill = current), 
              color = "black", shape = 21, size = 4) +
@@ -332,7 +332,7 @@ lea_curr_coast_avg
 lea_fut_coast_avg <- ggplot(data = world) +
   theme_bw()+
   geom_sf(data = st_as_sf(interpolated_lea_fut_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
-  geom_sf(data = world_crop, fill = "white") +
+  geom_sf(data = world_crop, fill = "gray90") +
   geom_point(data = go_plotting_exp_lea, aes(x = long, y = lat, 
                                               fill = future), 
              shape = 21, size = 4) +
@@ -366,7 +366,7 @@ go_plotting_exp_rda <- go_plotting_exp %>% filter(method == "rda_offset")
 rda_curr_coast_avg <- ggplot(data = world) +
   theme_bw()+
   geom_sf(data = st_as_sf(interpolated_rda_curr_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
-  geom_sf(data = world_crop, fill = "white") +
+  geom_sf(data = world_crop, fill = "gray90") +
   geom_point(data = go_plotting_exp_rda, aes(x = long, y = lat, 
                                              fill = current), 
              shape = 21, size = 4) +
@@ -392,7 +392,7 @@ rda_curr_coast_avg
 rda_fut_coast_avg <- ggplot(data = world) +
   theme_bw()+
   geom_sf(data = st_as_sf(interpolated_rda_fut_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
-  geom_sf(data = world_crop, fill = "white") +
+  geom_sf(data = world_crop, fill = "gray90") +
   geom_point(data = go_plotting_exp_rda, aes(x = long, y = lat, 
                                               fill = future), 
              shape = 21, size = 4) +
@@ -426,7 +426,7 @@ go_plotting_exp_gf <- go_plotting_exp %>% filter(method == "gf_offset")
 gf_curr_coast_avg <- ggplot(data = world) +
   theme_bw()+
   geom_sf(data = st_as_sf(interpolated_gf_curr_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
-  geom_sf(data = world_crop, fill = "white") +
+  geom_sf(data = world_crop, fill = "gray90") +
   geom_point(data = go_plotting_exp_gf, aes(x = long, y = lat, 
                                              fill = current), 
              shape = 21, size = 4) +
@@ -452,7 +452,7 @@ gf_curr_coast_avg
 gf_fut_coast_avg <- ggplot(data = world) +
   theme_bw()+
   geom_sf(data = st_as_sf(interpolated_gf_fut_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
-  geom_sf(data = world_crop, fill = "white") +
+  geom_sf(data = world_crop, fill = "gray90") +
   geom_point(data = go_plotting_exp_gf, aes(x = long, y = lat, 
                                               fill = future), 
              shape = 21, size = 4) +
@@ -486,7 +486,7 @@ go_plotting_exp_env <- go_plotting_exp %>% filter(method == "env")
 env_curr_coast_avg <- ggplot(data = world) +
   theme_bw()+
   geom_sf(data = st_as_sf(interpolated_env_curr_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
-  geom_sf(data = world_crop, fill = "white") +
+  geom_sf(data = world_crop, fill = "gray90") +
   geom_point(data = go_plotting_exp_env, aes(x = long, y = lat, 
                                              fill = current), 
              shape = 21, size = 4) +
@@ -512,7 +512,7 @@ env_curr_coast_avg
 env_fut_coast_avg <- ggplot(data = world) +
   theme_bw()+
   geom_sf(data = st_as_sf(interpolated_env_fut_masked_avg), mapping = aes(fill = var1.pred, col = var1.pred)) +
-  geom_sf(data = world_crop, fill = "white") +
+  geom_sf(data = world_crop, fill = "gray90") +
   geom_point(data = go_plotting_exp_env, aes(x = long, y = lat, 
                                               fill = future), 
              shape = 21, size = 4) +

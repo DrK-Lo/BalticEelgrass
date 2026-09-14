@@ -1912,16 +1912,13 @@ df_sim <- rbind(df_good1, df_good2, df_bad1, df_bad2)
 surv_good <- df_sim %>%
   filter(quality == "good") %>%
   ggplot(aes(x = offset, y = fitness, fill = pop)) +
-  geom_point(aes(fill = pop, shape = pop), size = 3) + 
   geom_smooth(aes(col = pop), method = "glm", method.args = list(family = "binomial"), se = T) + 
   labs(title = "Survival vs Genomic Offset (Good)", 
        x = "Genomic Offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#2b991f", "#1f4699")) +
+                    values = c("grey80", "grey30")) +
   scale_colour_manual(name = "Population",
-                    values = c("#2b991f", "#1f4699")) +
-  scale_shape_manual(name = "Population", 
-                     values = c(21, 24)) +
+                    values = c("grey80", "grey30")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_good
@@ -1930,16 +1927,13 @@ surv_good
 surv_bad <- df_sim %>%
   filter(quality == "bad") %>%
   ggplot(aes(x = offset, y = fitness, fill = pop)) +
-  geom_point(aes(fill = pop, shape = pop), size = 3) + 
   geom_smooth(aes(col = pop), method = "glm", method.args = list(family = "binomial"), se = T) + 
   labs(title = "Survival vs Genomic Offset (Bad)", 
        x = "Genomic Offset", y = "Survival") +
   scale_fill_manual(name = "Population",
-                    values = c("#2b991f", "#1f4699")) +
+                    values = c("grey80", "grey30")) +
   scale_colour_manual(name = "Population",
-                    values = c("#2b991f", "#1f4699")) +
-  scale_shape_manual(name = "Population", 
-                     values = c(21, 24)) +
+                    values = c("grey80", "grey30")) +
   guides(fill = guide_legend(override.aes = list(shape = 21))) +
   theme_minimal()
 surv_bad
